@@ -17,7 +17,7 @@
     "lint": "eslint . --ext .js,.md"
   },
   "devDependencies": {
-    "vitest": "^2.1.0",
+    "vitest": "^4.1.10",
     "eslint": "^9.0.0"
   }
 }
