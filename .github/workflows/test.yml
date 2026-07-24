@@ -33,7 +33,7 @@ jobs:
         run: npm test
 
       - name: Run memory-adapter tests (node:test)
-        run: node --test packages/memory-adapter/tests/
+        run: node --test packages/memory-adapter/tests/*.test.js
 
       - name: Run install test
         run: npm run test:install
