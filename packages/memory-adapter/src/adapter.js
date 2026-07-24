@@ -1,8 +1,8 @@
 import Database from "node:sqlite";
-import { existsSync, mkdirSync, readFileSync, execSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_logic";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_PATH = join(__dirname, "schema.sql");
@@ -303,16 +303,16 @@ export class MemoryAdapter {
 
     return { imported: true, projectId };
   }
-}
-  exportToObsidian({ project, projectPath, outputDir }) {
+
+  async exportToObsidian({ project, projectPath, outputDir }) {
     const projectId = this.getOrCreateProject(project, projectPath);
     const decisions = this.db.prepare("SELECT * FROM decisions WHERE project_id = ?").all(projectId);
     const bugs = this.db.prepare("SELECT * FROM bug_fixes WHERE project_id = ?").all(projectId);
 
     const fs = await import("node:fs");
-    const path = await import("node:path");
+    const nodePath = await import("node:path");
 
-    const outDir = outputDir || join(process.cwd(), "docs", "decisions");
+    const outDir = outputDir || nodePath.join(process.cwd(), "docs", "decisions");
     if (!fs.existsSync(outDir)) {
       fs.mkdirSync(outDir, { recursive: true });
     }
@@ -338,7 +338,7 @@ ${d.rationale || "N/A"}
 
 [[Decisiones Anteriores]]
 `;
-      fs.writeFileSync(join(outDir, fileName), content);
+      fs.writeFileSync(nodePath.join(outDir, fileName), content);
     }
 
     for (const b of bugs) {
@@ -367,8 +367,9 @@ ${b.fix}
 
 ${b.lesson || "N/A"}
 `;
-      fs.writeFileSync(join(outDir, fileName), content);
+      fs.writeFileSync(nodePath.join(outDir, fileName), content);
     }
 
     return { decisions: decisions.length, bugs: bugs.length, outputDir: outDir };
   }
+}

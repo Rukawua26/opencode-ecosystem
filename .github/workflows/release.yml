@@ -16,14 +16,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
+      - name: Run unit tests (vitest)
         run: npm test
+
+      - name: Run memory-adapter tests (node:test)
+        run: node --test packages/memory-adapter/tests/
 
       - name: Build memory-adapter
         run: |

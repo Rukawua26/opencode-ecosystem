@@ -11,7 +11,7 @@ const DEFAULT_DB_PATH = join(process.env.HOME || process.env.USERPROFILE || "/tm
 const commands = {
   init: {
     description: "Initialize memory adapter database",
-    run: (args) => {
+    run: async (args) => {
       const dbPath = args.db || DEFAULT_DB_PATH;
       const dir = dirname(dbPath);
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });

@@ -29,8 +29,11 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
-      - name: Run unit tests
+      - name: Run vitest tests
         run: npm test
+
+      - name: Run memory-adapter tests (node:test)
+        run: node --test packages/memory-adapter/tests/
 
       - name: Run install test
         run: npm run test:install
