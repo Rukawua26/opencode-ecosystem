@@ -1,0 +1,61 @@
+name: CI - Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: [18, 20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run lint
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run install test
+        run: npm run test:install
+        env:
+          HOME: /tmp/test-home
+
+  install-validation:
+    runs-on: ubuntu-latest
+    container: node:22-alpine
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install git
+        run: apk add --no-cache git bash
+
+      - name: Run install.sh
+        run: |
+          mkdir -p /tmp/test-home
+          HOME=/tmp/test-home bash install.sh --verbose --skip-memory
+
+      - name: Verify structure
+        run: |
+          test -f /tmp/test-home/.config/opencode/opencode.jsonc
+          test -d /tmp/test-home/.config/opencode/agents
+          test -d /tmp/test-home/.config/opencode/plugins
+          test -d /tmp/test-home/.config/opencode/mcp
+          test -d /tmp/test-home/opencode-custom/skills
+          echo "Install validation OK"

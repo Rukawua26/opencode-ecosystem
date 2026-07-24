@@ -1,0 +1,88 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "small_model": "openai/gpt-5.4-mini",
+  "subagent_depth": 1,
+  "experimental": {
+    "batch_tool": true,
+    "disable_paste_summary": true
+  },
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "tail_turns": 6
+  },
+  "tool_output": {
+    "max_lines": 200,
+    "max_bytes": 8192
+  },
+  "attachment": {
+    "image": {
+      "auto_resize": true,
+      "max_width": 1200,
+      "max_height": 1200
+    }
+  },
+  "agent": {
+    "explore": {
+      "model": "openai/gpt-5.4-mini",
+      "steps": 8,
+      "permission": { "edit": "deny", "bash": "deny", "task": "deny" }
+    },
+    "scout": {
+      "model": "openai/gpt-5.4-mini",
+      "steps": 8,
+      "permission": { "edit": "deny", "bash": "deny", "task": "deny" }
+    },
+    "title": { "model": "openai/gpt-5.4-mini" },
+    "summary": { "model": "openai/gpt-5.4-mini" },
+    "compaction": { "model": "openai/gpt-5.6-sol" }
+  },
+  "skills": {
+    "paths": ["~/opencode-custom/skills"]
+  },
+  "plugin": [
+    "./plugins/personalities.js",
+    "./plugins/guardrails.js",
+    "./plugins/checkpoints.js",
+    "./plugins/kanban.js",
+    "./plugins/sandbox.js",
+    "./plugins/validator.js",
+    "./plugins/session-metrics.js"
+  ],
+  "mcp": {
+    "memory-adapter": {
+      "type": "local",
+      "command": ["node", "~/.config/opencode/mcp/memory-adapter/src/mcp-server.js"],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "local-model-router": {
+      "type": "local",
+      "command": ["node", "~/.config/opencode/mcp/local-model-router.js"],
+      "enabled": true,
+      "timeout": 150000
+    },
+    "context7": {
+      "type": "local",
+      "command": ["npx", "-y", "@upstash/context7-mcp@latest"],
+      "enabled": false
+    },
+    "diagram-generator": {
+      "type": "local",
+      "command": ["npx", "-y", "mcp-diagram-generator"],
+      "enabled": false
+    }
+  },
+  // Multi-modelo por fase SDD - routeado automatico de modelo por tipo de tarea
+  // Specify/Plan: alto razonamiento (Gemini flash)
+  // Tasks/Document: ligeras (gpt-5.4-mini)
+  // Implement/Verify: robustas (gpt-5.4)
+  "sdd_multi_model": {
+    "specify":   { "model": "google/gemini-2.5-flash", "reason": "Alto razonamiento para specs" },
+    "plan":      { "model": "google/gemini-2.5-flash", "reason": "Razonamiento para diseno tecnico" },
+    "tasks":      { "model": "openai/gpt-5.4-mini",    "reason": "Tareas ligeras, descomposicion" },
+    "implement":  { "model": "openai/gpt-5.4",        "reason": "Implementacion robusta" },
+    "verify":     { "model": "openai/gpt-5.4",        "reason": "Deteccion de bugs, validacion" },
+    "document":   { "model": "openai/gpt-5.4-mini",   "reason": "Documentacion ligera" }
+  }
+}

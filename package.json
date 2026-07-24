@@ -1,0 +1,23 @@
+{
+  "name": "opencode-ecosystem",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open source ecosystem for OpenCode: memory, SDD, skills, multi-model agents",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rukawua26/opencode-ecosystem.git"
+  },
+  "author": "Rukawua26",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:install": "bash tests/install.test.sh",
+    "lint": "eslint . --ext .js,.md"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0",
+    "eslint": "^9.0.0"
+  }
+}

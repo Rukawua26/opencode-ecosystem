@@ -1,0 +1,61 @@
+name: Install Script Test
+
+on:
+  push:
+    paths:
+      - 'install.sh'
+      - '.github/workflows/install-test.yml'
+  pull_request:
+    paths:
+      - 'install.sh'
+
+jobs:
+  test-install-linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ["ubuntu:22.04", "ubuntu:24.04", "alpine:3.20", "node:22-alpine"]
+    container: ${{ matrix.container }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deps (apt)
+        if: contains(matrix.container, 'ubuntu')
+        run: apt-get update && apt-get install -y git bash curl
+
+      - name: Install deps (apk)
+        if: contains(matrix.container, 'alpine')
+        run: apk add --no-cache git bash curl
+
+      - name: Run install.sh
+        run: |
+          mkdir -p /tmp/home
+          HOME=/tmp/home bash install.sh --verbose --skip-memory
+
+      - name: Verify install
+        run: |
+          test -f /tmp/home/.config/opencode/opencode.jsonc
+          test -d /tmp/home/.config/opencode/agents
+          test -d /tmp/home/.config/opencode/plugins
+          test -d /tmp/home/.config/opencode/mcp
+          test -d /tmp/home/opencode-custom/skills
+          echo "[OK] All checks passed on ${{ matrix.container }}"
+
+  test-install-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run install.sh
+        run: |
+          mkdir -p /tmp/home
+          HOME=/tmp/home bash install.sh --verbose --skip-memory
+
+      - name: Verify install
+        run: |
+          test -f /tmp/home/.config/opencode/opencode.jsonc
+          test -d /tmp/home/.config/opencode/agents
+          test -d /tmp/home/.config/opencode/plugins
+          test -d /tmp/home/.config/opencode/mcp
+          test -d /tmp/home/opencode-custom/skills
+          echo "[OK] All checks passed on macOS"
