@@ -167,6 +167,19 @@ const TOOLS = [
       required: ["project", "projectPath", "query"],
     },
   },
+  {
+    name: "export_to_obsidian",
+    description: "Export decisions and bugs to Markdown files compatible with Obsidian vault.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Project name" },
+        projectPath: { type: "string", description: "Project path" },
+        outputDir: { type: "string", description: "Output directory for Markdown files", default: "./docs/decisions" },
+      },
+      required: ["project", "projectPath"],
+    },
+  },
 ];
 
 async function handleToolCall(name, args) {
@@ -194,6 +207,8 @@ async function handleToolCall(name, args) {
         return { content: [{ type: "text", text: JSON.stringify(adapter.exportProject(args)) }] };
       case "import_project":
         return { content: [{ type: "text", text: JSON.stringify(adapter.importProject(args.data)) }] };
+      case "export_to_obsidian":
+        return { content: [{ type: "text", text: JSON.stringify(await adapter.exportToObsidian(args)) }] };
       default:
         return { isError: true, content: [{ type: "text", text: `Unknown tool: ${name}` }] };
     }

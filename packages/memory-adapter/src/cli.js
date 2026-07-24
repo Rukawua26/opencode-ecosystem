@@ -78,6 +78,25 @@ const commands = {
       adapter.close();
     },
   },
+  export_obsidian: {
+    description: "Export decisions and bugs to Markdown files for Obsidian vault",
+    run: async (args) => {
+      if (!args.project) {
+        console.error("[ERROR] --project required");
+        exit(1);
+      }
+      const { MemoryAdapter } = await import("./adapter.js");
+      const adapter = new MemoryAdapter(args.db);
+      adapter.init();
+      const result = await adapter.exportToObsidian({
+        project: args.project,
+        projectPath: args.path || process.cwd(),
+        outputDir: args.out,
+      });
+      console.log(`[OK] Exported ${result.decisions} decisions, ${result.bugs} bugs to ${result.outputDir}`);
+      adapter.close();
+    },
+  },
   status: {
     description: "Show memory adapter status",
     run: async (args) => {

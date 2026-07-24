@@ -64,10 +64,35 @@ Add to your agent's MCP config:
 | `save_architecture` | Save architectural component info |
 | `save_preference` | Save project preferences |
 | `save_session_action` | Log session actions to history |
-| `search_memory` | Search past decisions, bugs, architecture |
+| `search_memory` | Search past decisions, bugs, architecture (text-based) |
+| `search_memory_semantic` | Search using semantic embeddings (requires Ollama) |
 | `get_context` | Get recent context for a project (use at session start) |
 | `get_history` | Get session history log |
 | `export_project` | Export all memory for sharing/syncing |
+| `import_project` | Import memory from exported JSON |
+| `export_to_obsidian` | Export decisions/bugs to Markdown for Obsidian vault |
+
+## CLI Commands
+
+```bash
+# Initialize database
+memory-adapter init
+
+# Export to JSON
+memory-adapter export --project MyProject --path /path/to/project
+
+# Import from JSON
+memory-adapter import --file memory-export.json
+
+# Sync with git
+memory-adapter sync --project MyProject --path /path/to/project
+
+# Export to Obsidian Markdown
+memory-adapter export-obsidian --project MyProject --out ./docs/decisions
+
+# Check status
+memory-adapter status --project MyProject
+```
 
 ## Philosophy
 

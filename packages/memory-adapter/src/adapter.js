@@ -304,3 +304,71 @@ export class MemoryAdapter {
     return { imported: true, projectId };
   }
 }
+  exportToObsidian({ project, projectPath, outputDir }) {
+    const projectId = this.getOrCreateProject(project, projectPath);
+    const decisions = this.db.prepare("SELECT * FROM decisions WHERE project_id = ?").all(projectId);
+    const bugs = this.db.prepare("SELECT * FROM bug_fixes WHERE project_id = ?").all(projectId);
+
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+
+    const outDir = outputDir || join(process.cwd(), "docs", "decisions");
+    if (!fs.existsSync(outDir)) {
+      fs.mkdirSync(outDir, { recursive: true });
+    }
+
+    for (const d of decisions) {
+      const fileName = d.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".md";
+      const content = `---
+title: "${d.title}"
+category: "${d.category}"
+tags: [${d.tags || ""}]
+created_at: "${d.created_at}"
+---
+
+# ${d.title}
+
+${d.content}
+
+## Rationale
+
+${d.rationale || "N/A"}
+
+## Related Decisions
+
+[[Decisiones Anteriores]]
+`;
+      fs.writeFileSync(join(outDir, fileName), content);
+    }
+
+    for (const b of bugs) {
+      const fileName = "bug-" + b.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".md";
+      const content = `---
+title: "${b.title}"
+tags: [${b.tags || ""}]
+created_at: "${b.created_at}"
+---
+
+# ${b.title}
+
+## Description
+
+${b.description}
+
+## Root Cause
+
+${b.root_cause || "N/A"}
+
+## Fix
+
+${b.fix}
+
+## Lesson
+
+${b.lesson || "N/A"}
+`;
+      fs.writeFileSync(join(outDir, fileName), content);
+    }
+
+    return { decisions: decisions.length, bugs: bugs.length, outputDir: outDir };
+  }
