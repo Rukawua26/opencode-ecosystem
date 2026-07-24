@@ -64,6 +64,24 @@ CREATE TABLE IF NOT EXISTS session_history (
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
 
+-- Embedding support for semantic search (optional, requires sqlite-vec extension)
+CREATE TABLE IF NOT EXISTS decision_embeddings (
+  id INTEGER PRIMARY KEY,
+  decision_id INTEGER NOT NULL,
+  embedding BLOB,
+  FOREIGN KEY (decision_id) REFERENCES decisions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS bug_embedding_cache (
+  id INTEGER PRIMARY KEY,
+  bug_id INTEGER NOT NULL,
+  embedding BLOB,
+  FOREIGN KEY (bug_id) REFERENCES bug_fixes(id) ON DELETE CASCADE
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS decision_embeddings_v USING fts5(id, title, content, tokenize='embed');
+CREATE VIRTUAL TABLE IF NOT EXISTS bug_embeddings_v USING fts5(id, title, description, fix, tokenize='embed');
+
 CREATE INDEX IF NOT EXISTS idx_decisions_project ON decisions(project_id);
 CREATE INDEX IF NOT EXISTS idx_bugfixes_project ON bug_fixes(project_id);
 CREATE INDEX IF NOT EXISTS idx_architecture_project ON architecture(project_id);

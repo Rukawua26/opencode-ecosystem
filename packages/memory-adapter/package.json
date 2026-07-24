@@ -7,7 +7,7 @@
   "type": "module",
   "main": "src/adapter.js",
   "bin": {
-    "memory-adapter": "src/cli.js"
+    "memory-adapter": "./src/cli.js"
   },
   "exports": {
     ".": "./src/adapter.js",
@@ -15,10 +15,11 @@
   },
   "scripts": {
     "start": "node src/mcp-server.js",
+    "cli": "node src/cli.js",
     "test": "node --test tests/",
     "build": "echo 'No build step needed - native Node.js'"
   },
   "dependencies": {
-    "node:sqlite": "*"
+    "node:sqlite": "^0.5.0"
   }
 }

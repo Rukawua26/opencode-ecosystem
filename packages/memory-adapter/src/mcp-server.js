@@ -141,6 +141,32 @@ const TOOLS = [
       required: ["project", "projectPath"],
     },
   },
+  {
+    name: "import_project",
+    description: "Import memory data for a project. Used for syncing/sharing memory between team members.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        data: { type: "object", description: "Exported project data from export_project" },
+      },
+      required: ["data"],
+    },
+  },
+  {
+    name: "search_memory_semantic",
+    description: "Search memory using semantic embeddings (requires Ollama with nomic-embed-text).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        project: { type: "string", description: "Project name" },
+        projectPath: { type: "string", description: "Project path" },
+        query: { type: "string", description: "Search query" },
+        category: { type: "string", description: "Category filter: decisions, bugs, architecture, or null for all" },
+        limit: { type: "number", description: "Max results per category", default: 10 },
+      },
+      required: ["project", "projectPath", "query"],
+    },
+  },
 ];
 
 async function handleToolCall(name, args) {
@@ -158,12 +184,16 @@ async function handleToolCall(name, args) {
         return { content: [{ type: "text", text: JSON.stringify(adapter.saveSessionAction(args)) }] };
       case "search_memory":
         return { content: [{ type: "text", text: JSON.stringify(adapter.searchMemory(args)) }] };
+      case "search_memory_semantic":
+        return { content: [{ type: "text", text: JSON.stringify(adapter.searchMemory({ ...args, semantic: true })) }] };
       case "get_context":
         return { content: [{ type: "text", text: JSON.stringify(adapter.getContext(args)) }] };
       case "get_history":
         return { content: [{ type: "text", text: JSON.stringify(adapter.getHistory(args)) }] };
       case "export_project":
         return { content: [{ type: "text", text: JSON.stringify(adapter.exportProject(args)) }] };
+      case "import_project":
+        return { content: [{ type: "text", text: JSON.stringify(adapter.importProject(args.data)) }] };
       default:
         return { isError: true, content: [{ type: "text", text: `Unknown tool: ${name}` }] };
     }

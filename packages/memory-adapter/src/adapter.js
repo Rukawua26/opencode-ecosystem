@@ -1,7 +1,8 @@
 import Database from "node:sqlite";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, execSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_logic";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_PATH = join(__dirname, "schema.sql");
@@ -11,10 +12,39 @@ const DEFAULT_DB_PATH = join(
   ".local/share/opencode/memory-adapter/memory.db"
 );
 
+let ollamaAvailable = null;
+
+function checkOllama() {
+  if (ollamaAvailable !== null) return ollamaAvailable;
+  try {
+    execSync("ollama list", { stdio: "pipe", timeout: 2000 });
+    ollamaAvailable = true;
+    return true;
+  } catch {
+    ollamaAvailable = false;
+    return false;
+  }
+}
+
+function embedQuery(query) {
+  if (!checkOllama()) return null;
+  try {
+    const result = execSync(`ollama embed nomic-embed-text "${query.replace(/"/g, '\\"')}"`, {
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+    const parsed = JSON.parse(result);
+    return parsed?.embedding || null;
+  } catch {
+    return null;
+  }
+}
+
 export class MemoryAdapter {
   constructor(dbPath = DEFAULT_DB_PATH) {
     this.dbPath = dbPath;
     this.db = null;
+    this.useEmbeddings = checkOllama();
   }
 
   init() {
@@ -39,14 +69,10 @@ export class MemoryAdapter {
   }
 
   getOrCreateProject(name, path) {
-    const existing = this.db.prepare(
-      "SELECT id FROM projects WHERE name = ?"
-    ).get(name);
+    const existing = this.db.prepare("SELECT id FROM projects WHERE name = ?").get(name);
     if (existing) return existing.id;
 
-    const result = this.db.prepare(
-      "INSERT INTO projects (name, path) VALUES (?, ?)"
-    ).run(name, path);
+    const result = this.db.prepare("INSERT INTO projects (name, path) VALUES (?, ?)").run(name, path);
     return result.lastInsertRowid;
   }
 
@@ -56,6 +82,15 @@ export class MemoryAdapter {
       `INSERT INTO decisions (project_id, category, title, content, rationale, tags, is_private)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(projectId, category, title, content, rationale || null, tags || null, isPrivate ? 1 : 0);
+
+    if (this.useEmbeddings) {
+      const embedding = embedQuery(title + " " + (rationale || ""));
+      if (embedding) {
+        this.db.prepare("INSERT INTO decision_embeddings (decision_id, embedding) VALUES (?, ?)")
+          .run(result.lastInsertRowid, JSON.stringify(embedding));
+      }
+    }
+
     return { id: result.lastInsertRowid, saved: true };
   }
 
@@ -65,6 +100,15 @@ export class MemoryAdapter {
       `INSERT INTO bug_fixes (project_id, title, description, root_cause, fix, lesson, tags)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     ).run(projectId, title, description, rootCause || null, fix, lesson || null, tags || null);
+
+    if (this.useEmbeddings) {
+      const embedding = embedQuery(title + " " + (description || "") + " " + (fix || ""));
+      if (embedding) {
+        this.db.prepare("INSERT INTO bug_embedding_cache (bug_id, embedding) VALUES (?, ?)")
+          .run(result.lastInsertRowid, JSON.stringify(embedding));
+      }
+    }
+
     return { id: result.lastInsertRowid, saved: true };
   }
 
@@ -79,12 +123,9 @@ export class MemoryAdapter {
 
   savePreference({ project, projectPath, key, value }) {
     const projectId = project ? this.getOrCreateProject(project, projectPath) : null;
-    this.db.prepare(
-      "DELETE FROM preferences WHERE project_id IS ? AND key = ?"
-    ).run(projectId, key);
-    const result = this.db.prepare(
-      "INSERT INTO preferences (project_id, key, value) VALUES (?, ?, ?)"
-    ).run(projectId, key, value);
+    this.db.prepare("DELETE FROM preferences WHERE project_id IS ? AND key = ?").run(projectId, key);
+    const result = this.db.prepare("INSERT INTO preferences (project_id, key, value) VALUES (?, ?, ?)")
+      .run(projectId, key, value);
     return { id: result.lastInsertRowid, saved: true };
   }
 
@@ -97,25 +138,61 @@ export class MemoryAdapter {
     return { id: res.lastInsertRowid, saved: true };
   }
 
-  searchMemory({ project, query, category, limit = 10 }) {
+  searchMemory({ project, query, category, limit = 10, semantic = true }) {
     const projectId = project ? this.getOrCreateProject(project, "") : null;
     const results = {};
     const likeQuery = `%${query || ""}%`;
 
+    const needSemantic = semantic && this.useEmbeddings && query;
+
     if (!category || category === "decisions") {
-      results.decisions = this.db.prepare(
-        `SELECT id, category, title, content, rationale, tags, created_at
-         FROM decisions WHERE project_id = ? AND (title LIKE ? OR content LIKE ? OR tags LIKE ?)
-         ORDER BY created_at DESC LIMIT ?`
-      ).all(projectId, likeQuery, likeQuery, likeQuery, limit);
+      if (needSemantic) {
+        const embedding = embedQuery(query);
+        if (embedding) {
+          const rows = this.db.prepare(
+            `SELECT d.id, d.category, d.title, d.content, d.rationale, d.tags, d.created_at,
+                    de.embedding
+             FROM decisions d
+             LEFT JOIN decision_embeddings de ON d.id = de.decision_id
+             WHERE d.project_id = ?
+             ORDER BY (CASE WHEN de.embedding IS NOT NULL THEN 1 ELSE 0 END) DESC, d.created_at DESC
+             LIMIT ?`
+          ).all(projectId, limit);
+          results.decisions = rows;
+        }
+      }
+      if (!semantic || !needSemantic) {
+        results.decisions = this.db.prepare(
+          `SELECT id, category, title, content, rationale, tags, created_at
+           FROM decisions WHERE project_id = ? AND (title LIKE ? OR content LIKE ? OR tags LIKE ?)
+           ORDER BY created_at DESC LIMIT ?`
+        ).all(projectId, likeQuery, likeQuery, likeQuery, limit);
+      }
     }
 
     if (!category || category === "bugs") {
-      results.bugs = this.db.prepare(
-        `SELECT id, title, description, root_cause, fix, lesson, tags, created_at
-         FROM bug_fixes WHERE project_id = ? AND (title LIKE ? OR description LIKE ? OR tags LIKE ?)
-         ORDER BY created_at DESC LIMIT ?`
-      ).all(projectId, likeQuery, likeQuery, likeQuery, limit);
+      if (needSemantic) {
+        const embedding = embedQuery(query);
+        if (embedding) {
+          const rows = this.db.prepare(
+            `SELECT b.id, b.title, b.description, b.root_cause, b.fix, b.lesson, b.tags, b.created_at,
+                    be.embedding
+             FROM bug_fixes b
+             LEFT JOIN bug_embedding_cache be ON b.id = be.bug_id
+             WHERE b.project_id = ?
+             ORDER BY (CASE WHEN be.embedding IS NOT NULL THEN 1 ELSE 0 END) DESC, b.created_at DESC
+             LIMIT ?`
+          ).all(projectId, limit);
+          results.bugs = rows;
+        }
+      }
+      if (!semantic || !needSemantic) {
+        results.bugs = this.db.prepare(
+          `SELECT id, title, description, root_cause, fix, lesson, tags, created_at
+           FROM bug_fixes WHERE project_id = ? AND (title LIKE ? OR description LIKE ? OR tags LIKE ?)
+           ORDER BY created_at DESC LIMIT ?`
+        ).all(projectId, likeQuery, likeQuery, likeQuery, limit);
+      }
     }
 
     if (!category || category === "architecture") {
@@ -149,6 +226,8 @@ export class MemoryAdapter {
       "SELECT key, value FROM preferences WHERE project_id = ?"
     ).all(projectId);
 
+    context.ollamaAvailable = this.useEmbeddings;
+
     return context;
   }
 
@@ -168,6 +247,60 @@ export class MemoryAdapter {
       architecture: this.db.prepare("SELECT * FROM architecture WHERE project_id = ?").all(projectId),
       preferences: this.db.prepare("SELECT * FROM preferences WHERE project_id = ?").all(projectId),
       history: this.db.prepare("SELECT * FROM session_history WHERE project_id = ?").all(projectId),
+      ollamaAvailable: this.useEmbeddings,
     };
+  }
+
+  importProject(data) {
+    const projectId = this.getOrCreateProject(data.project.name || "imported", data.project.path || "");
+    const clearTables = [
+      "DELETE FROM decisions WHERE project_id = ?",
+      "DELETE FROM bug_fixes WHERE project_id = ?",
+      "DELETE FROM architecture WHERE project_id = ?",
+      "DELETE FROM preferences WHERE project_id = ?",
+      "DELETE FROM session_history WHERE project_id = ?",
+      "DELETE FROM decision_embeddings WHERE decision_id NOT IN (SELECT id FROM decisions)",
+      "DELETE FROM bug_embedding_cache WHERE bug_id NOT IN (SELECT id FROM bug_fixes)",
+    ];
+    for (const sql of clearTables) {
+      this.db.prepare(sql).run(projectId);
+    }
+
+    if (data.decisions) {
+      for (const d of data.decisions) {
+        this.db.prepare(
+          "INSERT INTO decisions (id, project_id, category, title, content, rationale, tags, is_private, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).run(d.id, projectId, d.category, d.title, d.content, d.rationale, d.tags, d.is_private, d.created_at);
+      }
+    }
+    if (data.bugFixes) {
+      for (const b of data.bugFixes) {
+        this.db.prepare(
+          "INSERT INTO bug_fixes (id, project_id, title, description, root_cause, fix, lesson, tags, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).run(b.id, projectId, b.title, b.description, b.root_cause, b.fix, b.lesson, b.tags, b.created_at);
+      }
+    }
+    if (data.architecture) {
+      for (const a of data.architecture) {
+        this.db.prepare(
+          "INSERT INTO architecture (id, project_id, component, description, rationale, tags, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ).run(a.id, projectId, a.component, a.description, a.rationale, a.tags, a.created_at);
+      }
+    }
+    if (data.preferences) {
+      for (const p of data.preferences) {
+        this.db.prepare("INSERT INTO preferences (id, project_id, key, value, created_at) VALUES (?, ?, ?, ?, ?)")
+          .run(p.id, projectId, p.key, p.value, p.created_at);
+      }
+    }
+    if (data.history) {
+      for (const h of data.history) {
+        this.db.prepare(
+          "INSERT INTO session_history (id, project_id, session_id, action, detail, result, files_touched, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).run(h.id, projectId, h.session_id, h.action, h.detail, h.result, h.files_touched, h.created_at);
+      }
+    }
+
+    return { imported: true, projectId };
   }
 }

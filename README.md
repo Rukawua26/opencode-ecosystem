@@ -1,5 +1,11 @@
 # OpenCode Ecosystem
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/Rukawua26/opencode-ecosystem/workflows/CI%20-%20Tests/badge.svg)](https://github.com/Rukawua26/opencode-ecosystem/actions)
+[![Install Test](https://github.com/Rukawua26/opencode-ecosystem/workflows/Install%20Validation/badge.svg)](https://github.com/Rukawua26/opencode-ecosystem/actions)
+[![npm](https://badge.fury.io/js/@mizramilan/memory-adapter.svg)](https://www.npmjs.com/package/@mizramilan/memory-adapter)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/Rukawua26/opencode-ecosystem)
+
 > Un comando. Cualquier agente. Cualquier OS.
 > Ecosistema open source para potenciar OpenCode con memoria persistente, SDD, skills, multi-modelo y multiagentes.
 
@@ -13,15 +19,51 @@
 
 ## Quick Start
 
+### Linux / macOS
+
 ```bash
 curl -sSL https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.sh | bash
 ```
 
-Con verbose:
+Con verbose (debugging):
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.sh | bash -s -- --verbose
 ```
+
+### Windows (PowerShell)
+
+```powershell
+iwr -useb https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.ps1 | iex
+```
+
+O descargando directamente:
+
+```powershell
+git clone https://github.com/Rukawua26/opencode-ecosystem.git
+cd opencode-ecosystem
+.\install.ps1
+```
+
+## Herramientas
+
+### Doctor - Verificar salud del ecosistema
+
+```bash
+# Ejecutar desde el repo
+node tools/scripts/doctor.js
+
+# O desde cualquier lugar (instalado por install.sh)
+opencode-ecosystem-doctor
+```
+
+El comando `doctor` verifica:
+- Dependencias (Node.js, npm, git)
+- Estructura de directorios de OpenCode
+- Skills instalados
+- Memory Adapter y MCP
+- Servidor Ollama local
+- API Keys configuradas
 
 ## Que incluye
 
