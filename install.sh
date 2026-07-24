@@ -168,6 +168,13 @@ copy_config() {
     cp "$repo_dir/.env.example" "$OPENCODE_DIR/.env.example"
     info ".env.example copied (configure your API keys manually)"
   fi
+
+  # Global commands (opencode-doctor, memory-adapter CLI)
+  if [[ -f "$repo_dir/tools/scripts/opencode-doctor.sh" ]]; then
+    cp "$repo_dir/tools/scripts/opencode-doctor.sh" "$OPENCODE_BIN_DIR/opencode-doctor"
+    chmod +x "$OPENCODE_BIN_DIR/opencode-doctor"
+    info "opencode-doctor installed globally at $OPENCODE_BIN_DIR/opencode-doctor"
+  fi
 }
 
 # Install memory adapter
@@ -194,6 +201,13 @@ install_memory() {
     log "Installing memory adapter dependencies..."
     (cd "$mem_dir" && npm install --production 2>/dev/null) || warn "Failed to install memory adapter deps, run 'npm install' manually in $mem_dir"
     info "Memory adapter installed at $mem_dir"
+  fi
+
+  # Link global CLI
+  if [[ -f "$mem_dir/src/cli.js" ]]; then
+    cp "$mem_dir/src/cli.js" "$OPENCODE_BIN_DIR/memory-adapter"
+    chmod +x "$OPENCODE_BIN_DIR/memory-adapter"
+    info "memory-adapter CLI installed globally at $OPENCODE_BIN_DIR/memory-adapter"
   fi
 
   # Link MCP server in config
