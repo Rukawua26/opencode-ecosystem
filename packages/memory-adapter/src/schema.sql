@@ -79,8 +79,8 @@ CREATE TABLE IF NOT EXISTS bug_embedding_cache (
   FOREIGN KEY (bug_id) REFERENCES bug_fixes(id) ON DELETE CASCADE
 );
 
-CREATE VIRTUAL TABLE IF NOT EXISTS decision_embeddings_v USING fts5(id, title, content, tokenize='embed');
-CREATE VIRTUAL TABLE IF NOT EXISTS bug_embeddings_v USING fts5(id, title, description, fix, tokenize='embed');
+CREATE VIRTUAL TABLE IF NOT EXISTS decision_embeddings_v USING fts5(id UNINDEXED, title, content, tokenize='porter');
+CREATE VIRTUAL TABLE IF NOT EXISTS bug_embeddings_v USING fts5(id UNINDEXED, title, description, fix, tokenize='porter');
 
 CREATE INDEX IF NOT EXISTS idx_decisions_project ON decisions(project_id);
 CREATE INDEX IF NOT EXISTS idx_bugfixes_project ON bug_fixes(project_id);

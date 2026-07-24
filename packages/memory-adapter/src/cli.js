@@ -17,7 +17,7 @@ const commands = {
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
       const schema = readFileSync(join(__dirname, "schema.sql"), "utf-8");
       const Database = (await import("node:sqlite")).default;
-      const db = new Database(dbPath);
+      const db = new DatabaseSync(dbPath);
       db.exec(schema);
       db.close();
       console.log(`[OK] Database initialized at ${dbPath}`);

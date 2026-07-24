@@ -1,4 +1,4 @@
-import Database from "node:sqlite";
+import { DatabaseSync } from "node:sqlite";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { join, dirname } from "node:path";
@@ -51,7 +51,7 @@ export class MemoryAdapter {
     const dir = dirname(this.dbPath);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
-    this.db = new Database(this.dbPath);
+    this.db = new DatabaseSync(this.dbPath);
     this.db.exec("PRAGMA journal_mode = WAL;");
     this.db.exec("PRAGMA foreign_keys = ON;");
 
