@@ -1,6 +1,6 @@
 {
   "name": "@mizramilan/memory-adapter",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Universal memory adapter with SQLite and MCP server for any AI coding agent (OpenCode, Claude Code, Cursor, etc.)",
   "license": "MIT",
   "author": "Rukawua26",
