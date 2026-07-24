@@ -1,11 +1,11 @@
-# @mizramilan/memory-adapter
+# opencode-memory-adapter
 
 Universal memory adapter with SQLite + MCP server. Works with any AI coding agent that supports MCP: OpenCode, Claude Code, Cursor, Codex, VS Code Copilot, etc.
 
 ## Installation
 
 ```bash
-npm install -g @mizramilan/memory-adapter
+npm install -g opencode-memory-adapter
 ```
 
 Or via ecosystem install:
