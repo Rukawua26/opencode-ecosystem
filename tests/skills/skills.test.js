@@ -10,7 +10,7 @@ function getSkillDirs() {
   if (!existsSync(skillsDir)) return [];
   return readdirSync(skillsDir).filter((f) => {
     const p = join(skillsDir, f);
-    return statSync(p).isDirectory();
+    return statSync(p).isDirectory() && !f.startsWith("zz-test-");
   });
 }
 
