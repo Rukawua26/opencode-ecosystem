@@ -7,8 +7,9 @@
   <img src="https://img.shields.io/badge/Node.js-22+-green?style=for-the-badge&logo=node.js" alt="Node.js 22+" />
   <img src="https://img.shields.io/badge/CI-green?style=for-the-badge&logo=githubactions" alt="CI" />
   <img src="https://img.shields.io/badge/Install%20Test-passing-brightgreen?style=for-the-badge" alt="Install Test" />
-  <img src="https://img.shields.io/npm/v/@rukawua26/opencode-memory-adapter/1.3.0?color=blue&style=for-the-badge" alt="npm v1.3.0" />
+  <img src="https://img.shields.io/npm/v/@rukawua26/opencode-memory-adapter?color=blue&style=for-the-badge" alt="npm version" />
   <img src="https://img.shields.io/npm/dt/@rukawua26/opencode-memory-adapter?color=cyan&style=for-the-badge" alt="npm downloads" />
+  <img src="https://img.shields.io/badge/GitHub%20Pages-online-brightgreen?style=for-the-badge&logo=github&link=https://rukawua26.github.io/opencode-ecosystem/" alt="GitHub Pages" />
   <img src="https://img.shields.io/github/stars/Rukawua26/opencode-ecosystem?style=for-the-badge&color=ff6b6b" alt="GitHub stars" />
 </p>
 
