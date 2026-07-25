@@ -7,5 +7,5 @@
 - 16+ Agentes especializados
 - Multi-modelo automatico
 
-[Comenzar](quick-start.md)
+[Comenzar](#/guides/quick-start.md)
 [GitHub](https://github.com/Rukawua26/opencode-ecosystem)
