@@ -33,6 +33,6 @@ jobs:
       - name: Release
         env:
           GH_TOKEN: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx semantic-release
