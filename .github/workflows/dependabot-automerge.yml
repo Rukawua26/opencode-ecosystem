@@ -1,0 +1,53 @@
+name: Dependabot Auto-Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  automerge:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Wait for CI checks to complete
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          PR_REF=${{ github.event.pull_request.head.sha }}
+          MAX_WAIT=600
+          INTERVAL=30
+          ELAPSED=0
+
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            STATUS=$(gh pr checks $PR_NUMBER --repo ${{ github.repository }} --json name,state,conclusion 2>&1)
+            echo "Check status: $STATUS"
+
+            # Check if all checks are complete
+            PENDING=$(echo "$STATUS" | jq '[.[] | select(.state != "COMPLETE")] | length')
+            if [ "$PENDING" = "0" ]; then
+              echo "All checks complete."
+              break
+            fi
+
+            echo "Waiting for checks... ($ELAPSED/$MAX_WAIT seconds elapsed)"
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          # Verify all checks passed
+          FAILED=$(gh pr checks $PR_NUMBER --repo ${{ github.repository }} --json name,conclusion | jq '[.[] | select(.conclusion != "SUCCESS" and .conclusion != "NEUTRAL" and .conclusion != "SKIPPED")] | length')
+          if [ "$FAILED" != "0" ]; then
+            echo "Some CI checks failed. Not merging."
+            exit 1
+          fi
+
+          echo "All CI checks passed. Ready to merge."
+        env:
+          GH_TOKEN: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
+
+      - name: Merge Dependabot PR
+        run: gh pr merge ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --squash --delete-branch --admin
+        env:
+          GH_TOKEN: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
