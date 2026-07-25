@@ -9,7 +9,14 @@ const pluginsDir = join(__dirname, "..", "..", "config", "plugins");
 
 function getPluginFiles() {
   if (!existsSync(pluginsDir)) return [];
-  return readdirSync(pluginsDir).filter((f) => f.endsWith(".js") && !f.startsWith("zz-test-"));
+  return readdirSync(pluginsDir).filter((f) => {
+    if (!f.endsWith(".js") || f.startsWith("zz-test-")) return false;
+    try {
+      return true;
+    } catch {
+      return false;
+    }
+  });
 }
 
 describe("Plugins structure", () => {

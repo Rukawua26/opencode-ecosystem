@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -7,13 +7,19 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
 
+function cleanupTestArtifacts() {
+  const skillDir = join(repoRoot, "skills", "zz-test-scaffold-skill");
+  const pluginFile = join(repoRoot, "config", "plugins", "zz-test-scaffold-plugin.js");
+  if (existsSync(skillDir)) rmSync(skillDir, { recursive: true, force: true });
+  if (existsSync(pluginFile)) rmSync(pluginFile, { force: true });
+}
+
 describe("create-skill.sh scaffolder", () => {
   const skillName = "zz-test-scaffold-skill";
   const skillDir = join(repoRoot, "skills", skillName);
 
-  afterEach(() => {
-    if (existsSync(skillDir)) rmSync(skillDir, { recursive: true, force: true });
-  });
+  beforeEach(cleanupTestArtifacts);
+  afterEach(cleanupTestArtifacts);
 
   it("should create a skill directory with SKILL.md", () => {
     execSync(`bash ${join(repoRoot, "tools", "scripts", "create-skill.sh")} ${skillName}`, { cwd: repoRoot });
@@ -47,9 +53,8 @@ describe("create-plugin.sh scaffolder", () => {
   const pluginName = "zz-test-scaffold-plugin";
   const pluginFile = join(repoRoot, "config", "plugins", `${pluginName}.js`);
 
-  afterEach(() => {
-    if (existsSync(pluginFile)) rmSync(pluginFile, { force: true });
-  });
+  beforeEach(cleanupTestArtifacts);
+  afterEach(cleanupTestArtifacts);
 
   it("should create a plugin .js file", () => {
     execSync(`bash ${join(repoRoot, "tools", "scripts", "create-plugin.sh")} ${pluginName}`, { cwd: repoRoot });

@@ -9,8 +9,13 @@ const skillsDir = join(__dirname, "..", "..", "skills");
 function getSkillDirs() {
   if (!existsSync(skillsDir)) return [];
   return readdirSync(skillsDir).filter((f) => {
-    const p = join(skillsDir, f);
-    return statSync(p).isDirectory();
+    if (f.startsWith("zz-test-")) return false;
+    try {
+      const p = join(skillsDir, f);
+      return statSync(p).isDirectory();
+    } catch {
+      return false;
+    }
   });
 }
 
