@@ -6,7 +6,8 @@
   <img src="https://img.shields.io/badge/Licencia-MIT-yellow?style=for-the-badge&logo=opensource" alt="MIT License" />
   <img src="https://img.shields.io/badge/Node.js-22+-green?style=for-the-badge&logo=node.js" alt="Node.js 22+" />
   <img src="https://img.shields.io/badge/CI-activo-brightgreen?style=for-the-badge&logo=githubactions" alt="CI" />
-  <img src="https://img.shields.io/npm/v/@rukawua26/opencode-memory-adapter/1.3.0?color=blue&style=for-the-badge" alt="npm v1.3.0" />
+  <img src="https://img.shields.io/npm/v/@rukawua26/opencode-memory-adapter?color=blue&style=for-the-badge" alt="npm version" />
+  <img src="https://img.shields.io/badge/GitHub%20Pages-en%20linea-brightgreen?style=for-the-badge&logo=github" alt="GitHub Pages" />
 </p>
 
 <p align="center">
