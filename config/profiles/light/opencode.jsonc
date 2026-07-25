@@ -7,7 +7,7 @@
     "prune": true,
     "tail_turns": 3
   },
-  "tool_output": { "max_lines": 80, "max_bytes": 4096 },
+  "tool_output": { "max_lines": 60, "max_bytes": 2048 },
   "plugin": [
     "__OPENCODE_DIR__/plugins/guardrails.js",
     "__OPENCODE_DIR__/plugins/checkpoints.js",
@@ -15,6 +15,12 @@
     "__OPENCODE_DIR__/plugins/session-metrics.js"
   ],
   "mcp": {
+    "memory-adapter": {
+      "enabled": true
+    },
+    "local-model-router": {
+      "enabled": false
+    },
     "context7": {
       "enabled": false
     },
