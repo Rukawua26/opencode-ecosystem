@@ -17,12 +17,14 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "c8 vitest run",
     "test:install": "bash tests/install.test.sh",
     "test:hooks": "bash tests/hooks.test.sh",
     "lint": "eslint ."
   },
   "devDependencies": {
     "vitest": "^4.1.10",
-    "eslint": "^10.8.0"
+    "eslint": "^10.8.0",
+    "c8": "^10.1.3"
   }
 }
