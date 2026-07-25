@@ -8,11 +8,36 @@
   },
   "tool_output": { "max_lines": 200, "max_bytes": 8192 },
   "plugin": [
-    "/home/miguel/.config/opencode/plugins/personalities.js",
-    "/home/miguel/.config/opencode/plugins/guardrails.js",
-    "/home/miguel/.config/opencode/plugins/checkpoints.js",
-    "/home/miguel/.config/opencode/plugins/kanban.js",
-    "/home/miguel/.config/opencode/plugins/validator.js",
-    "/home/miguel/.config/opencode/plugins/session-metrics.js"
-  ]
+    "__OPENCODE_DIR__/plugins/personalities.js",
+    "__OPENCODE_DIR__/plugins/guardrails.js",
+    "__OPENCODE_DIR__/plugins/checkpoints.js",
+    "__OPENCODE_DIR__/plugins/kanban.js",
+    "__OPENCODE_DIR__/plugins/validator.js",
+    "__OPENCODE_DIR__/plugins/session-metrics.js",
+    "__OPENCODE_DIR__/plugins/auto-memory.js"
+  ],
+  "mcp": {
+    "memory-adapter": {
+      "type": "local",
+      "command": ["node", "__OPENCODE_DIR__/mcp/memory-adapter/src/mcp-server.js"],
+      "enabled": true,
+      "timeout": 30000
+    },
+    "local-model-router": {
+      "type": "local",
+      "command": ["node", "__OPENCODE_DIR__/mcp/local-model-router.js"],
+      "enabled": true,
+      "timeout": 150000
+    },
+    "context7": {
+      "type": "local",
+      "command": ["npx", "-y", "@upstash/context7-mcp@3.2.4"],
+      "enabled": true
+    },
+    "diagram-generator": {
+      "type": "local",
+      "command": ["npx", "-y", "mcp-diagram-generator@1.2.0"],
+      "enabled": true
+    }
+  }
 }

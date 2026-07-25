@@ -79,6 +79,10 @@ check_deps() {
     esac
     exit 1
   fi
+  if [[ "$(node -p 'Number(process.versions.node.split(".")[0])')" -lt 22 ]]; then
+    error "Node.js 22 or newer is required for the native node:sqlite module"
+    exit 1
+  fi
   info "Dependencies OK: node=$(node -v), npm=$(npm -v), git=$(git --version)"
 }
 
@@ -87,9 +91,11 @@ create_dirs() {
   log "Creating directories..."
   mkdir -p "$OPENCODE_DIR"
   mkdir -p "$OPENCODE_DIR/plugins"
+  mkdir -p "$OPENCODE_DIR/lib"
   mkdir -p "$OPENCODE_DIR/mcp"
   mkdir -p "$OPENCODE_DIR/agents"
   mkdir -p "$OPENCODE_DIR/profiles"
+  mkdir -p "$OPENCODE_DIR/tools"
   mkdir -p "$OPENCODE_BIN_DIR"
   mkdir -p "$HOME/.local/share/opencode/plugins-data"
   info "Directories created at $OPENCODE_DIR"
@@ -116,11 +122,12 @@ copy_config() {
 
   # opencode.jsonc
   if [[ -f "$OPENCODE_DIR/opencode.jsonc" && "$FORCE" == false ]]; then
-    warn "opencode.jsonc already exists, backing up..."
+    warn "opencode.jsonc already exists; preserving it (use --force to replace)"
     cp "$OPENCODE_DIR/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc.bak"
+  else
+    cp "$repo_dir/config/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc"
+    info "opencode.jsonc installed"
   fi
-  cp "$repo_dir/config/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc"
-  info "opencode.jsonc installed"
 
   # Agents
   log "Installing agents..."
@@ -136,6 +143,11 @@ copy_config() {
     info "Plugins copied"
   fi
 
+  if [[ -d "$repo_dir/config/lib" ]]; then
+    cp -r "$repo_dir/config/lib/"*.js "$OPENCODE_DIR/lib/" 2>/dev/null || true
+    info "Plugin libraries copied"
+  fi
+
   # MCP servers
   log "Installing MCP servers..."
   if [[ -d "$repo_dir/config/mcp" ]]; then
@@ -147,6 +159,10 @@ copy_config() {
   log "Installing profiles..."
   if [[ -d "$repo_dir/config/profiles" ]]; then
     cp -r "$repo_dir/config/profiles/"* "$OPENCODE_DIR/profiles/" 2>/dev/null || true
+    for profile in "$OPENCODE_DIR"/profiles/*/opencode.jsonc; do
+      [[ -f "$profile" ]] || continue
+      node -e 'const fs=require("node:fs"); const file=process.argv[1]; fs.writeFileSync(file, fs.readFileSync(file,"utf8").replaceAll("__OPENCODE_DIR__", process.argv[2]));' "$profile" "$OPENCODE_DIR"
+    done
     info "Profiles copied"
   fi
 
@@ -169,11 +185,18 @@ copy_config() {
     info ".env.example copied (configure your API keys manually)"
   fi
 
-  # Global commands (opencode-doctor, memory-adapter CLI)
-  if [[ -f "$repo_dir/tools/scripts/opencode-doctor.sh" ]]; then
+  # Global doctor command
+  if [[ -f "$repo_dir/tools/scripts/doctor.js" && -f "$repo_dir/tools/scripts/opencode-doctor.sh" ]]; then
+    cp "$repo_dir/tools/scripts/doctor.js" "$OPENCODE_DIR/tools/doctor.js"
     cp "$repo_dir/tools/scripts/opencode-doctor.sh" "$OPENCODE_BIN_DIR/opencode-doctor"
     chmod +x "$OPENCODE_BIN_DIR/opencode-doctor"
     info "opencode-doctor installed globally at $OPENCODE_BIN_DIR/opencode-doctor"
+  fi
+  if [[ -f "$repo_dir/tools/scripts/opencode-metrics.js" && -f "$repo_dir/tools/scripts/opencode-metrics.sh" ]]; then
+    cp "$repo_dir/tools/scripts/opencode-metrics.js" "$OPENCODE_DIR/tools/opencode-metrics.js"
+    cp "$repo_dir/tools/scripts/opencode-metrics.sh" "$OPENCODE_BIN_DIR/opencode-metrics"
+    chmod +x "$OPENCODE_BIN_DIR/opencode-metrics"
+    info "opencode-metrics installed globally at $OPENCODE_BIN_DIR/opencode-metrics"
   fi
 }
 
@@ -203,9 +226,9 @@ install_memory() {
     info "Memory adapter installed at $mem_dir"
   fi
 
-  # Link global CLI
-  if [[ -f "$mem_dir/src/cli.js" ]]; then
-    cp "$mem_dir/src/cli.js" "$OPENCODE_BIN_DIR/memory-adapter"
+  # Link global CLI through a wrapper so relative imports stay inside the package.
+  if [[ -f "$mem_dir/src/cli.js" && -f "$repo_dir/tools/scripts/memory-adapter.sh" ]]; then
+    cp "$repo_dir/tools/scripts/memory-adapter.sh" "$OPENCODE_BIN_DIR/memory-adapter"
     chmod +x "$OPENCODE_BIN_DIR/memory-adapter"
     info "memory-adapter CLI installed globally at $OPENCODE_BIN_DIR/memory-adapter"
   fi
@@ -225,6 +248,10 @@ verify_install() {
 
   check "$OPENCODE_DIR/opencode.jsonc"
   check "$OPENCODE_DIR/.env.example"
+  check "$OPENCODE_DIR/tools/doctor.js"
+  check "$OPENCODE_BIN_DIR/opencode-doctor"
+  check "$OPENCODE_DIR/lib/session-metrics.js"
+  check "$OPENCODE_BIN_DIR/opencode-metrics"
   [[ -d "$OPENCODE_DIR/agents" ]] && { checks=$((checks+1)); passed=$((passed+1)); } || warn "Missing agents dir"
   [[ -d "$OPENCODE_DIR/plugins" ]] && { checks=$((checks+1)); passed=$((passed+1)); } || warn "Missing plugins dir"
   [[ -d "$OPENCODE_DIR/mcp" ]] && { checks=$((checks+1)); passed=$((passed+1)); } || warn "Missing mcp dir"
@@ -232,6 +259,7 @@ verify_install() {
 
   if [[ "$SKIP_MEMORY" != true ]]; then
     check "$OPENCODE_DIR/mcp/memory-adapter/package.json"
+    check "$OPENCODE_BIN_DIR/memory-adapter"
   fi
 
   local agent_count plugin_count skill_count

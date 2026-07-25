@@ -55,22 +55,20 @@ Add to your agent's MCP config:
 }
 ```
 
-## Tools
+## MCP Tools (read-only)
 
 | Tool | Description |
 |---|---|
-| `save_decision` | Save architectural/technical decisions |
-| `save_bug_fix` | Save bugs and their fixes for future reference |
-| `save_architecture` | Save architectural component info |
-| `save_preference` | Save project preferences |
-| `save_session_action` | Log session actions to history |
 | `search_memory` | Search past decisions, bugs, architecture (text-based) |
 | `search_memory_semantic` | Search using semantic embeddings (requires Ollama) |
 | `get_context` | Get recent context for a project (use at session start) |
 | `get_history` | Get session history log |
-| `export_project` | Export all memory for sharing/syncing |
-| `import_project` | Import memory from exported JSON |
-| `export_to_obsidian` | Export decisions/bugs to Markdown for Obsidian vault |
+| `export_project` | Return shareable, non-private decisions as JSON |
+
+MCP is intentionally read-only. Persistent writes require an explicit local
+CLI command so model output cannot poison future sessions without approval.
+The server binds reads to `OPENCODE_PROJECT_ROOT` (or its startup directory)
+and derives a path-specific project identity, preventing cross-project reads.
 
 ## CLI Commands
 
@@ -78,20 +76,29 @@ Add to your agent's MCP config:
 # Initialize database
 memory-adapter init
 
-# Export to JSON
-memory-adapter export --project MyProject --path /path/to/project
+# Save an approved decision
+memory-adapter save-decision --title "Use SQLite" --content "Local-first storage"
 
-# Import from JSON
+# Save an approved bug fix
+memory-adapter save-bug --title "Timeout" --description "Request timed out" --fix "Add timeout handling"
+
+# Export to JSON
+memory-adapter export --path /path/to/project
+
+# Import from JSON (replaces the target project's existing memory)
 memory-adapter import --file memory-export.json
 
-# Sync with git
-memory-adapter sync --project MyProject --path /path/to/project
+# Safe sync outside the repository (non-private decisions only)
+memory-adapter sync --path /path/to/project
+
+# Explicit team export with operational records
+memory-adapter export --path /path/to/project --include-operational --out ./memory-export.json
 
 # Export to Obsidian Markdown
-memory-adapter export-obsidian --project MyProject --out ./docs/decisions
+memory-adapter export-obsidian --out ./docs/decisions
 
 # Check status
-memory-adapter status --project MyProject
+memory-adapter status
 ```
 
 ## Philosophy

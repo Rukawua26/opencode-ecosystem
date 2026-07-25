@@ -1,151 +1,215 @@
 #!/usr/bin/env node
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, execSync, readdirSync, statSync } from "node:fs";
-import { join, dirname, basename } from "node:path";
-import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { exit } from "node:process";
+import { MemoryAdapter } from "./adapter.js";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEFAULT_DB_PATH = join(process.env.HOME || process.env.USERPROFILE || "/tmp", ".local/share/opencode/memory-adapter/memory.db");
+const DEFAULT_DB_PATH = join(
+  process.env.HOME || process.env.USERPROFILE || "/tmp",
+  ".local",
+  "share",
+  "opencode",
+  "memory-adapter",
+  "memory.db",
+);
+
+function requireOption(args, name) {
+  if (!args[name]) throw new Error(`--${name} required`);
+  return args[name];
+}
+
+function projectIdentity(args) {
+  if (args.project) return args.project;
+  const root = resolve(args.path || process.cwd());
+  const suffix = createHash("sha256").update(root).digest("hex").slice(0, 12);
+  return `${basename(root)}-${suffix}`;
+}
+
+function writeJson(filePath, data) {
+  const target = resolve(filePath);
+  mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+  writeFileSync(target, JSON.stringify(data, null, 2), { mode: 0o600 });
+  chmodSync(target, 0o600);
+  return target;
+}
+
+async function withAdapter(args, callback) {
+  const adapter = new MemoryAdapter(args.db || DEFAULT_DB_PATH).init();
+  try {
+    return await callback(adapter);
+  } finally {
+    adapter.close();
+  }
+}
 
 const commands = {
   init: {
-    description: "Initialize memory adapter database",
-    run: async (args) => {
-      const dbPath = args.db || DEFAULT_DB_PATH;
-      const dir = dirname(dbPath);
-      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-      const schema = readFileSync(join(__dirname, "schema.sql"), "utf-8");
-      const Database = (await import("node:sqlite")).default;
-      const db = new DatabaseSync(dbPath);
-      db.exec(schema);
-      db.close();
-      console.log(`[OK] Database initialized at ${dbPath}`);
-    },
+    description: "Initialize the memory database",
+    run: (args) => withAdapter(args, async (adapter) => {
+      console.log(`[OK] Database initialized at ${adapter.dbPath}`);
+    }),
+  },
+  "save-decision": {
+    description: "Persist a user-approved decision",
+    run: (args) => withAdapter(args, async (adapter) => {
+      const result = adapter.saveDecision({
+        project: projectIdentity(args),
+        projectPath: args.path || process.cwd(),
+        title: requireOption(args, "title"),
+        content: requireOption(args, "content"),
+        rationale: args.rationale,
+        tags: args.tags,
+        category: args.category,
+        isPrivate: Boolean(args.private),
+      });
+      console.log(`[OK] Decision saved (${result.id})`);
+    }),
+  },
+  "save-bug": {
+    description: "Persist a user-approved bug fix",
+    run: (args) => withAdapter(args, async (adapter) => {
+      const result = adapter.saveBugFix({
+        project: projectIdentity(args),
+        projectPath: args.path || process.cwd(),
+        title: requireOption(args, "title"),
+        description: requireOption(args, "description"),
+        fix: requireOption(args, "fix"),
+        rootCause: args["root-cause"],
+        lesson: args.lesson,
+        tags: args.tags,
+      });
+      console.log(`[OK] Bug fix saved (${result.id})`);
+    }),
+  },
+  "save-architecture": {
+    description: "Persist a user-approved architecture note",
+    run: (args) => withAdapter(args, async (adapter) => {
+      const result = adapter.saveArchitecture({
+        project: projectIdentity(args),
+        projectPath: args.path || process.cwd(),
+        component: requireOption(args, "component"),
+        description: requireOption(args, "description"),
+        rationale: args.rationale,
+        tags: args.tags,
+      });
+      console.log(`[OK] Architecture note saved (${result.id})`);
+    }),
+  },
+  "save-preference": {
+    description: "Persist a user-approved project preference",
+    run: (args) => withAdapter(args, async (adapter) => {
+      const result = adapter.savePreference({
+        project: projectIdentity(args),
+        projectPath: args.path || process.cwd(),
+        key: requireOption(args, "key"),
+        value: requireOption(args, "value"),
+      });
+      console.log(`[OK] Preference saved (${result.id})`);
+    }),
   },
   export: {
-    description: "Export project memory to JSON file",
-    run: async (args) => {
-      if (!args.project) {
-        console.error("[ERROR] --project required");
-        exit(1);
-      }
-      const { MemoryAdapter } = await import("./adapter.js");
-      const adapter = new MemoryAdapter(args.db);
-      adapter.init();
-      const data = adapter.exportProject({ project: args.project, projectPath: args.path || process.cwd() });
-      const outputPath = args.out || join(process.cwd(), "memory-export.json");
-      writeFileSync(outputPath, JSON.stringify(data, null, 2));
-      console.log(`[OK] Exported to ${outputPath}`);
-      adapter.close();
-    },
+    description: "Export project memory to JSON",
+    run: (args) => withAdapter(args, async (adapter) => {
+      const project = projectIdentity(args);
+      const data = adapter.exportProject({
+        project,
+        projectPath: args.path || process.cwd(),
+        includePrivate: Boolean(args["include-private"]),
+        includeOperational: Boolean(args["include-operational"]),
+      });
+      const target = writeJson(args.out || "memory-export.json", data);
+      console.log(`[OK] Exported to ${target}`);
+    }),
   },
   import: {
-    description: "Import memory from JSON file",
-    run: async (args) => {
-      if (!args.file) {
-        console.error("[ERROR] --file required");
-        exit(1);
-      }
-      const { MemoryAdapter } = await import("./adapter.js");
-      const adapter = new MemoryAdapter(args.db);
-      adapter.init();
-      const data = JSON.parse(readFileSync(args.file, "utf-8"));
+    description: "Import project memory from JSON",
+    run: (args) => withAdapter(args, async (adapter) => {
+      const file = requireOption(args, "file");
+      if (!existsSync(file)) throw new Error(`File not found: ${file}`);
+      const data = JSON.parse(readFileSync(file, "utf8"));
       const result = adapter.importProject(data);
-      console.log(`[OK] Imported project "${data.project.name}" (${result.projectId})`);
-      adapter.close();
-    },
+      console.log(`[OK] Imported project ${data.project.name} (${result.projectId})`);
+    }),
   },
   sync: {
-    description: "Sync memory with git (export -> git add -> commit)",
-    run: async (args) => {
-      const { MemoryAdapter } = await import("./adapter.js");
-      const adapter = new MemoryAdapter(args.db);
-      adapter.init();
-      const data = adapter.exportProject({ project: args.project, projectPath: args.path || process.cwd() });
-      const outputPath = args.out || join(process.cwd(), "memory-sync.json");
-      writeFileSync(outputPath, JSON.stringify(data, null, 2));
-      console.log(`[OK] Exported to ${outputPath}`);
-
-      try {
-        execSync(`git add ${outputPath}`, { cwd: process.cwd() });
-        execSync(`git commit -m "chore: sync memory for ${args.project}"`, { cwd: process.cwd() });
-        console.log("[OK] Committed to git");
-      } catch (err) {
-        console.log("[INFO] No git changes to commit or not a git repo");
-      }
-
-      adapter.close();
-    },
+    description: "Export safe project memory and optionally commit it",
+    run: (args) => withAdapter(args, async (adapter) => {
+      const project = projectIdentity(args);
+      const target = writeJson(
+        args.out || join(
+          process.env.HOME || process.env.USERPROFILE || "/tmp",
+          ".local",
+          "share",
+          "opencode",
+          "memory-sync",
+          `${project}.json`,
+        ),
+        adapter.exportProject({ project, projectPath: args.path || process.cwd() }),
+      );
+      console.log(`[OK] Exported to ${target}`);
+      if (!args.commit) return;
+      execFileSync("git", ["add", "--", target], { cwd: args.path || process.cwd(), stdio: "inherit" });
+      execFileSync("git", ["commit", "-m", `chore: sync memory for ${project}`], {
+        cwd: args.path || process.cwd(),
+        stdio: "inherit",
+      });
+    }),
   },
-  export_obsidian: {
-    description: "Export decisions and bugs to Markdown files for Obsidian vault",
-    run: async (args) => {
-      if (!args.project) {
-        console.error("[ERROR] --project required");
-        exit(1);
-      }
-      const { MemoryAdapter } = await import("./adapter.js");
-      const adapter = new MemoryAdapter(args.db);
-      adapter.init();
+  "export-obsidian": {
+    description: "Export decisions and bugs as Obsidian Markdown",
+    run: (args) => withAdapter(args, async (adapter) => {
       const result = await adapter.exportToObsidian({
-        project: args.project,
+        project: projectIdentity(args),
         projectPath: args.path || process.cwd(),
         outputDir: args.out,
+        includeBugs: Boolean(args["include-operational"]),
       });
-      console.log(`[OK] Exported ${result.decisions} decisions, ${result.bugs} bugs to ${result.outputDir}`);
-      adapter.close();
-    },
+      console.log(`[OK] Exported ${result.decisions} decisions and ${result.bugs} bugs to ${result.outputDir}`);
+    }),
   },
   status: {
-    description: "Show memory adapter status",
-    run: async (args) => {
-      const { MemoryAdapter } = await import("./adapter.js");
-      const adapter = new MemoryAdapter(args.db);
-      adapter.init();
-      const ctx = adapter.getContext({ project: args.project || "default", projectPath: args.path || process.cwd() });
-      console.log(JSON.stringify(ctx, null, 2));
-      adapter.close();
-    },
+    description: "Show project memory status",
+    run: (args) => withAdapter(args, async (adapter) => {
+      console.log(JSON.stringify(adapter.getContext({
+        project: projectIdentity(args),
+        projectPath: args.path || process.cwd(),
+      }), null, 2));
+    }),
   },
 };
 
-const args = process.argv.slice(2);
-const opts = {};
-let cmd = null;
-
-for (let i = 0; i < args.length; i++) {
-  const arg = args[i];
-  if (arg.startsWith("--")) {
-    const key = arg.slice(2);
-    const val = args[i + 1];
-    if (val && !val.startsWith("--")) {
-      opts[key] = val;
-      i++;
+const argv = process.argv.slice(2);
+const options = {};
+let command;
+for (let index = 0; index < argv.length; index++) {
+  const value = argv[index];
+  if (!value.startsWith("--") && !command) {
+    command = value;
+  } else if (value.startsWith("--")) {
+    const key = value.slice(2);
+    const next = argv[index + 1];
+    if (next && !next.startsWith("--")) {
+      options[key] = next;
+      index++;
     } else {
-      opts[key] = true;
+      options[key] = true;
     }
-  } else if (!cmd) {
-    cmd = arg;
   }
 }
 
-if (!cmd || !commands[cmd]) {
-  console.log("Usage: memory-adapter <command> [options]");
-  console.log("\nCommands:");
-  for (const [name, cmdObj] of Object.entries(commands)) {
-    console.log(`  ${name.padEnd(12)} ${cmdObj.description}`);
+if (!command || !commands[command]) {
+  console.log("Usage: memory-adapter <command> [options]\n\nCommands:");
+  for (const [name, definition] of Object.entries(commands)) {
+    console.log(`  ${name.padEnd(18)} ${definition.description}`);
   }
-  console.log("\nOptions:");
-  console.log("  --db     Path to database file");
-  console.log("  --project Project name");
-  console.log("  --path   Project path");
-  console.log("  --out    Output file path");
-  console.log("  --file   Input file path");
-  exit(1);
+  console.log("\nOptions: --db --project --path --out --file --title --content --description --fix --private --include-private --include-operational --commit");
+  exit(command ? 1 : 0);
 }
 
-commands[cmd].run({ ...opts, _cmd: cmd }).catch((err) => {
-  console.error("[ERROR]", err.message);
+commands[command].run(options).catch((error) => {
+  console.error(`[ERROR] ${error.message}`);
   exit(1);
 });

@@ -1,126 +1,92 @@
 #!/usr/bin/env node
 
-import { readFileSync, existsSync, statSync } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { execSync, spawn } from "node:child_process";
-import { exit } from "node:process";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const HOME = process.env.HOME || process.env.USERPROFILE;
+const HOME = process.env.HOME || process.env.USERPROFILE || "/tmp";
 const OPENCODE_DIR = join(HOME, ".config", "opencode");
 const DATA_DIR = join(HOME, ".local", "share", "opencode", "plugins-data");
 
 let checks = 0;
 let passed = 0;
 
-function check(name, fn) {
+function check(name, test) {
   checks++;
   try {
-    if (fn()) {
+    if (test()) {
       passed++;
       console.log(`[OK] ${name}`);
-      return true;
-    } else {
-      console.log(`[FAIL] ${name}`);
-      return false;
+      return;
     }
-  } catch (err) {
-    console.log(`[ERROR] ${name}: ${err.message}`);
-    return false;
+    console.log(`[FAIL] ${name}`);
+  } catch (error) {
+    console.log(`[ERROR] ${name}: ${error.message}`);
   }
 }
 
-function checkFile(path, desc) {
-  return check(desc, () => existsSync(path));
+function optional(name, test) {
+  try {
+    console.log(test() ? `[OK] ${name}` : `[SKIP] ${name}`);
+  } catch {
+    console.log(`[SKIP] ${name}`);
+  }
 }
 
-function checkDir(path, desc) {
-  return check(desc, () => existsSync(path) && statSync(path).isDirectory());
+function commandWorks(command, args = ["--version"]) {
+  return spawnSync(command, args, { stdio: "ignore", timeout: 5000 }).status === 0;
 }
 
-function checkCmd(cmd, desc) {
-  return check(desc, () => {
-    try {
-      execSync(`which ${cmd} 2>/dev/null || command -v ${cmd}`, { stdio: "pipe" });
-      return true;
-    } catch {
-      return false;
-    }
-  });
+function parseEnv(filePath) {
+  if (!existsSync(filePath)) return {};
+  return Object.fromEntries(
+    readFileSync(filePath, "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#") && line.includes("="))
+      .map((line) => {
+        const separator = line.indexOf("=");
+        return [line.slice(0, separator), line.slice(separator + 1).trim()];
+      }),
+  );
 }
 
 console.log("\n=== OpenCode Ecosystem Doctor ===\n");
 
-console.log("--- Sistema y Dependencias ---");
-checkCmd("node", "Node.js disponible");
-checkCmd("npm", "npm disponible");
-checkCmd("git", "git disponible");
+console.log("--- Runtime ---");
+check("Node.js >= 22", () => Number(process.versions.node.split(".")[0]) >= 22);
+check("npm available", () => commandWorks("npm"));
+check("git available", () => commandWorks("git"));
 
-console.log("\n--- OpenCode Config ---");
-checkFile(join(OPENCODE_DIR, "opencode.jsonc"), "opencode.jsonc");
-checkDir(join(OPENCODE_DIR, "agents"), "agents directory");
-checkDir(join(OPENCODE_DIR, "plugins"), "plugins directory");
-checkDir(join(OPENCODE_DIR, "mcp"), "mcp directory");
-checkDir(join(OPENCODE_DIR, "profiles"), "profiles directory");
-
-console.log("\n--- Skills ---");
-checkDir(join(HOME, "opencode-custom", "skills"), "skills directory");
-
-console.log("\n--- Data Directory ---");
-checkDir(DATA_DIR, "plugins-data directory");
-
-console.log("\n--- Memory Adapter ---");
-const memAdapterDir = join(OPENCODE_DIR, "mcp", "memory-adapter");
-if (existsSync(memAdapterDir)) {
-  checkFile(join(memAdapterDir, "package.json"), "memory-adapter package.json");
-  checkFile(join(memAdapterDir, "src", "adapter.js"), "memory-adapter adapter.js");
-  checkFile(join(memAdapterDir, "src", "mcp-server.js"), "memory-adapter mcp-server.js");
-
-  check("memory-adapter dependencies", () => {
-    try {
-      execSync("npm ls --depth=0", { cwd: memAdapterDir, stdio: "pipe" });
-      return true;
-    } catch {
-      return false;
-    }
+console.log("\n--- OpenCode ---");
+check("opencode.jsonc", () => existsSync(join(OPENCODE_DIR, "opencode.jsonc")));
+for (const directory of ["agents", "plugins", "mcp", "profiles"]) {
+  check(`${directory} directory`, () => {
+    const path = join(OPENCODE_DIR, directory);
+    return existsSync(path) && statSync(path).isDirectory();
   });
-} else {
-  console.log("[SKIP] memory-adapter directory not found");
+}
+check("skills directory", () => existsSync(join(HOME, "opencode-custom", "skills")));
+check("plugins-data directory", () => existsSync(DATA_DIR));
+
+console.log("\n--- Memory adapter ---");
+const memoryDir = join(OPENCODE_DIR, "mcp", "memory-adapter");
+for (const file of ["package.json", join("src", "adapter.js"), join("src", "mcp-server.js"), join("src", "cli.js")]) {
+  check(`memory-adapter/${file}`, () => existsSync(join(memoryDir, file)));
 }
 
-console.log("\n--- Ollama Local Models ---");
-check("Ollama server", () => {
-  try {
-    execSync("ollama list", { stdio: "pipe" });
-    return true;
-  } catch {
-    return false;
-  }
+console.log("\n--- Optional services ---");
+optional("Ollama server", () => commandWorks("ollama", ["list"]));
+optional("opencode-doctor installed", () => {
+  const suffix = process.platform === "win32" ? ".cmd" : "";
+  return existsSync(join(HOME, ".opencode", "bin", `opencode-doctor${suffix}`));
 });
 
-console.log("\n--- API Keys ---");
-const envFile = join(OPENCODE_DIR, ".env");
-if (existsSync(envFile)) {
-  const content = readFileSync(envFile, "utf-8");
-  const hasOpenAI = content.includes("OPENAI_API_KEY");
-  const hasAnthropic = content.includes("ANTHROPIC_API_KEY");
-  const hasGoogle = content.includes("GOOGLE_API_KEY");
-
-  check("OPENAI_API_KEY set", () => hasOpenAI && !content.includes("OPENAI_API_KEY="));
-  check("ANTHROPIC_API_KEY set", () => hasAnthropic && !content.includes("ANTHROPIC_API_KEY="));
-  check("GOOGLE_API_KEY set", () => hasGoogle && !content.includes("GOOGLE_API_KEY="));
-} else {
-  console.log("[SKIP] .env file not found (run install.sh first)");
-}
+console.log("\n--- Providers ---");
+const environment = parseEnv(join(OPENCODE_DIR, ".env"));
+const providers = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY"];
+check("at least one provider key configured", () => providers.some((key) => Boolean(environment[key] || process.env[key])));
 
 console.log("\n=== Summary ===");
 console.log(`Checks: ${passed}/${checks} passed`);
-
-if (passed === checks) {
-  console.log("\n✓ All checks passed! OpenCode Ecosystem is healthy.\n");
-  exit(0);
-} else {
-  console.log("\n✗ Some checks failed. Review the output above.\n");
-  exit(1);
-}
+process.exitCode = passed === checks ? 0 : 1;

@@ -4,7 +4,7 @@
 [![CI](https://github.com/Rukawua26/opencode-ecosystem/workflows/CI%20-%20Tests/badge.svg)](https://github.com/Rukawua26/opencode-ecosystem/actions)
 [![Install Test](https://github.com/Rukawua26/opencode-ecosystem/workflows/Install%20Validation/badge.svg)](https://github.com/Rukawua26/opencode-ecosystem/actions)
 [![npm](https://badge.fury.io/js/opencode-memory-adapter.svg)](https://www.npmjs.com/package/opencode-memory-adapter)
-[![Version](https://img.shields.io/badge/version-1.0.0-blue)](https://github.com/Rukawua26/opencode-ecosystem)
+[![Version](https://img.shields.io/badge/version-1.3.0-blue)](https://github.com/Rukawua26/opencode-ecosystem)
 
 > Un comando. Cualquier agente. Cualquier OS.
 > Ecosistema open source para potenciar OpenCode con memoria persistente, SDD, skills, multi-modelo y multiagentes.
@@ -18,6 +18,8 @@
 - **Modularidad**: plugins, skills, agentes y MCPs independientes
 
 ## Quick Start
+
+Requiere Node.js 22 o superior y Git.
 
 ### Linux / macOS
 
@@ -54,7 +56,7 @@ cd opencode-ecosystem
 node tools/scripts/doctor.js
 
 # O desde cualquier lugar (instalado por install.sh)
-opencode-ecosystem-doctor
+opencode-doctor
 ```
 
 El comando `doctor` verifica:
@@ -65,14 +67,24 @@ El comando `doctor` verifica:
 - Servidor Ollama local
 - API Keys configuradas
 
+### Medir ahorro de tokens
+
+```bash
+# Resumen de los ultimos 7 dias
+opencode-metrics 7
+```
+
+Repite el comando despues de una semana y compara tokens por mensaje,
+compactaciones, fallos y modelos. Consulta `docs/token-economy/measurement.md`.
+
 ## Que incluye
 
 | Componente | Descripcion |
 |---|---|
 | **16+ agentes** | Especializados: backend, frontend, security, devops, etc. |
-| **17+ skills** | SDD, debug-bugs, security-review, obsidian, tdd, etc. |
-| **7 plugins** | Kanban, guardrails, checkpoints, sandbox, personalities, validator, session-metrics |
-| **3 MCP servers** | local-model-router (Ollama), context7, diagram-generator |
+| **20 skills** | SDD, modes, prompts, debug, security, Obsidian y TDD |
+| **8 plugins** | Kanban, guardrails, checkpoints, sandbox, personalities, validator, metrics y auto-memory |
+| **4 MCP servers** | memory-adapter, local-model-router, context7 y diagram-generator |
 | **Memory adapter** | SQLite + MCP server universal (OpenCode, Claude Code, Cursor, etc.) |
 | **Multi-modelo** | Routeo automatico de modelo por fase de trabajo |
 | **Perfiles** | work, personal, light |
@@ -83,7 +95,7 @@ El comando `doctor` verifica:
 ```
 opencode-ecosystem/
 ├── config/          # opencode.jsonc, agents, plugins, mcp, profiles
-├── skills/          # 17+ skills exportables
+├── skills/          # 20 skills exportables
 ├── packages/        # Paquetes npm (memory-adapter)
 ├── docs/            # Arquitectura, guias, token-economy
 ├── tools/           # Repo map builder, scripts

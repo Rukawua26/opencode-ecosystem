@@ -28,6 +28,9 @@ jobs:
       - name: Run memory-adapter tests (node:test)
         run: node --test packages/memory-adapter/tests/*.test.js
 
+      - name: Run hook safety test
+        run: npm run test:hooks
+
       - name: Build memory-adapter
         run: |
           cd packages/memory-adapter
