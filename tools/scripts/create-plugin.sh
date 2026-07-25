@@ -23,13 +23,16 @@ fi
 
 echo "Creating plugin: $PLUGIN_NAME"
 
+# Convert kebab-case to camelCase for JS identifiers (e.g. "my-plugin" -> "myPlugin")
+CAMEL_NAME=$(echo "$PLUGIN_NAME" | sed -E 's/-([a-zA-Z])/\U\1/g' | sed -E 's/^([A-Z])/\L\1/')
+
 cat > "$PLUGIN_FILE" << 'EOF'
 import { tool } from "@opencode-ai/plugin";
 
-export const PLUGIN_NAMEPlugin = async () => {
+export const __CAMEL__ = async () => {
   return {
     tool: {
-      PLUGIN_NAME_action: tool({
+      __CAMEL__Action: tool({
         description: "TODO - Describe what this tool does.",
         args: {
           input: tool.schema.string().describe("Input parameter"),
@@ -44,7 +47,7 @@ export const PLUGIN_NAMEPlugin = async () => {
 };
 EOF
 
-sed -i "s/PLUGIN_NAME/$PLUGIN_NAME/g" "$PLUGIN_FILE"
+sed -i "s/__CAMEL__/$CAMEL_NAME/g" "$PLUGIN_FILE"
 
 echo "Created: $PLUGIN_FILE"
 echo ""

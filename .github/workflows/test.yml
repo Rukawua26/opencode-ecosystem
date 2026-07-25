@@ -10,9 +10,13 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
         node-version: [22]
+        exclude:
+          # Install test and hook test only run on Unix
+          - os: windows-latest
 
     steps:
       - uses: actions/checkout@v7.0.1
@@ -38,6 +42,25 @@ jobs:
 
       - name: Run memory-adapter tests (node:test)
         run: node --test packages/memory-adapter/tests/*.test.js
+
+  test-unix-only:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node-version: [22]
+
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Run install test
         run: npm run test:install
