@@ -2,14 +2,16 @@ import { after, before, describe, it } from "node:test";
 import { strict as assert } from "node:assert";
 import { mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
 import { MemoryAdapter } from "../src/adapter.js";
+import { fileURLToPath } from "node:url";
 
-const HOME = "/tmp/test-memory-mcp";
+const HOME = join(tmpdir(), "test-memory-mcp");
 const PROJECT_ROOT = join(HOME, "trusted-project");
 const PROJECT_NAME = "trusted-project-test";
 const DB_PATH = join(HOME, ".local", "share", "opencode", "memory-adapter", "memory.db");
-const SERVER = new URL("../src/mcp-server.js", import.meta.url);
+const SERVER = fileURLToPath(new URL("../src/mcp-server.js", import.meta.url));
 
 describe("memory MCP server", () => {
   let child;
@@ -64,9 +66,10 @@ describe("memory MCP server", () => {
     });
   });
 
-  after(() => {
+  after(async () => {
     child.stdin.end();
     child.kill();
+    await new Promise((resolve) => child.on("exit", resolve));
     rmSync(HOME, { recursive: true, force: true });
   });
 

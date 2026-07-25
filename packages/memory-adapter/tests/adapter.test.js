@@ -2,9 +2,11 @@ import { describe, it, beforeEach, afterEach } from "node:test";
 import { strict as assert } from "node:assert";
 import { MemoryAdapter } from "../src/adapter.js";
 import { chmodSync, existsSync, rmSync, mkdirSync, statSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
 
-const TEST_DB = "/tmp/test-memory-adapter/memory.db";
+const TMP_ROOT = join(tmpdir(), "opencode-test");
+const TEST_DB = join(TMP_ROOT, "memory-adapter", "memory.db");
 
 describe("MemoryAdapter", () => {
   let adapter;
@@ -18,8 +20,8 @@ describe("MemoryAdapter", () => {
 
   afterEach(() => {
     adapter.close();
-    if (existsSync(dirname(TEST_DB))) {
-      rmSync(dirname(TEST_DB), { recursive: true, force: true });
+    if (existsSync(TMP_ROOT)) {
+      rmSync(TMP_ROOT, { recursive: true, force: true });
     }
   });
 
@@ -31,7 +33,7 @@ describe("MemoryAdapter", () => {
 
     it("should not change permissions of a caller-provided directory", () => {
       if (process.platform === "win32") return;
-      const customDir = "/tmp/test-memory-custom-dir";
+      const customDir = join(TMP_ROOT, "memory-adapter-custom-dir");
       rmSync(customDir, { recursive: true, force: true });
       mkdirSync(customDir, { mode: 0o770 });
       chmodSync(customDir, 0o770);
@@ -45,7 +47,7 @@ describe("MemoryAdapter", () => {
     it("should save a decision and return an id", () => {
       const result = adapter.saveDecision({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         category: "architecture",
         title: "Use SQLite for memory",
         content: "We chose SQLite because it's embedded and fast.",
@@ -59,7 +61,7 @@ describe("MemoryAdapter", () => {
     it("should retrieve saved decisions via search", () => {
       adapter.saveDecision({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Use Redis for cache",
         content: "Redis is fast for caching",
         tags: "cache,redis",
@@ -67,7 +69,7 @@ describe("MemoryAdapter", () => {
 
       const results = adapter.searchMemory({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         query: "redis",
       });
 
@@ -78,14 +80,14 @@ describe("MemoryAdapter", () => {
     it("should reject the same project name with a different path", () => {
       adapter.saveDecision({
         project: "isolated-project",
-        projectPath: "/tmp/project-a",
+        projectPath: join(TMP_ROOT, "project-a"),
         title: "Path A",
         content: "Bound to project A",
       });
 
       assert.throws(() => adapter.saveDecision({
         project: "isolated-project",
-        projectPath: "/tmp/project-b",
+        projectPath: join(TMP_ROOT, "project-b"),
         title: "Path B",
         content: "Must not cross projects",
       }), /path mismatch/);
@@ -96,7 +98,7 @@ describe("MemoryAdapter", () => {
     it("should save a bug fix with lesson learned", () => {
       const result = adapter.saveBugFix({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Memory leak in event listener",
         description: "Event listeners were not being cleaned up",
         rootCause: "Missing cleanup in useEffect return",
@@ -110,7 +112,7 @@ describe("MemoryAdapter", () => {
     it("should find bug fixes via search", () => {
       adapter.saveBugFix({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Off by one in loop",
         description: "Loop started at 1 instead of 0",
         fix: "Changed i=1 to i=0",
@@ -119,7 +121,7 @@ describe("MemoryAdapter", () => {
 
       const results = adapter.searchMemory({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         query: "loop",
         category: "bugs",
       });
@@ -133,7 +135,7 @@ describe("MemoryAdapter", () => {
     it("should save architectural component info", () => {
       const result = adapter.saveArchitecture({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         component: "MemoryAdapter",
         description: "SQLite-based adapter for persistent memory across sessions",
         rationale: "Local-first, no external dependencies",
@@ -147,21 +149,21 @@ describe("MemoryAdapter", () => {
     it("should save and update a preference", () => {
       adapter.savePreference({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         key: "linting",
         value: "eslint",
       });
 
       adapter.savePreference({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         key: "linting",
         value: "biome",
       });
 
       const context = adapter.getContext({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
       });
 
       const pref = context.preferences.find((p) => p.key === "linting");
@@ -174,7 +176,7 @@ describe("MemoryAdapter", () => {
     it("should log a session action", () => {
       const result = adapter.saveSessionAction({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         sessionId: "abc-123",
         action: "created_file",
         detail: "Created src/index.js",
@@ -189,14 +191,14 @@ describe("MemoryAdapter", () => {
     it("should return recent decisions, bugs, architecture, and preferences", () => {
       adapter.saveDecision({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Decision 1",
         content: "First decision",
       });
 
       adapter.saveBugFix({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Bug 1",
         description: "A bug",
         fix: "Fixed it",
@@ -204,7 +206,7 @@ describe("MemoryAdapter", () => {
 
       const context = adapter.getContext({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
       });
 
       assert.ok(context.recentDecisions.length > 0);
@@ -216,14 +218,14 @@ describe("MemoryAdapter", () => {
     it("should return session history ordered by date", () => {
       adapter.saveSessionAction({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         action: "task_start",
         detail: "Started implementing feature X",
       });
 
       const history = adapter.getHistory({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
       });
 
       assert.ok(history.length > 0);
@@ -235,14 +237,14 @@ describe("MemoryAdapter", () => {
     it("should export all data for a project", () => {
       adapter.saveDecision({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Export test",
         content: "Testing export",
       });
 
       const exported = adapter.exportProject({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
       });
 
       assert.ok(exported.project);
@@ -254,22 +256,22 @@ describe("MemoryAdapter", () => {
     it("should exclude private decisions unless explicitly requested", () => {
       adapter.saveDecision({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Public decision",
         content: "Safe to share",
       });
       adapter.saveDecision({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Private decision",
         content: "Do not share",
         isPrivate: true,
       });
 
-      const safeExport = adapter.exportProject({ project: "test-project", projectPath: "/tmp/test" });
+      const safeExport = adapter.exportProject({ project: "test-project", projectPath: join(TMP_ROOT, "test") });
       const fullExport = adapter.exportProject({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         includePrivate: true,
       });
 
@@ -280,16 +282,16 @@ describe("MemoryAdapter", () => {
     it("should exclude operational records unless explicitly requested", () => {
       adapter.saveBugFix({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Sensitive operational detail",
         description: "Internal path",
         fix: "Local fix",
       });
 
-      const safeExport = adapter.exportProject({ project: "test-project", projectPath: "/tmp/test" });
+      const safeExport = adapter.exportProject({ project: "test-project", projectPath: join(TMP_ROOT, "test") });
       const operationalExport = adapter.exportProject({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         includeOperational: true,
       });
 
@@ -300,18 +302,18 @@ describe("MemoryAdapter", () => {
     it("should import into a different project without reusing global row ids", () => {
       adapter.saveDecision({
         project: "source-project",
-        projectPath: "/tmp/source",
+        projectPath: join(TMP_ROOT, "source"),
         title: "Source decision",
         content: "Portable memory",
       });
       adapter.saveDecision({
         project: "existing-project",
-        projectPath: "/tmp/existing",
+        projectPath: join(TMP_ROOT, "existing"),
         title: "Existing decision",
         content: "Keeps its id",
       });
 
-      const exported = adapter.exportProject({ project: "source-project", projectPath: "/tmp/source" });
+      const exported = adapter.exportProject({ project: "source-project", projectPath: join(TMP_ROOT, "source") });
       exported.project.name = "imported-project";
       exported.project.path = "/tmp/imported";
       adapter.importProject(exported);
@@ -323,19 +325,19 @@ describe("MemoryAdapter", () => {
     it("should reject malformed imports before replacing existing memory", () => {
       adapter.saveDecision({
         project: "protected-project",
-        projectPath: "/tmp/protected",
+        projectPath: join(TMP_ROOT, "protected"),
         title: "Original decision",
         content: "Must survive a failed import",
       });
       const malformed = adapter.exportProject({
         project: "protected-project",
-        projectPath: "/tmp/protected",
+        projectPath: join(TMP_ROOT, "protected"),
         includeOperational: true,
       });
       malformed.decisions.push({ title: "Incomplete decision" });
 
       assert.throws(() => adapter.importProject(malformed), /decisions.content/);
-      const context = adapter.getContext({ project: "protected-project", projectPath: "/tmp/protected" });
+      const context = adapter.getContext({ project: "protected-project", projectPath: join(TMP_ROOT, "protected") });
       assert.deepStrictEqual(context.recentDecisions.map((item) => item.title), ["Original decision"]);
     });
   });
@@ -344,7 +346,7 @@ describe("MemoryAdapter", () => {
     it("should search across all categories when no category specified", () => {
       adapter.saveDecision({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Use PostgreSQL",
         content: "Database choice",
         tags: "db",
@@ -352,7 +354,7 @@ describe("MemoryAdapter", () => {
 
       adapter.saveBugFix({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Connection timeout",
         description: "DB connection timeout",
         fix: "Added pool config",
@@ -361,7 +363,7 @@ describe("MemoryAdapter", () => {
 
       const results = adapter.searchMemory({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         query: "db",
       });
 
@@ -372,7 +374,7 @@ describe("MemoryAdapter", () => {
     it("should never expose private decisions through search or context", () => {
       adapter.saveDecision({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         title: "Private token rotation",
         content: "private-marker",
         isPrivate: true,
@@ -380,11 +382,11 @@ describe("MemoryAdapter", () => {
 
       const results = adapter.searchMemory({
         project: "test-project",
-        projectPath: "/tmp/test",
+        projectPath: join(TMP_ROOT, "test"),
         query: "private-marker",
         semantic: false,
       });
-      const context = adapter.getContext({ project: "test-project", projectPath: "/tmp/test" });
+      const context = adapter.getContext({ project: "test-project", projectPath: join(TMP_ROOT, "test") });
 
       assert.strictEqual(results.decisions.length, 0);
       assert.strictEqual(context.recentDecisions.length, 0);
