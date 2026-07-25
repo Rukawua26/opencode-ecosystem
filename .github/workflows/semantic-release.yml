@@ -40,6 +40,17 @@ jobs:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npx semantic-release
 
+      - name: Create GitHub Release for latest tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(git describe --tags --abbrev=0)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub Release $TAG already exists."
+            exit 0
+          fi
+          gh release create "$TAG" --generate-notes --latest
+
       - name: Restore remote URL
         if: always()
         run: git remote set-url origin https://github.com/${{ github.repository }}.git
