@@ -1,6 +1,6 @@
 import { after, before, describe, it } from "node:test";
 import { strict as assert } from "node:assert";
-import { mkdirSync, rmSync } from "node:fs";
+import { mkdirSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
@@ -26,8 +26,8 @@ describe("memory MCP server", () => {
     });
   }
 
-  before(() => {
-    rmSync(HOME, { recursive: true, force: true });
+  before(async () => {
+    if (existsSync(HOME)) rmSync(HOME, { recursive: true, force: true });
     mkdirSync(PROJECT_ROOT, { recursive: true });
     const setup = new MemoryAdapter(DB_PATH).init();
     setup.saveDecision({
@@ -43,7 +43,7 @@ describe("memory MCP server", () => {
       content: "Must not cross project boundaries",
     });
     setup.close();
-    child = spawn(process.execPath, [SERVER.pathname], {
+    child = spawn(process.execPath, [SERVER], {
       cwd: PROJECT_ROOT,
       env: {
         ...process.env,
@@ -53,6 +53,7 @@ describe("memory MCP server", () => {
         OPENCODE_PROJECT_NAME: PROJECT_NAME,
       },
       stdio: ["pipe", "pipe", "pipe"],
+      detached: true,
     });
     child.stdout.on("data", (chunk) => {
       buffer += chunk.toString();
@@ -64,13 +65,22 @@ describe("memory MCP server", () => {
         if (index >= 0) pending.splice(index, 1)[0].resolve(message);
       }
     });
+    await new Promise((r) => setTimeout(r, 500));
   });
 
   after(async () => {
-    child.stdin.end();
-    child.kill();
-    await new Promise((resolve) => child.on("exit", resolve));
-    rmSync(HOME, { recursive: true, force: true });
+    if (child && !child.killed) {
+      child.stdin.end();
+      child.kill("SIGTERM");
+      await new Promise((resolve) => {
+        const timeout = setTimeout(resolve, 1000);
+        child.on("exit", () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+      });
+    }
+    if (existsSync(HOME)) rmSync(HOME, { recursive: true, force: true });
   });
 
   it("exposes only read-only tools without private export", async () => {
