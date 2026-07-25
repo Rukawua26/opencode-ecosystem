@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { existsSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
@@ -9,14 +9,7 @@ const pluginsDir = join(__dirname, "..", "..", "config", "plugins");
 
 function getPluginFiles() {
   if (!existsSync(pluginsDir)) return [];
-  return readdirSync(pluginsDir).filter((f) => {
-    if (!f.endsWith(".js") || f.startsWith("zz-test-")) return false;
-    try {
-      return true;
-    } catch {
-      return false;
-    }
-  });
+  return readdirSync(pluginsDir).filter((f) => f.endsWith(".js") && !f.startsWith("zz-test-"));
 }
 
 describe("Plugins structure", () => {

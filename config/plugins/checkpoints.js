@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, copyFileSync, readdirSync, rmSync, cpSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { join, resolve } from 'node:path';
 import { tool } from "@opencode-ai/plugin";
 
 const HOME = process.env.HOME || process.env.USERPROFILE || '/tmp';
@@ -108,7 +108,7 @@ export const checkpointsPlugin = async () => {
         args: {
           file: tool.schema.string().describe("Ruta del archivo para ver sus snapshots"),
         },
-        async execute(args, ctx) {
+        async execute(args, _ctx) {
           const absPath = resolve(args.file);
           const safeName = absPath.replace(/[^a-zA-Z0-9_\-/.]/g, '_');
           const dir = join(CHECKPOINT_DIR, safeName);

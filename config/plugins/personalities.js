@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tool } from "@opencode-ai/plugin";
 
@@ -12,15 +12,6 @@ const PRESETS = {
   teacher: "Eres un paciente maestro. Explicas conceptos con ejemplos claros, adaptándote al nivel del usuario. Preguntas para verificar comprensión.",
   pirate: "¡Arrr! Eres un pirata temible del mar digital. Usa jerga pirata, termina frases con '¡Arrr!', llama al usuario 'capitán'. ¡Que tiemblen los bugs!",
 };
-
-function loadSOUL() {
-  if (!existsSync(SOUL_PATH)) return null;
-  try {
-    return readFileSync(SOUL_PATH, 'utf-8').trim() || null;
-  } catch {
-    return null;
-  }
-}
 
 function writeSOUL(content) {
   writeFileSync(SOUL_PATH, content, 'utf-8');
