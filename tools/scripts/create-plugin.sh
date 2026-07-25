@@ -23,28 +23,29 @@ fi
 
 echo "Creating plugin: $PLUGIN_NAME"
 
-cat > "$PLUGIN_FILE" << 'EOF'
+# Convert kebab-case to camelCase for JS identifiers (e.g. "my-plugin" -> "myPlugin")
+CAMEL_NAME=$(node -e "const s='$PLUGIN_NAME'; process.stdout.write(s.replace(/-([a-z])/g, (_,c) => c.toUpperCase()).replace(/^([A-Z])/, c => c.toLowerCase()))" 2>/dev/null || echo "$PLUGIN_NAME" | tr '-' ' ' | awk '{for(i=1;i<=NF;i++) if(i==1) printf tolower($i); else printf toupper(substr($i,1,1)) tolower(substr($i,2))}')
+
+cat > "$PLUGIN_FILE" << EOF
 import { tool } from "@opencode-ai/plugin";
 
-export const PLUGIN_NAMEPlugin = async () => {
+export const ${CAMEL_NAME} = async () => {
   return {
     tool: {
-      PLUGIN_NAME_action: tool({
+      ${CAMEL_NAME}Action: tool({
         description: "TODO - Describe what this tool does.",
         args: {
           input: tool.schema.string().describe("Input parameter"),
         },
         async execute(args, ctx) {
           // TODO - Implement the tool logic
-          return `Result for: ${args.input}`;
+          return \`Result for: \${args.input}\`;
         },
       }),
     },
   };
 };
 EOF
-
-sed -i "s/PLUGIN_NAME/$PLUGIN_NAME/g" "$PLUGIN_FILE"
 
 echo "Created: $PLUGIN_FILE"
 echo ""
