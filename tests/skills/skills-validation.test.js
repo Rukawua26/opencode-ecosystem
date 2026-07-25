@@ -15,10 +15,10 @@ function getSkillDirs() {
 }
 
 function parseFrontmatter(content) {
-  const fmMatch = content.match(/^---\s*\n([\s\S]*?)\n---/);
+  const fmMatch = content.match(/^---\s*\r?\n([\s\S]*?)\r?\n---/);
   if (!fmMatch) return null;
   const fm = {};
-  for (const line of fmMatch[1].split("\n")) {
+  for (const line of fmMatch[1].split(/\r?\n/)) {
     const m = line.match(/^(\w+):\s*(.+)$/);
     if (m) fm[m[1]] = m[2].replace(/^["']|["']$/g, "");
   }
