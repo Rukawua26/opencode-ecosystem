@@ -11,14 +11,15 @@ Estado registrado: 2026-07-24.
 
 ## 2. Publicar el paquete npm
 
-- Paquete: `opencode-memory-adapter@1.3.0`.
-- Bloqueo: falta configurar un token npm real en el secreto `NPM_TOKEN`.
-- Accion: generar un token npm de publicacion, actualizar el secreto y ejecutar
-  el workflow de release para la etiqueta `v1.3.0`.
+- Paquete: `@rukawua26/opencode-memory-adapter@1.3.0`.
+- Bloqueo: pendiente fusionar el cambio de nombre scoped porque
+  `opencode-memory-adapter` ya pertenece a otro mantenedor en npm.
+- Accion: fusionar el fix del nombre, confirmar `NPM_TOKEN` y ejecutar el
+  workflow de release para la etiqueta `v1.3.0`.
 
 ## 3. Rotar el PAT de GitHub
 
-- Revocar el PAT que fue compartido durante la configuracion.
+- PAT revocado el 2026-07-25.
 - Generar uno nuevo con los permisos minimos necesarios.
 - No almacenar el nuevo valor en archivos, commits, logs ni documentacion.
 

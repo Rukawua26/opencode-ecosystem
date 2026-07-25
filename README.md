@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/Rukawua26/opencode-ecosystem/workflows/CI%20-%20Tests/badge.svg)](https://github.com/Rukawua26/opencode-ecosystem/actions)
 [![Install Test](https://github.com/Rukawua26/opencode-ecosystem/workflows/Install%20Validation/badge.svg)](https://github.com/Rukawua26/opencode-ecosystem/actions)
-[![npm](https://badge.fury.io/js/opencode-memory-adapter.svg)](https://www.npmjs.com/package/opencode-memory-adapter)
+[![npm](https://badge.fury.io/js/%40rukawua26%2Fopencode-memory-adapter.svg)](https://www.npmjs.com/package/@rukawua26/opencode-memory-adapter)
 [![Version](https://img.shields.io/badge/version-1.3.0-blue)](https://github.com/Rukawua26/opencode-ecosystem)
 
 > Un comando. Cualquier agente. Cualquier OS.
