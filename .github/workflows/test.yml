@@ -32,6 +32,10 @@ jobs:
       - name: Run vitest tests
         run: npm test
 
+      - name: Run tests with coverage
+        run: npm run test:coverage
+        continue-on-error: true
+
       - name: Run memory-adapter tests (node:test)
         run: node --test packages/memory-adapter/tests/*.test.js
 
