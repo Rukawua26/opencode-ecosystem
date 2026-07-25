@@ -1,27 +1,34 @@
 # Pendientes de v1.3
 
-Estado registrado: 2026-07-24.
+Actualizado: 2026-07-25.
 
 ## 1. Aprobar y fusionar PR #6
 
 - PR: https://github.com/Rukawua26/opencode-ecosystem/pull/6
-- Estado: abierta, fusionable y con todos los checks en verde.
-- Bloqueo: `main` requiere una aprobacion humana externa.
-- Regla: no omitir ni desactivar la proteccion para fusionarla.
+- Estado: fusionada en main (`44bb3dd`).
 
 ## 2. Publicar el paquete npm
 
 - Paquete: `@rukawua26/opencode-memory-adapter@1.3.0`.
-- Bloqueo: pendiente fusionar el cambio de nombre scoped porque
-  `opencode-memory-adapter` ya pertenece a otro mantenedor en npm.
-- Accion: fusionar el fix del nombre, confirmar `NPM_TOKEN` y ejecutar el
-  workflow de release para la etiqueta `v1.3.0`.
+- Estado: publicado exitosamente.
+- Release: https://github.com/Rukawua26/opencode-ecosystem/releases/tag/v1.3.0
 
 ## 3. Rotar el PAT de GitHub
 
 - PAT revocado el 2026-07-25.
 - Generar uno nuevo con los permisos minimos necesarios.
 - No almacenar el nuevo valor en archivos, commits, logs ni documentacion.
+
+## 4. Redisenio visual del README
+
+- PR #8 fusionada en main (`e060c87`).
+- Hero SVG, diagramas Mermaid, badges vibrantes, cards de componentes.
+
+## 5. Actualizar Actions (Node 20 deprecation warning)
+
+- Estado: completado.
+- `actions/checkout@v4` → `actions/checkout@v4.2.2`
+- `actions/setup-node@v4` → `actions/setup-node@v4.1.0`
 
 ## Verificacion completada
 
@@ -33,3 +40,4 @@ Estado registrado: 2026-07-24.
 - Auditoria npm: 0 vulnerabilidades.
 - Revision funcional independiente: PASS.
 - Revision de seguridad independiente: PASS.
+- CI con Actions actualizadas: PASS.

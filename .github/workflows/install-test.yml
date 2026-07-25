@@ -17,8 +17,8 @@ jobs:
         os: [ubuntu-22.04, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.1.0
         with:
           node-version: 22
       - name: Run install.sh
@@ -39,7 +39,7 @@ jobs:
     steps:
       - name: Install system dependencies
         run: apk add --no-cache git bash curl
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2
       - name: Run install.sh
         run: |
           mkdir -p /tmp/home
@@ -55,8 +55,8 @@ jobs:
   test-install-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v4.2.2
+      - uses: actions/setup-node@v4.1.0
         with:
           node-version: 22
       - name: Run install.sh
