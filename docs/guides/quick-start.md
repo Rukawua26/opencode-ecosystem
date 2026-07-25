@@ -1,62 +1,96 @@
 # Quick Start Guide
 
-## Installation
+## Requisitos
+
+- **Node.js 22+** (`node -v` para verificar)
+- **Git** (`git --version` para verificar)
+- **npm** (incluido con Node.js)
+
+## Instalacion
+
+### Linux / macOS (recomendado)
 
 ```bash
-# Opcion 1: Curl-pipe (recomendado)
 curl -sSL https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.sh | bash
+```
 
-# Opcion 2: Git clone
+### Windows (PowerShell)
+
+```powershell
+irm -useb https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.ps1 | iex
+```
+
+### Git clone (manual)
+
+```bash
 git clone https://github.com/Rukawua26/opencode-ecosystem.git
 cd opencode-ecosystem
 ./install.sh
+```
 
+### Opciones de instalacion
+
+```bash
 # Con verbose (debugging)
 ./install.sh --verbose
 
 # Sin memory adapter
 ./install.sh --skip-memory
+
+# Perfil ligero (para PCs con poca RAM)
+./install.sh --profile light
 ```
 
 ## Post-Install
 
-1. **Configurar API keys (manual, por seguridad)**
+### 1. Configurar API keys
+
+Las API keys se configuran **manualmente** por seguridad. Nunca las subas a git.
+
 ```bash
 cp ~/.config/opencode/.env.example ~/.config/opencode/.env
 nano ~/.config/opencode/.env
 ```
 
-2. **Iniciar OpenCode**
+Agrega al menos una:
+- `OPENAI_API_KEY` - para modelos GPT
+- `ANTHROPIC_API_KEY` - para modelos Claude
+- `GEMINI_API_KEY` - para modelos Gemini
+
+### 2. Verificar instalacion
+
+```bash
+opencode-doctor
+```
+
+### 3. Iniciar OpenCode
+
 ```bash
 opencode
 ```
 
-## Uso del Memory Adapter
+## Memoria Persistente
 
-El memory adapter carga automaticamente. En cualquier sesion:
+El memory adapter se carga automaticamente. Herramientas disponibles:
 
-- Al inicio de sesion, OpenCode puede usar `get_context` para cargar decisiones, bugs y arquitectura previa
-- Cuando tomas una decision, usa `save_decision`
-- Cuando arreglas un bug, usa `save_bug_fix`
-- Para buscar algo previo, usa `search_memory`
+| Herramienta | Uso |
+|---|---|
+| `get_context` | Cargar decisiones, bugs y arquitectura previa |
+| `save_decision` | Guardar una decision tecnica |
+| `save_bug_fix` | Guardar un fix y leccion aprendida |
+| `save_architecture` | Guardar info de componentes |
+| `search_memory` | Buscar en toda la memoria |
+| `export_project` | Exportar datos de un proyecto |
 
-## Uso de Skills
+## Skills
 
-Las skills se cargan por necesidad. Al iniciar OpenCode:
+Las skills se cargan por necesidad. Ejemplos:
 
 ```
 > implementa un componente React con SDD
+> depura este error de TypeScript
+> revisa la seguridad de este endpoint
 ```
-
-OpenCode detecta que pides SDD y carga las skills automaticamente.
-
-## Uso de Multi-Modelo
-
-La fase SDD usa el modelo optimo automaticamente segun `sdd_multi_model` en `opencode.jsonc`:
-
-- specify/plan → Gemini (alto razonamiento)
-- tasks/document → gpt-5.4-mini (ligero)
-- implement/verify → gpt-5.4 (robusto)
 
 ## Perfiles
 
@@ -66,6 +100,9 @@ opencode --profile work
 
 # Perfil ligero (personal)
 opencode --profile personal
+
+# Perfil minimo (PCs limitadas)
+opencode --profile light
 ```
 
 ## Backup
@@ -76,4 +113,22 @@ opencode --profile personal
 
 # Auto-backup (cron, cada 5 min)
 # Ya configurado si tienes el timer activo
+```
+
+## Solucion de problemas
+
+### "command not found: opencode"
+Reinicia la terminal o ejecuta:
+```bash
+export PATH="$HOME/.opencode/bin:$PATH"
+```
+
+### "out of memory"
+Usa el perfil `light` y cierra otras aplicaciones.
+
+### "EACCES permission denied"
+No uses `sudo` con install.sh. Si ya lo hiciste:
+```bash
+rm -rf ~/.config/opencode
+./install.sh
 ```
