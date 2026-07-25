@@ -104,13 +104,13 @@ create_dirs() {
 # Clone or update repo
 clone_repo() {
   local clone_dir="$SCRIPT_DIR"
-  if [[ ! -d "$SCRIPT_DIR/.git" ]]; then
+  if [[ ! -f "$SCRIPT_DIR/config/opencode.jsonc" || ! -d "$SCRIPT_DIR/skills" ]]; then
     clone_dir="$(mktemp -d)"
     log "Cloning repo to $clone_dir..."
     git clone --depth 1 "$REPO_URL" "$clone_dir"
     info "Repo cloned"
   else
-    info "Running from repo, using local files"
+    info "Using local distribution files"
   fi
   printf '%s\n' "$clone_dir"
 }

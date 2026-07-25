@@ -47,9 +47,9 @@ Write-Info "Directories created at $OpenCodeDir"
 
 # Determine script location
 $ScriptDir = if ($MyInvocation.MyCommand.Path) { Split-Path $MyInvocation.MyCommand.Path } else { Get-Location }
-if (Test-Path (Join-Path $ScriptDir ".git")) {
+if ((Test-Path (Join-Path $ScriptDir "config\opencode.jsonc")) -and (Test-Path (Join-Path $ScriptDir "skills"))) {
     $RepoDir = $ScriptDir
-    Write-Info "Running from repo, using local files"
+    Write-Info "Using local distribution files"
 } else {
     $TempDir = [System.IO.Path]::GetTempFileName() | ForEach-Object { [System.IO.Path]::ChangeExtension($_, '') }
     New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
