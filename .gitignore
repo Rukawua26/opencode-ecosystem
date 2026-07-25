@@ -7,3 +7,4 @@ coverage/
 .tmp/
 *.db
 *.sqlite
+.opencode-memory/

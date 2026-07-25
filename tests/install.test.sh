@@ -7,7 +7,7 @@ rm -rf "$HOME"
 mkdir -p "$HOME"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Run install with skip-memory (avoids npm install in test)
 bash "$REPO_DIR/install.sh" --verbose --skip-memory --force
@@ -30,6 +30,10 @@ assert_exists "$HOME/.config/opencode/mcp"
 assert_exists "$HOME/.config/opencode/profiles"
 assert_exists "$HOME/opencode-custom/skills"
 assert_exists "$HOME/.config/opencode/.env.example"
+assert_exists "$HOME/.config/opencode/tools/doctor.js"
+assert_exists "$HOME/.opencode/bin/opencode-doctor"
+assert_exists "$HOME/.config/opencode/lib/session-metrics.js"
+assert_exists "$HOME/.opencode/bin/opencode-metrics"
 
 # Count agents
 AGENT_COUNT=$(find "$HOME/.config/opencode/agents" -name "*.md" | wc -l)

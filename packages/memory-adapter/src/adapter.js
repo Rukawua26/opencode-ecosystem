@@ -1,8 +1,8 @@
-import Database from "node:sqlite";
-import { existsSync, mkdirSync, readFileSync, execSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawn } from "node:child_logic";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_PATH = join(__dirname, "schema.sql");
@@ -17,7 +17,7 @@ let ollamaAvailable = null;
 function checkOllama() {
   if (ollamaAvailable !== null) return ollamaAvailable;
   try {
-    execSync("ollama list", { stdio: "pipe", timeout: 2000 });
+    execFileSync("ollama", ["list"], { stdio: "pipe", timeout: 2000 });
     ollamaAvailable = true;
     return true;
   } catch {
@@ -29,14 +29,73 @@ function checkOllama() {
 function embedQuery(query) {
   if (!checkOllama()) return null;
   try {
-    const result = execSync(`ollama embed nomic-embed-text "${query.replace(/"/g, '\\"')}"`, {
+    const result = execFileSync("ollama", ["embed", "nomic-embed-text", query], {
       encoding: "utf-8",
       timeout: 10000,
     });
     const parsed = JSON.parse(result);
-    return parsed?.embedding || null;
+    return parsed?.embedding || parsed?.embeddings?.[0] || null;
   } catch {
     return null;
+  }
+}
+
+function cosineSimilarity(left, right) {
+  if (!left?.length || left.length !== right?.length) return -1;
+  let dot = 0;
+  let leftNorm = 0;
+  let rightNorm = 0;
+  for (let index = 0; index < left.length; index++) {
+    dot += left[index] * right[index];
+    leftNorm += left[index] ** 2;
+    rightNorm += right[index] ** 2;
+  }
+  return leftNorm && rightNorm ? dot / Math.sqrt(leftNorm * rightNorm) : -1;
+}
+
+function rankByEmbedding(rows, queryEmbedding, limit) {
+  return rows
+    .map(({ embedding, ...row }) => {
+      try {
+        return { ...row, score: cosineSimilarity(queryEmbedding, JSON.parse(embedding)) };
+      } catch {
+        return { ...row, score: -1 };
+      }
+    })
+    .filter((row) => row.score >= 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, limit);
+}
+
+function validateImportData(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) throw new Error("Import data must be an object");
+  if (!data.project || typeof data.project.name !== "string" || !data.project.name.trim()) {
+    throw new Error("Import project.name is required");
+  }
+  const arrays = ["decisions", "bugFixes", "architecture", "preferences", "history"];
+  for (const key of arrays) {
+    if (data[key] !== undefined && !Array.isArray(data[key])) throw new Error(`${key} must be an array`);
+    if (data[key]?.length > 10000) throw new Error(`${key} exceeds 10000 records`);
+    for (const item of data[key] || []) {
+      if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error(`${key} contains an invalid record`);
+    }
+  }
+
+  const requiredStrings = {
+    decisions: ["title", "content"],
+    bugFixes: ["title", "description", "fix"],
+    architecture: ["component", "description"],
+    preferences: ["key", "value"],
+    history: ["action"],
+  };
+  for (const [collection, fields] of Object.entries(requiredStrings)) {
+    for (const item of data[collection] || []) {
+      for (const field of fields) {
+        if (typeof item[field] !== "string" || !item[field].trim()) {
+          throw new Error(`${collection}.${field} must be a non-empty string`);
+        }
+      }
+    }
   }
 }
 
@@ -49,11 +108,18 @@ export class MemoryAdapter {
 
   init() {
     const dir = dirname(this.dbPath);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const createdDirectory = !existsSync(dir);
+    if (createdDirectory) mkdirSync(dir, { recursive: true, mode: 0o700 });
+    if (createdDirectory && process.platform !== "win32") chmodSync(dir, 0o700);
 
-    this.db = new Database(this.dbPath);
+    this.db = new DatabaseSync(this.dbPath);
     this.db.exec("PRAGMA journal_mode = WAL;");
     this.db.exec("PRAGMA foreign_keys = ON;");
+    if (process.platform !== "win32") {
+      for (const file of [this.dbPath, `${this.dbPath}-wal`, `${this.dbPath}-shm`]) {
+        if (existsSync(file)) chmodSync(file, 0o600);
+      }
+    }
 
     const schema = readFileSync(SCHEMA_PATH, "utf-8");
     this.db.exec(schema);
@@ -69,11 +135,21 @@ export class MemoryAdapter {
   }
 
   getOrCreateProject(name, path) {
-    const existing = this.db.prepare("SELECT id FROM projects WHERE name = ?").get(name);
-    if (existing) return existing.id;
+    const normalizedPath = resolve(path || ".");
+    const existing = this.db.prepare("SELECT id, path FROM projects WHERE name = ?").get(name);
+    if (existing) {
+      if (resolve(existing.path || ".") !== normalizedPath) throw new Error(`Project path mismatch for ${name}`);
+      return existing.id;
+    }
 
-    const result = this.db.prepare("INSERT INTO projects (name, path) VALUES (?, ?)").run(name, path);
+    const result = this.db.prepare("INSERT INTO projects (name, path) VALUES (?, ?)").run(name, normalizedPath);
     return result.lastInsertRowid;
+  }
+
+  findProject(name, path) {
+    const existing = this.db.prepare("SELECT id, path FROM projects WHERE name = ?").get(name);
+    if (!existing || resolve(existing.path || ".") !== resolve(path || ".")) return null;
+    return existing.id;
   }
 
   saveDecision({ project, projectPath, category = "general", title, content, rationale, tags, isPrivate = false }) {
@@ -138,55 +214,50 @@ export class MemoryAdapter {
     return { id: res.lastInsertRowid, saved: true };
   }
 
-  searchMemory({ project, query, category, limit = 10, semantic = true }) {
-    const projectId = project ? this.getOrCreateProject(project, "") : null;
+  searchMemory({ project, projectPath, query, category, limit = 10, semantic = true }) {
+    const projectId = project ? this.findProject(project, projectPath) : null;
     const results = {};
     const likeQuery = `%${query || ""}%`;
 
-    const needSemantic = semantic && this.useEmbeddings && query;
+    if (!projectId) {
+      if (!category || category === "decisions") results.decisions = [];
+      if (!category || category === "bugs") results.bugs = [];
+      if (!category || category === "architecture") results.architecture = [];
+      return results;
+    }
+
+    const queryEmbedding = semantic && this.useEmbeddings && query ? embedQuery(query) : null;
 
     if (!category || category === "decisions") {
-      if (needSemantic) {
-        const embedding = embedQuery(query);
-        if (embedding) {
-          const rows = this.db.prepare(
+      if (queryEmbedding) {
+        const rows = this.db.prepare(
             `SELECT d.id, d.category, d.title, d.content, d.rationale, d.tags, d.created_at,
-                    de.embedding
+                     de.embedding
              FROM decisions d
-             LEFT JOIN decision_embeddings de ON d.id = de.decision_id
-             WHERE d.project_id = ?
-             ORDER BY (CASE WHEN de.embedding IS NOT NULL THEN 1 ELSE 0 END) DESC, d.created_at DESC
-             LIMIT ?`
-          ).all(projectId, limit);
-          results.decisions = rows;
-        }
-      }
-      if (!semantic || !needSemantic) {
+             JOIN decision_embeddings de ON d.id = de.decision_id
+             WHERE d.project_id = ? AND d.is_private = 0`
+          ).all(projectId);
+        results.decisions = rankByEmbedding(rows, queryEmbedding, limit);
+      } else {
         results.decisions = this.db.prepare(
           `SELECT id, category, title, content, rationale, tags, created_at
-           FROM decisions WHERE project_id = ? AND (title LIKE ? OR content LIKE ? OR tags LIKE ?)
+           FROM decisions WHERE project_id = ? AND is_private = 0 AND (title LIKE ? OR content LIKE ? OR tags LIKE ?)
            ORDER BY created_at DESC LIMIT ?`
         ).all(projectId, likeQuery, likeQuery, likeQuery, limit);
       }
     }
 
     if (!category || category === "bugs") {
-      if (needSemantic) {
-        const embedding = embedQuery(query);
-        if (embedding) {
-          const rows = this.db.prepare(
+      if (queryEmbedding) {
+        const rows = this.db.prepare(
             `SELECT b.id, b.title, b.description, b.root_cause, b.fix, b.lesson, b.tags, b.created_at,
-                    be.embedding
+                     be.embedding
              FROM bug_fixes b
-             LEFT JOIN bug_embedding_cache be ON b.id = be.bug_id
-             WHERE b.project_id = ?
-             ORDER BY (CASE WHEN be.embedding IS NOT NULL THEN 1 ELSE 0 END) DESC, b.created_at DESC
-             LIMIT ?`
-          ).all(projectId, limit);
-          results.bugs = rows;
-        }
-      }
-      if (!semantic || !needSemantic) {
+             JOIN bug_embedding_cache be ON b.id = be.bug_id
+             WHERE b.project_id = ?`
+          ).all(projectId);
+        results.bugs = rankByEmbedding(rows, queryEmbedding, limit);
+      } else {
         results.bugs = this.db.prepare(
           `SELECT id, title, description, root_cause, fix, lesson, tags, created_at
            FROM bug_fixes WHERE project_id = ? AND (title LIKE ? OR description LIKE ? OR tags LIKE ?)
@@ -207,11 +278,15 @@ export class MemoryAdapter {
   }
 
   getContext({ project, projectPath, limit = 5 }) {
-    const projectId = this.getOrCreateProject(project, projectPath);
+    const projectId = this.findProject(project, projectPath);
     const context = {};
 
+    if (!projectId) {
+      return { recentDecisions: [], recentBugs: [], architecture: [], preferences: [], ollamaAvailable: this.useEmbeddings };
+    }
+
     context.recentDecisions = this.db.prepare(
-      "SELECT id, category, title, content, created_at FROM decisions WHERE project_id = ? ORDER BY created_at DESC LIMIT ?"
+      "SELECT id, category, title, content, created_at FROM decisions WHERE project_id = ? AND is_private = 0 ORDER BY created_at DESC LIMIT ?"
     ).all(projectId, limit);
 
     context.recentBugs = this.db.prepare(
@@ -232,87 +307,116 @@ export class MemoryAdapter {
   }
 
   getHistory({ project, projectPath, limit = 20 }) {
-    const projectId = this.getOrCreateProject(project, projectPath);
+    const projectId = this.findProject(project, projectPath);
+    if (!projectId) return [];
     return this.db.prepare(
       "SELECT id, session_id, action, detail, result, files_touched, created_at FROM session_history WHERE project_id = ? ORDER BY created_at DESC LIMIT ?"
     ).all(projectId, limit);
   }
 
-  exportProject({ project, projectPath }) {
-    const projectId = this.getOrCreateProject(project, projectPath);
+  exportProject({ project, projectPath, includePrivate = false, includeOperational = false }) {
+    const projectId = this.findProject(project, projectPath);
+    if (!projectId) {
+      return {
+        project: { name: project, path: resolve(projectPath || ".") },
+        decisions: [],
+        bugFixes: [],
+        architecture: [],
+        preferences: [],
+        history: [],
+        ollamaAvailable: this.useEmbeddings,
+      };
+    }
     return {
       project: this.db.prepare("SELECT * FROM projects WHERE id = ?").get(projectId),
-      decisions: this.db.prepare("SELECT * FROM decisions WHERE project_id = ?").all(projectId),
-      bugFixes: this.db.prepare("SELECT * FROM bug_fixes WHERE project_id = ?").all(projectId),
-      architecture: this.db.prepare("SELECT * FROM architecture WHERE project_id = ?").all(projectId),
-      preferences: this.db.prepare("SELECT * FROM preferences WHERE project_id = ?").all(projectId),
-      history: this.db.prepare("SELECT * FROM session_history WHERE project_id = ?").all(projectId),
+      decisions: includePrivate
+        ? this.db.prepare("SELECT * FROM decisions WHERE project_id = ?").all(projectId)
+        : this.db.prepare("SELECT * FROM decisions WHERE project_id = ? AND is_private = 0").all(projectId),
+      bugFixes: includeOperational
+        ? this.db.prepare("SELECT * FROM bug_fixes WHERE project_id = ?").all(projectId)
+        : [],
+      architecture: includeOperational
+        ? this.db.prepare("SELECT * FROM architecture WHERE project_id = ?").all(projectId)
+        : [],
+      preferences: includeOperational
+        ? this.db.prepare("SELECT * FROM preferences WHERE project_id = ?").all(projectId)
+        : [],
+      history: includeOperational
+        ? this.db.prepare("SELECT * FROM session_history WHERE project_id = ?").all(projectId)
+        : [],
       ollamaAvailable: this.useEmbeddings,
     };
   }
 
   importProject(data) {
-    const projectId = this.getOrCreateProject(data.project.name || "imported", data.project.path || "");
-    const clearTables = [
-      "DELETE FROM decisions WHERE project_id = ?",
-      "DELETE FROM bug_fixes WHERE project_id = ?",
-      "DELETE FROM architecture WHERE project_id = ?",
-      "DELETE FROM preferences WHERE project_id = ?",
-      "DELETE FROM session_history WHERE project_id = ?",
-      "DELETE FROM decision_embeddings WHERE decision_id NOT IN (SELECT id FROM decisions)",
-      "DELETE FROM bug_embedding_cache WHERE bug_id NOT IN (SELECT id FROM bug_fixes)",
-    ];
-    for (const sql of clearTables) {
-      this.db.prepare(sql).run(projectId);
-    }
+    validateImportData(data);
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const projectId = this.getOrCreateProject(data.project.name, data.project.path || ".");
+      const clearTables = [
+        "DELETE FROM decisions WHERE project_id = ?",
+        "DELETE FROM bug_fixes WHERE project_id = ?",
+        "DELETE FROM architecture WHERE project_id = ?",
+        "DELETE FROM preferences WHERE project_id = ?",
+        "DELETE FROM session_history WHERE project_id = ?",
+      ];
+      for (const sql of clearTables) this.db.prepare(sql).run(projectId);
 
-    if (data.decisions) {
+      if (data.decisions) {
       for (const d of data.decisions) {
         this.db.prepare(
-          "INSERT INTO decisions (id, project_id, category, title, content, rationale, tags, is_private, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        ).run(d.id, projectId, d.category, d.title, d.content, d.rationale, d.tags, d.is_private, d.created_at);
+          "INSERT INTO decisions (project_id, category, title, content, rationale, tags, is_private, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).run(projectId, d.category, d.title, d.content, d.rationale, d.tags, d.is_private, d.created_at);
       }
-    }
-    if (data.bugFixes) {
+      }
+      if (data.bugFixes) {
       for (const b of data.bugFixes) {
         this.db.prepare(
-          "INSERT INTO bug_fixes (id, project_id, title, description, root_cause, fix, lesson, tags, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        ).run(b.id, projectId, b.title, b.description, b.root_cause, b.fix, b.lesson, b.tags, b.created_at);
+          "INSERT INTO bug_fixes (project_id, title, description, root_cause, fix, lesson, tags, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+        ).run(projectId, b.title, b.description, b.root_cause, b.fix, b.lesson, b.tags, b.created_at);
       }
-    }
-    if (data.architecture) {
+      }
+      if (data.architecture) {
       for (const a of data.architecture) {
         this.db.prepare(
-          "INSERT INTO architecture (id, project_id, component, description, rationale, tags, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).run(a.id, projectId, a.component, a.description, a.rationale, a.tags, a.created_at);
+          "INSERT INTO architecture (project_id, component, description, rationale, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+        ).run(projectId, a.component, a.description, a.rationale, a.tags, a.created_at);
       }
-    }
-    if (data.preferences) {
+      }
+      if (data.preferences) {
       for (const p of data.preferences) {
-        this.db.prepare("INSERT INTO preferences (id, project_id, key, value, created_at) VALUES (?, ?, ?, ?, ?)")
-          .run(p.id, projectId, p.key, p.value, p.created_at);
+        this.db.prepare("INSERT INTO preferences (project_id, key, value, created_at) VALUES (?, ?, ?, ?)")
+          .run(projectId, p.key, p.value, p.created_at);
       }
-    }
-    if (data.history) {
+      }
+      if (data.history) {
       for (const h of data.history) {
         this.db.prepare(
-          "INSERT INTO session_history (id, project_id, session_id, action, detail, result, files_touched, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        ).run(h.id, projectId, h.session_id, h.action, h.detail, h.result, h.files_touched, h.created_at);
+          "INSERT INTO session_history (project_id, session_id, action, detail, result, files_touched, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+        ).run(projectId, h.session_id, h.action, h.detail, h.result, h.files_touched, h.created_at);
       }
-    }
+      }
 
-    return { imported: true, projectId };
+      this.db.exec("COMMIT");
+      return { imported: true, projectId };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
-}
-  exportToObsidian({ project, projectPath, outputDir }) {
-    const projectId = this.getOrCreateProject(project, projectPath);
-    const decisions = this.db.prepare("SELECT * FROM decisions WHERE project_id = ?").all(projectId);
-    const bugs = this.db.prepare("SELECT * FROM bug_fixes WHERE project_id = ?").all(projectId);
+
+  async exportToObsidian({ project, projectPath, outputDir, includeBugs = false }) {
+    const projectId = this.findProject(project, projectPath);
+    if (!projectId) return { decisions: 0, bugs: 0, outputDir: outputDir || join(process.cwd(), "docs", "decisions") };
+    const decisions = this.db.prepare("SELECT * FROM decisions WHERE project_id = ? AND is_private = 0").all(projectId);
+    const bugs = includeBugs
+      ? this.db.prepare("SELECT * FROM bug_fixes WHERE project_id = ?").all(projectId)
+      : [];
 
     const fs = await import("node:fs");
-    const path = await import("node:path");
+    const nodePath = await import("node:path");
 
-    const outDir = outputDir || join(process.cwd(), "docs", "decisions");
+    const outDir = outputDir || nodePath.join(process.cwd(), "docs", "decisions");
     if (!fs.existsSync(outDir)) {
       fs.mkdirSync(outDir, { recursive: true });
     }
@@ -338,7 +442,7 @@ ${d.rationale || "N/A"}
 
 [[Decisiones Anteriores]]
 `;
-      fs.writeFileSync(join(outDir, fileName), content);
+      fs.writeFileSync(nodePath.join(outDir, fileName), content, { mode: 0o600 });
     }
 
     for (const b of bugs) {
@@ -367,8 +471,9 @@ ${b.fix}
 
 ${b.lesson || "N/A"}
 `;
-      fs.writeFileSync(join(outDir, fileName), content);
+      fs.writeFileSync(nodePath.join(outDir, fileName), content, { mode: 0o600 });
     }
 
     return { decisions: decisions.length, bugs: bugs.length, outputDir: outDir };
   }
+}

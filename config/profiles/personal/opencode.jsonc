@@ -8,10 +8,10 @@
   },
   "tool_output": { "max_lines": 120, "max_bytes": 8192 },
   "plugin": [
-    "/home/miguel/.config/opencode/plugins/personalities.js",
-    "/home/miguel/.config/opencode/plugins/guardrails.js",
-    "/home/miguel/.config/opencode/plugins/checkpoints.js",
-    "/home/miguel/.config/opencode/plugins/validator.js",
-    "/home/miguel/.config/opencode/plugins/session-metrics.js"
+    "__OPENCODE_DIR__/plugins/personalities.js",
+    "__OPENCODE_DIR__/plugins/guardrails.js",
+    "__OPENCODE_DIR__/plugins/checkpoints.js",
+    "__OPENCODE_DIR__/plugins/validator.js",
+    "__OPENCODE_DIR__/plugins/session-metrics.js"
   ]
 }

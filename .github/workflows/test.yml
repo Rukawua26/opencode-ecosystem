@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node-version: [18, 20, 22]
+        node-version: [22]
 
     steps:
       - uses: actions/checkout@v4
@@ -29,13 +29,19 @@ jobs:
         run: npm run lint
         continue-on-error: true
 
-      - name: Run unit tests
+      - name: Run vitest tests
         run: npm test
+
+      - name: Run memory-adapter tests (node:test)
+        run: node --test packages/memory-adapter/tests/*.test.js
 
       - name: Run install test
         run: npm run test:install
         env:
           HOME: /tmp/test-home
+
+      - name: Run hook safety test
+        run: npm run test:hooks
 
   install-validation:
     runs-on: ubuntu-latest

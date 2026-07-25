@@ -18,7 +18,6 @@ describe("Skills structure", () => {
   const skills = getSkillDirs();
 
   it("should have at least 10 skills", () => {
-  it("should have at least 10 skills", () => {
     expect(skills.length).toBeGreaterThanOrEqual(10);
   });
 

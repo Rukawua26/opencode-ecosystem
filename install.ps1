@@ -28,22 +28,28 @@ if ($missing.Count -gt 0) {
     Write-Err "Install with: winget install $($missing -join ' ') or choco install $($missing -join ' ')"
     exit 1
 }
+$NodeMajor = [int]((node --version).TrimStart('v').Split('.')[0])
+if ($NodeMajor -lt 22) {
+    Write-Err "Node.js 22 or newer is required for the native node:sqlite module"
+    exit 1
+}
 Write-Info "Dependencies OK: node=$(node --version), git=$(git --version)"
 
 # Set paths
 $OpenCodeDir = Join-Path $env:USERPROFILE ".config\opencode"
 $OpenCodeBinDir = Join-Path $env:USERPROFILE ".opencode\bin"
 $DataDir = Join-Path $env:LOCALAPPDATA "opencode\plugins-data"
+$ToolsDir = Join-Path $OpenCodeDir "tools"
 
 Write-Log "Creating directories..."
-$null = New-Item -ItemType Directory -Force -Path $OpenCodeDir, "$OpenCodeDir\plugins", "$OpenCodeDir\mcp", "$OpenCodeDir\agents", "$OpenCodeDir\profiles", $OpenCodeBinDir, $DataDir
+$null = New-Item -ItemType Directory -Force -Path $OpenCodeDir, "$OpenCodeDir\plugins", "$OpenCodeDir\lib", "$OpenCodeDir\mcp", "$OpenCodeDir\agents", "$OpenCodeDir\profiles", $ToolsDir, $OpenCodeBinDir, $DataDir
 Write-Info "Directories created at $OpenCodeDir"
 
 # Determine script location
 $ScriptDir = if ($MyInvocation.MyCommand.Path) { Split-Path $MyInvocation.MyCommand.Path } else { Get-Location }
-if (Test-Path (Join-Path $ScriptDir ".git")) {
+if ((Test-Path (Join-Path $ScriptDir "config\opencode.jsonc")) -and (Test-Path (Join-Path $ScriptDir "skills"))) {
     $RepoDir = $ScriptDir
-    Write-Info "Running from repo, using local files"
+    Write-Info "Using local distribution files"
 } else {
     $TempDir = [System.IO.Path]::GetTempFileName() | ForEach-Object { [System.IO.Path]::ChangeExtension($_, '') }
     New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
@@ -58,12 +64,13 @@ Write-Log "Installing config..."
 
 # opencode.jsonc
 $ConfigPath = Join-Path $OpenCodeDir "opencode.jsonc"
-if (Test-Path $ConfigPath -and -not $Force) {
-    Write-Warn "opencode.jsonc already exists, backing up..."
+if ((Test-Path $ConfigPath) -and -not $Force) {
+    Write-Warn "opencode.jsonc already exists; preserving it (use -Force to replace)"
     Copy-Item $ConfigPath "$ConfigPath.bak" -Force
+} else {
+    Copy-Item (Join-Path $RepoDir "config\opencode.jsonc") $ConfigPath -Force
+    Write-Info "opencode.jsonc installed"
 }
-Copy-Item (Join-Path $RepoDir "config\opencode.jsonc") $ConfigPath -Force
-Write-Info "opencode.jsonc installed"
 
 # Agents
 Write-Log "Installing agents..."
@@ -77,6 +84,10 @@ $PluginFiles = Get-ChildItem (Join-Path $RepoDir "config\plugins") -Filter "*.js
 foreach ($f in $PluginFiles) { Copy-Item $f.FullName (Join-Path $OpenCodeDir "plugins") -Force }
 Write-Info "Plugins copied: $($PluginFiles.Count)"
 
+$LibraryFiles = Get-ChildItem (Join-Path $RepoDir "config\lib") -Filter "*.js" -ErrorAction SilentlyContinue
+foreach ($f in $LibraryFiles) { Copy-Item $f.FullName (Join-Path $OpenCodeDir "lib") -Force }
+Write-Info "Plugin libraries copied: $($LibraryFiles.Count)"
+
 # MCP servers
 Write-Log "Installing MCP servers..."
 $McpFiles = Get-ChildItem (Join-Path $RepoDir "config\mcp") -Filter "*.js" -ErrorAction SilentlyContinue
@@ -88,7 +99,12 @@ Write-Log "Installing profiles..."
 $ProfileDirs = Get-ChildItem (Join-Path $RepoDir "config\profiles") -Directory -ErrorAction SilentlyContinue
 foreach ($d in $ProfileDirs) {
     $dest = Join-Path $OpenCodeDir "profiles" $d.Name
-    Copy-Item $d.FullName $dest -Recurse -Force
+    New-Item -ItemType Directory -Force -Path $dest | Out-Null
+    Copy-Item (Join-Path $d.FullName "*") $dest -Recurse -Force
+    $ProfileConfig = Join-Path $dest "opencode.jsonc"
+    if (Test-Path $ProfileConfig) {
+        (Get-Content $ProfileConfig -Raw).Replace("__OPENCODE_DIR__", $OpenCodeDir.Replace("\", "/")) | Set-Content $ProfileConfig -Encoding UTF8
+    }
 }
 Write-Info "Profiles copied: $($ProfileDirs.Count)"
 
@@ -99,7 +115,7 @@ $SkillDirs = Get-ChildItem (Join-Path $RepoDir "skills") -Directory -ErrorAction
 foreach ($d in $SkillDirs) {
     $dest = Join-Path $SkillsDir $d.Name
     New-Item -ItemType Directory -Force -Path $dest | Out-Null
-    Copy-Item $d.FullName $dest -Recurse -Force
+    Copy-Item (Join-Path $d.FullName "*") $dest -Recurse -Force
     Write-Info "Skill installed: $($d.Name)"
 }
 
@@ -108,6 +124,20 @@ $EnvExample = Join-Path $OpenCodeDir ".env.example"
 if (Test-Path (Join-Path $RepoDir ".env.example")) {
     Copy-Item (Join-Path $RepoDir ".env.example") $EnvExample -Force
     Write-Info ".env.example copied (configure your API keys manually)"
+}
+
+# Global doctor command
+$DoctorSource = Join-Path $RepoDir "tools\scripts\doctor.js"
+if (Test-Path $DoctorSource) {
+    Copy-Item $DoctorSource (Join-Path $ToolsDir "doctor.js") -Force
+    '@node "%USERPROFILE%\.config\opencode\tools\doctor.js" %*' | Set-Content (Join-Path $OpenCodeBinDir "opencode-doctor.cmd") -Encoding Ascii
+    Write-Info "opencode-doctor installed at $OpenCodeBinDir\opencode-doctor.cmd"
+}
+$MetricsSource = Join-Path $RepoDir "tools\scripts\opencode-metrics.js"
+if (Test-Path $MetricsSource) {
+    Copy-Item $MetricsSource (Join-Path $ToolsDir "opencode-metrics.js") -Force
+    '@node "%USERPROFILE%\.config\opencode\tools\opencode-metrics.js" %*' | Set-Content (Join-Path $OpenCodeBinDir "opencode-metrics.cmd") -Encoding Ascii
+    Write-Info "opencode-metrics installed at $OpenCodeBinDir\opencode-metrics.cmd"
 }
 
 # Memory adapter
@@ -124,6 +154,7 @@ if (-not $SkipMemory) {
         Pop-Location
         Write-Info "Memory adapter installed at $MemDir"
     }
+    '@node "%USERPROFILE%\.config\opencode\mcp\memory-adapter\src\cli.js" %*' | Set-Content (Join-Path $OpenCodeBinDir "memory-adapter.cmd") -Encoding Ascii
 } else {
     Write-Warn "Skipping memory adapter (--skip-memory)"
 }
@@ -145,11 +176,16 @@ Assert-Path (Join-Path $OpenCodeDir "mcp") "mcp dir"
 Assert-Path (Join-Path $OpenCodeDir "profiles") "profiles dir"
 Assert-Path (Join-Path $SkillsDir) "skills dir"
 Assert-Path $EnvExample ".env.example"
+Assert-Path (Join-Path $ToolsDir "doctor.js") "doctor.js"
+Assert-Path (Join-Path $OpenCodeBinDir "opencode-doctor.cmd") "opencode-doctor command"
+Assert-Path (Join-Path $OpenCodeDir "lib\session-metrics.js") "session-metrics library"
+Assert-Path (Join-Path $OpenCodeBinDir "opencode-metrics.cmd") "opencode-metrics command"
+if (-not $SkipMemory) { Assert-Path (Join-Path $OpenCodeBinDir "memory-adapter.cmd") "memory-adapter command" }
 
 $agentCount = (Get-ChildItem (Join-Path $OpenCodeDir "agents") -Filter "*.md" -ErrorAction SilentlyContinue).Count
 $pluginCount = (Get-ChildItem (Join-Path $OpenCodeDir "plugins") -Filter "*.js" -ErrorAction SilentlyContinue).Count
 $skillCount = (Get-ChildItem (Join-Path $SkillsDir) -Directory -ErrorAction SilentlyContinue | Measure-Object).Count
-$skillCount = if ($skillCount -gt 0) { $skillCount.Count } else { 0 }
+$skillCount = if ($skillCount -gt 0) { $skillCount } else { 0 }
 
 Write-Host ""
 Write-Log "Installation summary:"

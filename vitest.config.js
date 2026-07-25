@@ -6,7 +6,9 @@ export default defineConfig({
     environment: "node",
     include: [
       "tests/**/*.test.js",
-      "packages/*/tests/**/*.test.js",
+    ],
+    exclude: [
+      "packages/**",
     ],
     coverage: {
       reporter: ["text", "json-summary"],
