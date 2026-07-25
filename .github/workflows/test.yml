@@ -15,7 +15,7 @@ jobs:
         node-version: [22]
 
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v7.0.1
 
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4.1.0
@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-latest
     container: node:22-alpine
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v7.0.1
 
       - name: Install git
         run: apk add --no-cache git bash
