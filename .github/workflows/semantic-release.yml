@@ -29,6 +29,16 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Debug PAT scopes
+        env:
+          GH_TOKEN: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
+        run: |
+          echo "PAT scopes:"
+          curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/user | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log('User:', j.login);console.log('Scopes:', j.scopes || 'N/A')"
+          echo "---"
+          echo "Repo access:"
+          curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/${{ github.repository }} | node -e "const d=require('fs').readFileSync(0,'utf8');const j=JSON.parse(d);console.log('Repo:', j.full_name);console.log('Permissions:', JSON.stringify(j.permissions || {}))"
+
       - name: Configure git remote with PAT
         run: |
           git remote set-url origin https://x-access-token:${{ secrets.ECOSYSTEMAPUBLISH2 }}@github.com/${{ github.repository }}.git
