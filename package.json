@@ -1,6 +1,6 @@
 {
   "name": "opencode-ecosystem",
-  "version": "1.5.2",
+  "version": "1.6.1",
   "private": true,
   "type": "module",
   "description": "Open source ecosystem for OpenCode: memory, SDD, skills, multi-model agents",
