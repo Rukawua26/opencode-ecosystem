@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg" alt="OpenCode Ecosystem" width="100%" />
+  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg?v=1.6.1" alt="OpenCode Ecosystem" width="100%" />
 </p>
 
 <p align="center">
@@ -59,7 +59,7 @@ cd opencode-ecosystem
 
 ```mermaid
 graph TD
-    subgraph "🎯 OpenCode Ecosystem v1.3"
+    subgraph "🎯 OpenCode Ecosystem v1.6.1"
         A[CLI Install] --> B[config/]
         A --> C[skills/]
         A --> D[packages/]
@@ -231,9 +231,9 @@ Análisis del paquete `hypruse` 0.9.4 (dispatcher para Hyprland Lua-shim, `point
    - `hypruse_pointer scroll` → `cursor now at (150,500)` ✅
    - `hypruse_pointer click` → `click ok` ✅
    - `hypruse_hypr focus_window target=0x...eafef0` → `active_window: 0x...eafef0` ✅ (P4 ventana flotante)
-   - `hypruse_launch brave --new-tab https://aicl…` → `title: aicall.io – KI für Hotels` ✅ (P3)
+   - `hypruse_launch brave --new-tab https://aicall.io` → `title: aicall.io – KI für Hotels` ✅ (P3)
    - navegación GoHighLevel → sidebar "Automatización" → URL `…/automation/workflows` ✅
-   - `webfetch https://aicall.io` → confirma título real = "apicall.io – KI für Hotels" (valida URL, detecta omnibox hijack)
+   - `webfetch https://aicall.io` → confirma título real = "aicall.io – KI für Hotels" (valida URL, detecta omnibox hijack)
 4. **Review (capas) — Organic RDD tiers:**
    - Tier 0: `docs/sources/hypruse-analysis.md` (referencia, 0 ceremony).
    - Tier 1: `AGENTS.md` (philosophy: i5-1235U, 8GB RAM, YAGNI, ahorro de tokens).

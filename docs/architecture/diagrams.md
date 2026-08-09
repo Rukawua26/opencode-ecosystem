@@ -4,7 +4,7 @@
 
 ```mermaid
 graph TD
-    subgraph "OpenCode Ecosystem v1.3"
+    subgraph "OpenCode Ecosystem v1.6.1"
         A[CLI Install] --> B[config/]
         A --> C[skills/]
         A --> D[packages/]
@@ -41,37 +41,40 @@ graph TD
     K -->|reads| D1
     K -->|uses| C1
     K -->|queries| D1a
+    K -->|verifies via| P[hypruse MCP tools]
+    R[ADR-004 analysis] -->|documents| P
 
     L[npm registry] <-->|publish| D1
-    M[GitHub Releases] <-->|tag v1.3.0| H3
+    M[GitHub Releases] <-->|tag v1.6.1| H3
 ```
 
-## Flujo de Trabajo del Agente
+## Grafo de Trabajo del Agente (SDD + Organic RDD)
 
 ```mermaid
-flowchart LR
-    A[User Prompt] --> B{Agent Route}
-    B -->|Backend| C1[backend agent]
-    B -->|Frontend| C2[frontend agent]
-    B -->|Security| C3[security agent]
-    B -->|DevOps| C4[devops agent]
-    B -->|Debug| C5[debug agent]
-
-    C1 --> D[Memory Layer]
-    C2 --> D
-    C3 --> D
-    C4 --> D
-    C5 --> D
-
-    D --> E[Structured Context]
-    E --> F[Token Metrics]
-    F --> G[opencode-metrics]
+graph LR
+    A[User Prompt] --> B[Agent]
+    B --> C[Plan: SDD]
+    C --> D[Build: atomic task]
+    D --> E[Verify: tests + evidence]
+    E --> F[Review: Organic RDD]
+    F --> G{Decision}
+    G -->|pass| H[Merge / release]
+    G -->|fail| C
+    F --> I[Tier 0-3 risk]
+    F --> J[Review lenses]
+    F --> K[Receipt: start-capture-verify-finalize]
+    I --> K
+    J --> K
+    K --> H
+    B --> L[Skills on demand]
+    B --> M[Local model router]
+    B --> N[Memory adapter]
 ```
 
-## Flujo SDD (Spec-Driven Development)
+## Grafo SDD (Spec-Driven Development)
 
 ```mermaid
-flowchart TD
+graph TD
     A[Feature Request] --> B[spec.md]
     B --> C[plan.md]
     C --> D[tasks.md]
@@ -90,7 +93,7 @@ flowchart TD
 ## Diagrama de Seguridad
 
 ```mermaid
-flowchart TD
+graph TD
     A[Usuario] --> B[OpenCode CLI]
     B --> C[Plugins]
     B --> D[MCP Servers]
@@ -118,11 +121,11 @@ flowchart TD
 ## Flujo de Release
 
 ```mermaid
-flowchart LR
+graph LR
     A[PR merged a main] --> B[CI Tests]
     B --> C{Tests pass?}
     C -->|No| D[Fix required]
-    C -->|Yes| E[Tag v1.3.0]
+    C -->|Yes| E[Tag v1.6.1]
     E --> F[Release workflow]
     F --> G[npm publish]
     F --> H[GitHub Release]
