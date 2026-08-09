@@ -212,6 +212,12 @@ cp .env.example ~/.config/opencode/.env
 
 ---
 
+## 📋 Nota técnica — ADR-004 (2026-08-09)
+
+Análisis del paquete `hypruse` 0.9.4 (dispatcher `hl.dsp.*` para Hyprland Lua-shim, `pointer` reparado con `hl.dsp.cursor.move`, sin parche inventado). Ver `docs/sources/hypruse-analysis.md` (rama `feature/adr-004-hypruse-analysis`).
+
+---
+
 ## 📜 Licencia
 
 [MIT](https://opensource.org/licenses/MIT) © 2026 Rukawua26
