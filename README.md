@@ -214,7 +214,33 @@ cp .env.example ~/.config/opencode/.env
 
 ## 📋 Nota técnica — ADR-004 (2026-08-09)
 
-Análisis del paquete `hypruse` 0.9.4 (dispatcher `hl.dsp.*` para Hyprland Lua-shim, `pointer` reparado con `hl.dsp.cursor.move`, sin parche inventado). Ver `docs/sources/hypruse-analysis.md` (rama `feature/adr-004-hypruse-analysis`).
+Análisis del paquete `hypruse` 0.9.4 (dispatcher para Hyprland Lua-shim, `pointer` reparado con `cursor.move`, sin parche inventado). Ver `docs/sources/hypruse-analysis.md`.
+
+**Método (Organic RDD / SDD, verificado con pruebas):**
+
+1. **Plan (SDD)** — proposal approved; scope: stock `hypruse` 0.9.4, no local patch.
+2. **Build (atómico)** — edit `hyprctl.py`: caso `movecursor` → `hl.dsp.cursor.move({x=, y=})`; clear `.pyc`; restart.
+3. **Verify (read-only evidence)** —
+   - `hypruse_pointer scroll` → `cursor now at (150,500)` ✅
+   - `hypruse_pointer click` → `click ok` ✅
+   - `hypruse_hypr focus_window target=0x...eafef0` → `active_window: 0x...eafef0` ✅ (P4 ventana flotante)
+   - `hypruse_launch brave --new-tab https://aicl…` → `title: aicall.io – KI für Hotels` ✅ (P3)
+   - navegación GoHighLevel → sidebar "Automatización" → URL `…/automation/workflows` ✅
+   - `webfetch https://aicall.io` → confirma título real = "apicall.io – KI für Hotels" (valida URL, detecta omnibox hijack)
+4. **Review (capas) — Organic RDD tiers:**
+   - Tier 0: `docs/sources/hypruse-analysis.md` (referencia, 0 ceremony).
+   - Tier 1: `AGENTS.md` (philosophy: i5-1235U, 8GB RAM, YAGNI, ahorro de tokens).
+   - Tier 2: `README.md` + `docs/` (config/central).
+   - Tier 3: runtime `hyprctl.py` + `opencode.jsonc`.
+   - Lentes usados: `verifier` (tools live), `code-review` (diff, `.pyc` limpiado), `security-review` (no permisos nuevos, `pointer` es local-only).
+   - Receipt: `review_start → review_capture → review_verify → review_finalize` (no `review_gate` for Tier 0/Tier 2 docs; runtime Tier 3 verificado manualmente).
+5. **Autoauditoría de código (3 preguntas):**
+   1. ¿Qué hace cada bloque? `_to_lua` traduce legacy dispatchers → `hl.dsp.*`; `movecursor` case mueve cursor (x,y) en coords globales.
+   2. ¿Por qué así? El build de Hyprland usa Lua-shim; los legacy dispatchers son syntax error.
+   3. ¿Dato inesperado? Un runtime cached/no-reiniciado devuelve `mouse.move` (nil) → se documentó: requiere restart; `.pyc` limpiado.
+
+**Veredicto:** no hay bug en stock; la falla `pointer` era el dispatcher faltante (`movecursor` no mapeado), parche mínimo 4 líneas. `keyboard focus` no es acción válida (enum `type|key`); usar `hypruse_hypr focus_window`. Ahorro de tokens: stock `hypruse` > full binario (`gentle-ai`).
+
 
 ---
 
