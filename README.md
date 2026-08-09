@@ -96,33 +96,40 @@ graph TD
     K -->|reads| D1
     K -->|uses| C1
     K -->|queries| D1a
+    K -->|verifies via| P[hypruse MCP tools]
+    R[ADR-004 docs/sources/adr-004-hypruse-analysis] -->|validates| P
 
     L[🌐 npm registry] <-->|publish| D1
-    M[📦 GitHub Releases] <-->|tag v1.3.0| H3
+    M[📦 GitHub Releases] <-->|tag v1.6.1| H3
 ```
 
 ---
 
-## 🔄 Flujo de Trabajo
+## 🔄 Flujo de Trabajo (SDD + Organic RDD verificado, ADR-004)
 
 ```mermaid
-flowchart LR
-    A[📝 User Prompt] --> B{Agent Route}
-    B -->|Backend| C1[backend agent]
-    B -->|Frontend| C2[frontend agent]
-    B -->|Security| C3[security agent]
-    B -->|DevOps| C4[devops agent]
-    B -->|Debug| C5[debug agent]
-
-    C1 --> D[💾 Memory Layer]
-    C2 --> D
-    C3 --> D
-    C4 --> D
-    C5 --> D
-
-    D --> E[🧩 Structured Context]
-    E --> F[📊 Token Metrics]
-    F --> G[📈 opencode-metrics]
+graph LR
+    Prompt["📝 User Prompt"] --> Agente["🤖 Agente"]
+    Agente --> Plan["📋 Plan (SDD): proposal approved"]
+    Plan --> Build["🔨 Build: edit atomic (hyprctl.py, README)"]
+    Build --> Verify["✅ Verify: hypruse_* tools + webfetch live"]
+    Verify --> Review["🔍 Review (Organic RDD tiers)"]
+    Review --> Decision{"Decisión"}
+    Decision -- "OK / YAGNI" --> Merge["📦 Push (main / feature branch)"]
+    Decision -- "Reabrir" --> Plan
+    Review -->|Tier 0/1/2/3| T0["📄 docs (0 ceremony)"]
+    Review -->|verifier| T1["🧪 code-review + security-review"]
+    Review -->|evidence| Receipt["🧾 Receipt: start→capture→verify→finalize"]
+    T0 --> Receipt
+    T1 --> Receipt
+    Receipt --> Merge
+    Merge --> npm["🌐 npm registry"]
+    Merge --> gh["📦 GitHub Release"]
+    subgraph "Ahorro de tokens / YAGNI (hardware: i5-1235U, 8GB)"
+        Plan
+        Verify
+        T0
+    end
 ```
 
 ---
