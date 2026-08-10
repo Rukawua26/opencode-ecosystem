@@ -35,6 +35,26 @@ describe("memory MCP server", () => {
       projectPath: PROJECT_ROOT,
       title: "Trusted decision",
       content: "Visible only in the trusted project",
+      tags: "feature:001,receipt:r1",
+    });
+    setup.saveDecision({
+      project: PROJECT_NAME,
+      projectPath: PROJECT_ROOT,
+      title: "Private trusted decision",
+      content: "Must never leave the local CLI",
+      isPrivate: true,
+    });
+    setup.savePreference({
+      project: PROJECT_NAME,
+      projectPath: PROJECT_ROOT,
+      key: "api_key",
+      value: "must-require-explicit-kind",
+    });
+    setup.saveSessionAction({
+      project: PROJECT_NAME,
+      projectPath: PROJECT_ROOT,
+      action: "touched_secret",
+      filesTouched: ".env",
     });
     setup.saveDecision({
       project: "other-project",
@@ -92,6 +112,8 @@ describe("memory MCP server", () => {
     assert.ok(!names.includes("import_project"));
     assert.ok(!names.includes("export_to_obsidian"));
     assert.ok(!names.some((name) => name.startsWith("save_")));
+    assert.ok(names.includes("list_events"));
+    assert.ok(names.includes("export_events"));
     assert.ok(!Object.hasOwn(exportTool.inputSchema.properties, "includePrivate"));
     assert.ok(!Object.hasOwn(exportTool.inputSchema.properties, "project"));
   });
@@ -107,6 +129,13 @@ describe("memory MCP server", () => {
 
     assert.strictEqual(response.result.isError, true);
     assert.match(response.result.content[0].text, /limit must be a number/);
+
+    const zeroLimit = await request("tools/call", {
+      name: "list_events",
+      arguments: { limit: 0 },
+    });
+    assert.strictEqual(zeroLimit.result.isError, true);
+    assert.match(zeroLimit.result.content[0].text, /positive integer/);
   });
 
   it("binds reads to the trusted project without creating metadata", async () => {
@@ -118,5 +147,41 @@ describe("memory MCP server", () => {
     const projects = database.db.prepare("SELECT name FROM projects ORDER BY name").all();
     database.close();
     assert.deepStrictEqual(projects.map((item) => item.name), ["other-project", PROJECT_NAME]);
+  });
+
+  it("lists and exports only canonical non-private events", async () => {
+    const listed = await request("tools/call", {
+      name: "list_events",
+      arguments: { kind: "decision", limit: 10 },
+    });
+    const events = JSON.parse(listed.result.content[0].text);
+    assert.deepStrictEqual(events.map((event) => event.content.title), ["Trusted decision"]);
+    assert.deepStrictEqual(events[0].tags, [["feature", "001"], ["receipt", "r1"]]);
+
+    const exported = await request("tools/call", {
+      name: "export_events",
+      arguments: { kind: "decision", limit: 10 },
+    });
+    const lines = exported.result.content[0].text.trim().split("\n");
+    assert.strictEqual(lines.length, 1);
+    assert.strictEqual(JSON.parse(lines[0]).content.title, "Trusted decision");
+
+    const safeDefault = await request("tools/call", {
+      name: "export_events",
+      arguments: { limit: 10 },
+    });
+    const defaultKinds = safeDefault.result.content[0].text.trim().split("\n")
+      .filter(Boolean).map((line) => JSON.parse(line).kind);
+    assert.ok(!defaultKinds.includes("preference"));
+    assert.ok(!defaultKinds.includes("operational"));
+
+    const explicitOperational = await request("tools/call", {
+      name: "list_events",
+      arguments: { kind: "operational", limit: 10 },
+    });
+    assert.deepStrictEqual(
+      JSON.parse(explicitOperational.result.content[0].text).map((event) => event.kind),
+      ["operational"],
+    );
   });
 });

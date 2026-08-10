@@ -65,6 +65,34 @@ const TOOLS = [
       required: [],
     },
   },
+  {
+    name: "list_events",
+    description: "List canonical non-private memory events with bounded filters.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["decision", "bugfix", "architecture", "preference", "operational"] },
+        since: { type: "string" },
+        until: { type: "string" },
+        limit: { type: "number", default: 50 },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "export_events",
+    description: "Export canonical non-private memory events as verified JSONL.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["decision", "bugfix", "architecture", "preference", "operational"] },
+        since: { type: "string" },
+        until: { type: "string" },
+        limit: { type: "number", default: 50 },
+      },
+      required: [],
+    },
+  },
 ];
 
 function validateToolArgs(name, args) {
@@ -83,13 +111,14 @@ function validateToolArgs(name, args) {
     if (!schema) throw new Error(`Unknown argument: ${key}`);
     if (schema.type === "string" && typeof value !== "string") throw new Error(`${key} must be a string`);
     if (schema.type === "number" && typeof value !== "number") throw new Error(`${key} must be a number`);
+    if (key === "limit" && (!Number.isInteger(value) || value < 1)) throw new Error("limit must be a positive integer");
     if (typeof value === "string" && value.length > 20000) throw new Error(`${key} exceeds 20000 characters`);
     if (schema.enum && !schema.enum.includes(value)) throw new Error(`${key} has an invalid value`);
   }
 
   return {
     ...args,
-    limit: args.limit === undefined ? undefined : Math.max(1, Math.min(50, args.limit)),
+    limit: args.limit === undefined ? undefined : Math.min(50, args.limit),
   };
 }
 
@@ -103,8 +132,19 @@ async function handleToolCall(name, rawArgs) {
       get_context: () => adapter.getContext({ ...project, ...args }),
       get_history: () => adapter.getHistory({ ...project, ...args }),
       export_project: () => adapter.exportProject(project),
+      list_events: () => adapter.listEvents({
+        ...project,
+        ...args,
+        kind: args.kind ?? ["decision", "bugfix", "architecture"],
+      }),
+      export_events: () => adapter.exportEventsJsonl({
+        ...project,
+        ...args,
+        kind: args.kind ?? ["decision", "bugfix", "architecture"],
+      }),
     };
-    return { content: [{ type: "text", text: JSON.stringify(methods[name]()) }] };
+    const result = methods[name]();
+    return { content: [{ type: "text", text: name === "export_events" ? result : JSON.stringify(result) }] };
   } catch (error) {
     return { isError: true, content: [{ type: "text", text: `Error: ${error.message}` }] };
   }
@@ -131,7 +171,7 @@ input.on("line", async (line) => {
       id,
       result: {
         protocolVersion: "2024-11-05",
-        serverInfo: { name: "memory-adapter", version: "1.3.0" },
+        serverInfo: { name: "memory-adapter", version: "1.6.1" },
         capabilities: { tools: { listChanged: false } },
       },
     });

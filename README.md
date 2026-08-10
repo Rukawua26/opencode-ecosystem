@@ -94,6 +94,7 @@ La filosofía es **local-first, YAGNI y ahorro de tokens**: reutilizar lo existe
 | Subagentes especializados | Cada tarea recibe contexto fresco y acotado |
 | `local-model-router` | Enruta tareas simples a Ollama/modelos ligeros |
 | Memory adapter | Recupera decisiones y bugs relevantes, no todo el historial |
+| Event projection | Filtra por kind/fecha/límite y exporta JSONL verificable sin duplicar SQLite |
 | Organic RDD por tiers | La documentación no recibe la misma ceremonia que runtime/seguridad |
 | `opencode-metrics` | Mide tokens, compactaciones y fallos para ajustar el sistema |
 

@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseEventJsonl, toMemoryEvent } from "./memory-events.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_PATH = join(__dirname, "schema.sql");
@@ -17,13 +18,77 @@ let ollamaAvailable = null;
 function checkOllama() {
   if (ollamaAvailable !== null) return ollamaAvailable;
   try {
-    execFileSync("ollama", ["list"], { stdio: "pipe", timeout: 2000 });
+    execFileSync("ollama", ["embed", "--help"], { stdio: "pipe", timeout: 2000 });
     ollamaAvailable = true;
     return true;
   } catch {
     ollamaAvailable = false;
     return false;
   }
+}
+
+const EVENT_SOURCES = {
+  decision: {
+    table: "decisions",
+    columns: "id, category, title, content, rationale, tags, is_private, COALESCE(created_at, '1970-01-01 00:00:00') AS created_at",
+  },
+  bugfix: {
+    table: "bug_fixes",
+    columns: "id, title, description, root_cause, fix, lesson, tags, COALESCE(created_at, '1970-01-01 00:00:00') AS created_at",
+  },
+  architecture: {
+    table: "architecture",
+    columns: "id, component, description, rationale, tags, COALESCE(created_at, '1970-01-01 00:00:00') AS created_at",
+  },
+  preference: {
+    table: "preferences",
+    columns: "id, key, value, COALESCE(created_at, '1970-01-01 00:00:00') AS created_at",
+  },
+  operational: {
+    table: "session_history",
+    columns: "id, session_id, action, detail, result, files_touched, COALESCE(created_at, '1970-01-01 00:00:00') AS created_at",
+  },
+};
+
+function eventTimestamp(value, name) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") throw new Error(`invalid: ${name} must be a valid date`);
+  const calendar = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,3}))?(Z|[+-]\d{2}:\d{2})?)?$/.exec(value);
+  if (!calendar) throw new Error(`invalid: ${name} must be a valid date`);
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, fraction, zone] = calendar;
+  const [year, month, day] = [yearText, monthText, dayText].map(Number);
+  const calendarDate = new Date(Date.UTC(year, month - 1, day));
+  if (calendarDate.getUTCFullYear() !== year
+    || calendarDate.getUTCMonth() !== month - 1
+    || calendarDate.getUTCDate() !== day) {
+    throw new Error(`invalid: ${name} must be a valid date`);
+  }
+
+  if (hourText === undefined) {
+    return `${yearText}-${monthText}-${dayText} ${name === "until" ? "23:59:59" : "00:00:00"}`;
+  }
+  const [hour, minute, second] = [hourText, minuteText, secondText].map(Number);
+  if (hour > 23 || minute > 59 || second > 59) {
+    throw new Error(`invalid: ${name} must be a valid date`);
+  }
+  if (!zone) return `${yearText}-${monthText}-${dayText} ${hourText}:${minuteText}:${secondText}`;
+
+  const timestamp = new Date(
+    `${yearText}-${monthText}-${dayText}T${hourText}:${minuteText}:${secondText}${fraction ? `.${fraction}` : ""}${zone}`,
+  );
+  if (Number.isNaN(timestamp.getTime())) throw new Error(`invalid: ${name} must be a valid date`);
+  return timestamp.toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "");
+}
+
+function importedTimestamp(value) {
+  return eventTimestamp(value, "created_at")
+    || new Date().toISOString().replace("T", " ").replace(/\.\d{3}Z$/, "");
+}
+
+function eventLimit(value) {
+  if (value === undefined) return 50;
+  if (!Number.isInteger(value) || value < 1) throw new Error("invalid: limit must be a positive integer");
+  return Math.min(value, 1000);
 }
 
 function embedQuery(query) {
@@ -314,6 +379,70 @@ export class MemoryAdapter {
     ).all(projectId, limit);
   }
 
+  listEvents({
+    project,
+    projectPath,
+    kind,
+    since,
+    until,
+    limit,
+    includePrivate = false,
+    references,
+  }) {
+    const projectId = this.findProject(project, projectPath);
+    if (!projectId) return [];
+
+    const kinds = kind === undefined ? Object.keys(EVENT_SOURCES) : (Array.isArray(kind) ? kind : [kind]);
+    for (const eventKind of kinds) {
+      if (!EVENT_SOURCES[eventKind]) throw new Error(`invalid: unsupported event kind ${eventKind}`);
+    }
+
+    const normalizedSince = eventTimestamp(since, "since");
+    const normalizedUntil = eventTimestamp(until, "until");
+    if (normalizedSince && normalizedUntil && normalizedSince > normalizedUntil) {
+      throw new Error("invalid: since must be before until");
+    }
+    const normalizedLimit = eventLimit(limit);
+
+    const events = [];
+    for (const eventKind of kinds) {
+      const source = EVENT_SOURCES[eventKind];
+      const conditions = ["project_id = ?"];
+      const params = [projectId];
+      if (eventKind === "decision" && !includePrivate) conditions.push("is_private = 0");
+      if (normalizedSince) {
+        conditions.push("created_at >= ?");
+        params.push(normalizedSince);
+      }
+      if (normalizedUntil) {
+        conditions.push("created_at <= ?");
+        params.push(normalizedUntil);
+      }
+      params.push(normalizedLimit);
+
+      const rows = this.db.prepare(
+        `SELECT ${source.columns} FROM ${source.table}
+         WHERE ${conditions.join(" AND ")}
+         ORDER BY created_at DESC, id DESC LIMIT ?`,
+      ).all(...params);
+      events.push(...rows.map((row) => toMemoryEvent(row, eventKind, project, references)));
+    }
+
+    return events
+      .sort((left, right) => right.created_at.localeCompare(left.created_at)
+        || right.event_id.localeCompare(left.event_id))
+      .slice(0, normalizedLimit);
+  }
+
+  exportEventsJsonl(options) {
+    const events = this.listEvents(options);
+    return events.length ? `${events.map((event) => JSON.stringify(event)).join("\n")}\n` : "";
+  }
+
+  validateEventsJsonl(jsonl) {
+    return parseEventJsonl(jsonl);
+  }
+
   exportProject({ project, projectPath, includePrivate = false, includeOperational = false }) {
     const projectId = this.findProject(project, projectPath);
     if (!projectId) {
@@ -363,38 +492,42 @@ export class MemoryAdapter {
       for (const sql of clearTables) this.db.prepare(sql).run(projectId);
 
       if (data.decisions) {
-      for (const d of data.decisions) {
-        this.db.prepare(
-          "INSERT INTO decisions (project_id, category, title, content, rationale, tags, is_private, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        ).run(projectId, d.category, d.title, d.content, d.rationale, d.tags, d.is_private, d.created_at);
-      }
+        for (const d of data.decisions) {
+          this.db.prepare(
+            "INSERT INTO decisions (project_id, category, title, content, rationale, tags, is_private, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+          ).run(projectId, d.category || "general", d.title, d.content, d.rationale || null,
+            d.tags || null, d.is_private ? 1 : 0, importedTimestamp(d.created_at));
+        }
       }
       if (data.bugFixes) {
-      for (const b of data.bugFixes) {
-        this.db.prepare(
-          "INSERT INTO bug_fixes (project_id, title, description, root_cause, fix, lesson, tags, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-        ).run(projectId, b.title, b.description, b.root_cause, b.fix, b.lesson, b.tags, b.created_at);
-      }
+        for (const b of data.bugFixes) {
+          this.db.prepare(
+            "INSERT INTO bug_fixes (project_id, title, description, root_cause, fix, lesson, tags, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+          ).run(projectId, b.title, b.description, b.root_cause || null, b.fix, b.lesson || null,
+            b.tags || null, importedTimestamp(b.created_at));
+        }
       }
       if (data.architecture) {
-      for (const a of data.architecture) {
-        this.db.prepare(
-          "INSERT INTO architecture (project_id, component, description, rationale, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-        ).run(projectId, a.component, a.description, a.rationale, a.tags, a.created_at);
-      }
+        for (const a of data.architecture) {
+          this.db.prepare(
+            "INSERT INTO architecture (project_id, component, description, rationale, tags, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+          ).run(projectId, a.component, a.description, a.rationale || null, a.tags || null,
+            importedTimestamp(a.created_at));
+        }
       }
       if (data.preferences) {
-      for (const p of data.preferences) {
-        this.db.prepare("INSERT INTO preferences (project_id, key, value, created_at) VALUES (?, ?, ?, ?)")
-          .run(projectId, p.key, p.value, p.created_at);
-      }
+        for (const p of data.preferences) {
+          this.db.prepare("INSERT INTO preferences (project_id, key, value, created_at) VALUES (?, ?, ?, ?)")
+            .run(projectId, p.key, p.value, importedTimestamp(p.created_at));
+        }
       }
       if (data.history) {
-      for (const h of data.history) {
-        this.db.prepare(
-          "INSERT INTO session_history (project_id, session_id, action, detail, result, files_touched, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).run(projectId, h.session_id, h.action, h.detail, h.result, h.files_touched, h.created_at);
-      }
+        for (const h of data.history) {
+          this.db.prepare(
+            "INSERT INTO session_history (project_id, session_id, action, detail, result, files_touched, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+          ).run(projectId, h.session_id || null, h.action, h.detail || null, h.result || null,
+            h.files_touched || null, importedTimestamp(h.created_at));
+        }
       }
 
       this.db.exec("COMMIT");

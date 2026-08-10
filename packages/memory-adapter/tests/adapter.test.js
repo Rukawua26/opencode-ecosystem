@@ -340,6 +340,27 @@ describe("MemoryAdapter", () => {
       const context = adapter.getContext({ project: "protected-project", projectPath: join(TMP_ROOT, "protected") });
       assert.deepStrictEqual(context.recentDecisions.map((item) => item.title), ["Original decision"]);
     });
+
+    it("should normalize a missing imported timestamp for event projection", () => {
+      const data = {
+        project: { name: "legacy-project", path: "/tmp/legacy-project" },
+        decisions: [{
+          title: "Legacy decision",
+          content: "Created before event projections",
+          created_at: null,
+        }],
+      };
+
+      adapter.importProject(data);
+      const events = adapter.listEvents({
+        project: "legacy-project",
+        projectPath: "/tmp/legacy-project",
+        kind: "decision",
+      });
+
+      assert.strictEqual(events.length, 1);
+      assert.ok(events[0].created_at);
+    });
   });
 
   describe("searchMemory", () => {
@@ -390,6 +411,139 @@ describe("MemoryAdapter", () => {
 
       assert.strictEqual(results.decisions.length, 0);
       assert.strictEqual(context.recentDecisions.length, 0);
+    });
+  });
+
+  describe("memory events", () => {
+    it("filters events by kind and excludes private decisions by default", () => {
+      adapter.saveDecision({
+        project: "event-project",
+        projectPath: join(TMP_ROOT, "events"),
+        title: "Public event",
+        content: "Shareable",
+        tags: "feature:001,receipt:r1",
+      });
+      adapter.saveDecision({
+        project: "event-project",
+        projectPath: join(TMP_ROOT, "events"),
+        title: "Private event",
+        content: "Secret",
+        isPrivate: true,
+      });
+      adapter.saveBugFix({
+        project: "event-project",
+        projectPath: join(TMP_ROOT, "events"),
+        title: "Bug event",
+        description: "Broken",
+        fix: "Fixed",
+      });
+
+      const safe = adapter.listEvents({
+        project: "event-project",
+        projectPath: join(TMP_ROOT, "events"),
+        kind: "decision",
+      });
+      const complete = adapter.listEvents({
+        project: "event-project",
+        projectPath: join(TMP_ROOT, "events"),
+        kind: "decision",
+        includePrivate: true,
+      });
+
+      assert.deepStrictEqual(safe.map((event) => event.content.title), ["Public event"]);
+      assert.strictEqual(complete.length, 2);
+      assert.deepStrictEqual(safe[0].tags, [["feature", "001"], ["receipt", "r1"]]);
+    });
+
+    it("applies limits and date filters before returning projected events", () => {
+      for (const title of ["One", "Two", "Three"]) {
+        adapter.saveDecision({
+          project: "limited-project",
+          projectPath: join(TMP_ROOT, "limited"),
+          title,
+          content: title,
+        });
+      }
+
+      assert.strictEqual(adapter.listEvents({
+        project: "limited-project",
+        projectPath: join(TMP_ROOT, "limited"),
+        kind: "decision",
+        limit: 2,
+      }).length, 2);
+      assert.deepStrictEqual(adapter.listEvents({
+        project: "limited-project",
+        projectPath: join(TMP_ROOT, "limited"),
+        since: "2999-01-01T00:00:00Z",
+      }), []);
+      assert.throws(() => adapter.listEvents({
+        project: "limited-project",
+        projectPath: join(TMP_ROOT, "limited"),
+        since: "not-a-date",
+      }), /invalid: since/);
+      assert.throws(() => adapter.listEvents({
+        project: "limited-project",
+        projectPath: join(TMP_ROOT, "limited"),
+        since: "2026-02-30",
+      }), /invalid: since/);
+    });
+
+    it("treats stored timestamps as UTC and date-only until as end of day", () => {
+      const saved = adapter.saveDecision({
+        project: "date-project",
+        projectPath: join(TMP_ROOT, "dates"),
+        title: "Boundary event",
+        content: "UTC timestamp",
+      });
+      adapter.db.prepare("UPDATE decisions SET created_at = ? WHERE id = ?")
+        .run("2026-08-10 21:01:47", saved.id);
+
+      const base = {
+        project: "date-project",
+        projectPath: join(TMP_ROOT, "dates"),
+        kind: "decision",
+      };
+      assert.strictEqual(adapter.listEvents({ ...base, since: "2026-08-10 21:01:47" }).length, 1);
+      assert.strictEqual(adapter.listEvents({ ...base, until: "2026-08-10" }).length, 1);
+      assert.strictEqual(adapter.listEvents({ ...base, since: "2026-08-11" }).length, 0);
+    });
+
+    it("projects legacy rows with null timestamps without failing the project", () => {
+      const projectPath = join(TMP_ROOT, "legacy-null");
+      const projectId = adapter.getOrCreateProject("legacy-null-project", projectPath);
+      adapter.db.prepare(
+        "INSERT INTO decisions (project_id, title, content, created_at) VALUES (?, ?, ?, NULL)",
+      ).run(projectId, "Legacy null date", "Still readable");
+
+      const events = adapter.listEvents({
+        project: "legacy-null-project",
+        projectPath,
+        kind: "decision",
+      });
+      assert.strictEqual(events[0].created_at, "1970-01-01 00:00:00");
+    });
+
+    it("exports and validates canonical JSONL", () => {
+      adapter.saveArchitecture({
+        project: "jsonl-project",
+        projectPath: join(TMP_ROOT, "jsonl"),
+        component: "Memory events",
+        description: "Canonical projection",
+        tags: "feature:001,lens:architecture-review",
+      });
+
+      const jsonl = adapter.exportEventsJsonl({
+        project: "jsonl-project",
+        projectPath: join(TMP_ROOT, "jsonl"),
+      });
+      const events = adapter.validateEventsJsonl(jsonl);
+
+      assert.strictEqual(events.length, 1);
+      assert.strictEqual(events[0].kind, "architecture");
+      assert.throws(
+        () => adapter.validateEventsJsonl(jsonl.replace("Canonical projection", "Modified")),
+        /hash mismatch/,
+      );
     });
   });
 });

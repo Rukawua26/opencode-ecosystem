@@ -36,6 +36,24 @@ function writeJson(filePath, data) {
   return target;
 }
 
+function writeText(filePath, data) {
+  const target = resolve(filePath);
+  mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
+  writeFileSync(target, data, { mode: 0o600 });
+  chmodSync(target, 0o600);
+  return target;
+}
+
+function optionalInteger(value, name) {
+  if (value === undefined) return undefined;
+  if (typeof value !== "string" && typeof value !== "number") {
+    throw new Error(`--${name} must be an integer`);
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) throw new Error(`--${name} must be an integer`);
+  return parsed;
+}
+
 async function withAdapter(args, callback) {
   const adapter = new MemoryAdapter(args.db || DEFAULT_DB_PATH).init();
   try {
@@ -124,6 +142,31 @@ const commands = {
       console.log(`[OK] Exported to ${target}`);
     }),
   },
+  "export-events": {
+    description: "Export canonical memory events to verified JSONL",
+    run: (args) => withAdapter(args, async (adapter) => {
+      const jsonl = adapter.exportEventsJsonl({
+        project: projectIdentity(args),
+        projectPath: args.path || process.cwd(),
+        kind: args.kind,
+        since: args.since,
+        until: args.until,
+        limit: optionalInteger(args.limit, "limit"),
+        includePrivate: Boolean(args["include-private"]),
+      });
+      const target = writeText(args.out || "memory-events.jsonl", jsonl);
+      console.log(`[OK] Exported ${jsonl ? jsonl.trim().split("\n").length : 0} events to ${target}`);
+    }),
+  },
+  "verify-events": {
+    description: "Verify canonical hashes in a memory event JSONL file",
+    run: (args) => withAdapter(args, async (adapter) => {
+      const file = requireOption(args, "file");
+      if (!existsSync(file)) throw new Error(`File not found: ${file}`);
+      const events = adapter.validateEventsJsonl(readFileSync(file, "utf8"));
+      console.log(`[OK] Verified ${events.length} events`);
+    }),
+  },
   import: {
     description: "Import project memory from JSON",
     run: (args) => withAdapter(args, async (adapter) => {
@@ -205,7 +248,7 @@ if (!command || !commands[command]) {
   for (const [name, definition] of Object.entries(commands)) {
     console.log(`  ${name.padEnd(18)} ${definition.description}`);
   }
-  console.log("\nOptions: --db --project --path --out --file --title --content --description --fix --private --include-private --include-operational --commit");
+  console.log("\nOptions: --db --project --path --out --file --title --content --description --fix --tags --kind --since --until --limit --private --include-private --include-operational --commit");
   exit(command ? 1 : 0);
 }
 

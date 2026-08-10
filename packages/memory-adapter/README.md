@@ -64,6 +64,8 @@ Add to your agent's MCP config:
 | `get_context` | Get recent context for a project (use at session start) |
 | `get_history` | Get session history log |
 | `export_project` | Return shareable, non-private decisions as JSON |
+| `list_events` | List canonical non-private events filtered by kind/date/limit |
+| `export_events` | Return canonical non-private events as hash-verified JSONL |
 
 MCP is intentionally read-only. Persistent writes require an explicit local
 CLI command so model output cannot poison future sessions without approval.
@@ -85,6 +87,12 @@ memory-adapter save-bug --title "Timeout" --description "Request timed out" --fi
 # Export to JSON
 memory-adapter export --path /path/to/project
 
+# Export canonical events (private decisions excluded by default)
+memory-adapter export-events --path /path/to/project --kind decision --limit 50 --out memory-events.jsonl
+
+# Verify every JSONL event hash
+memory-adapter verify-events --file memory-events.jsonl
+
 # Import from JSON (replaces the target project's existing memory)
 memory-adapter import --file memory-export.json
 
@@ -100,6 +108,35 @@ memory-adapter export-obsidian --out ./docs/decisions
 # Check status
 memory-adapter status
 ```
+
+## Canonical memory events
+
+The event projection reuses the current SQLite tables; it does not create a journal table or duplicate writes.
+
+```json
+{
+  "event_id": "decision:project:42",
+  "kind": "decision",
+  "project": "project",
+  "created_at": "2026-08-10 12:00:00",
+  "tags": [["feature", "001"], ["receipt", "r1"]],
+  "content": { "title": "Decision", "content": "Approved" },
+  "content_hash": "sha256-as-lowercase-hex"
+}
+```
+
+Supported kinds are `decision`, `bugfix`, `architecture`, `preference`, and `operational`. References to SDD and Organic RDD use existing tags:
+
+MCP defaults to `decision`, `bugfix`, and `architecture`. Preference values and operational history require an explicit `kind` because they may contain local configuration or file paths. Private decisions are never available through MCP.
+
+```bash
+memory-adapter save-decision \
+  --title "Adopt event projection" \
+  --content "No duplicated journal" \
+  --tags "feature:001,file:src/adapter.js,commit:abc123,test:node-test,lens:verifier,receipt:r1"
+```
+
+The hash verifies content integrity, not author identity. The implementation intentionally has no relays, networking, public keys, Schnorr signatures, or new runtime dependencies.
 
 ## Philosophy
 

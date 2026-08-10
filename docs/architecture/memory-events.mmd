@@ -1,0 +1,24 @@
+graph LR
+    D[(decisions)] --> P[MemoryEventProjection]
+    B[(bug_fixes)] --> P
+    A[(architecture)] --> P
+    R[(preferences)] --> P
+    H[(session_history)] --> P
+
+    Q[SQL filters: project/kind/date/limit] --> D
+    Q --> B
+    Q --> A
+    Q --> R
+    Q --> H
+
+    P --> C[Canonical event]
+    C --> S[SHA-256 content hash]
+    C --> T[Canonical RDD tags]
+    S --> J[JSONL export]
+    T --> J
+    J --> V[Hash validation]
+
+    C --> M[MCP read-only list/export]
+    C --> L[Explicit local CLI]
+
+    X[No relays / no signatures / no duplicate table] -. constraint .-> P
