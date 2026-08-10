@@ -21,11 +21,19 @@
   <i>Ecosistema open source para potenciar OpenCode con memoria persistente, SDD, skills, multi-modelo y multiagentes.</i>
 </p>
 
+<p align="center">
+  <a href="#quick-start">Instalar</a> ·
+  <a href="#qué-incluye">Componentes</a> ·
+  <a href="#ahorro-de-tokens-y-memoria">Ahorro</a> ·
+  <a href="#sdd--organic-rdd">SDD + RDD</a> ·
+  <a href="#troubleshooting">Troubleshooting</a>
+</p>
+
 ---
 
 ## 🚀 Quick Start
 
-Requiere **Node.js 22+** y **Git**.
+OpenCode Ecosystem instala una configuración reproducible con agentes, skills, plugins, MCP servers, perfiles y memoria local. Requiere **Node.js 22+** y **Git**.
 
 ### Linux / macOS
 
@@ -52,6 +60,44 @@ git clone https://github.com/Rukawua26/opencode-ecosystem.git
 cd opencode-ecosystem
 .\install.ps1
 ```
+
+### Verificar la instalación
+
+```bash
+node tools/scripts/doctor.js
+opencode-metrics 7
+```
+
+`doctor` valida dependencias, estructura, skills, MCP, Ollama y configuración. `opencode-metrics` muestra tokens, compactaciones, fallos y modelos usados.
+
+---
+
+## 🎯 Qué resuelve
+
+| Problema | Solución |
+|---|---|
+| Contexto grande y conversaciones monolíticas | Skills y subagentes cargados bajo demanda |
+| Memoria dispersa | `memory-adapter`: SQLite + FTS5 + MCP |
+| Modelo caro para cualquier tarea | `local-model-router` y perfiles por coste/capacidad |
+| Cambios difíciles de revisar | SDD para planificar y Organic RDD para verificar evidencia |
+| Configuración frágil | Instalador, perfiles, backups, guardrails y `doctor` |
+
+La filosofía es **local-first, YAGNI y ahorro de tokens**: reutilizar lo existente, cargar solo lo necesario y usar un modelo ligero cuando el riesgo lo permite.
+
+---
+
+## 💾 Ahorro de tokens y memoria
+
+| Mecanismo | Cómo ahorra |
+|---|---|
+| Skills on-demand | No carga las 20 skills en cada conversación |
+| Subagentes especializados | Cada tarea recibe contexto fresco y acotado |
+| `local-model-router` | Enruta tareas simples a Ollama/modelos ligeros |
+| Memory adapter | Recupera decisiones y bugs relevantes, no todo el historial |
+| Organic RDD por tiers | La documentación no recibe la misma ceremonia que runtime/seguridad |
+| `opencode-metrics` | Mide tokens, compactaciones y fallos para ajustar el sistema |
+
+La referencia técnica `docs/sources/hypruse-analysis.md` registra un ahorro aproximado del **61% de contexto estático** frente a una configuración completa equivalente, manteniendo la ejecución local cuando es suficiente.
 
 ---
 
@@ -134,6 +180,37 @@ graph LR
 
 ---
 
+## 🧭 SDD + Organic RDD
+
+### SDD: Spec-Driven Development
+
+Las features no empiezan directamente en código. El ciclo recomendado es:
+
+1. **Proposal** — intención, alcance y criterios de aceptación.
+2. **Spec** — requisitos RFC 2119 y escenarios Given/When/Then.
+3. **Plan** — arquitectura, alternativas rechazadas y archivos afectados.
+4. **Tasks** — checklist atómico ordenado por dependencias.
+5. **Apply** — implementación mínima y trazable.
+6. **Verify** — pruebas, matriz de cumplimiento y evidencia.
+
+Artefactos: `spec/features/<NNN-name>/{proposal,spec,plan,tasks,verify}.md`.
+
+### Organic RDD: Review-Driven Development
+
+Organic RDD complementa SDD y gobierna la revisión del candidato ya producido:
+
+- **Tier 0:** documentación; revisión ligera.
+- **Tier 1:** guidance, skills y comandos; revisión de legibilidad y contrato.
+- **Tier 2:** configuración central y gates; revisión de arquitectura y seguridad.
+- **Tier 3:** runtime, permisos, seguridad, persistencia; revisión completa y verificación obligatoria.
+
+El receipt conserva la relación entre archivos congelados, riesgo y evidencia:
+`review_start → review_capture → review_verify → review_finalize → review_gate`.
+
+Las lentes disponibles cubren riesgo, legibilidad, fiabilidad, resiliencia, seguridad, arquitectura, verificación y refutación. La regla de precisión evita reportar falsos positivos: si la evidencia no alcanza, se marca la duda en vez de bloquear sin fundamento.
+
+---
+
 ## 🧰 Herramientas
 
 ### 🩺 Doctor — Verificar salud del ecosistema
@@ -163,13 +240,24 @@ opencode-metrics 7
 
 Repite el comando después de una semana y compara tokens por mensaje, compactaciones, fallos y modelos. Consulta `docs/token-economy/measurement.md`.
 
+### 🧩 Elegir un perfil
+
+```bash
+# Perfiles disponibles en config/profiles/
+opencode-work      # máxima capacidad y herramientas de trabajo
+opencode-personal  # equilibrio entre coste y capacidad
+opencode-light     # mínimo consumo local
+```
+
+Los nombres exactos dependen del instalador y del shell. Usa `doctor` si un perfil no aparece.
+
 ---
 
 ## 📦 Qué incluye
 
 | Componente | Descripción |
 |---|---|
-| **16+ agentes** | Especializados: backend, frontend, security, devops, etc. |
+| **16 agentes** | Especializados: backend, frontend, security, devops, etc. |
 | **20 skills** | SDD, modes, prompts, debug, security, Obsidian y TDD |
 | **8 plugins** | Kanban, guardrails, checkpoints, sandbox, personalities, validator, metrics y auto-memory |
 | **4 MCP servers** | memory-adapter, local-model-router, context7 y diagram-generator |
@@ -190,7 +278,7 @@ opencode-ecosystem/
 │   └── memory-adapter/
 │       ├── src/        # Adapter, MCP server, CLI
 │       ├── tests/      # 22 tests passing
-│       └── package.json  # @rukawua26/opencode-memory-adapter@1.3.0
+│       └── package.json  # @rukawua26/opencode-memory-adapter@1.6.1
 ├── docs/            # Arquitectura, guías, token-economy
 ├── tools/           # Repo map builder, scripts
 ├── tests/           # Tests de skills e install.sh
@@ -208,6 +296,37 @@ Las API keys se configuran manualmente por seguridad:
 cp .env.example ~/.config/opencode/.env
 # Editar con tus keys
 ```
+
+No incluyas `.env` ni tokens en commits. Usa `.env.example` como plantilla y mantén las credenciales fuera del repositorio.
+
+---
+
+## 🧯 Troubleshooting
+
+### El instalador termina pero OpenCode no encuentra la configuración
+
+```bash
+node tools/scripts/doctor.js
+```
+
+Comprueba `~/.config/opencode/`, el perfil activo y que `OPENCODE_CONFIG` apunte a un archivo existente.
+
+### El routing local no responde
+
+Comprueba que Ollama esté instalado y que el modelo configurado exista. El router local arranca Ollama bajo demanda y aplica auto-stop cuando queda inactivo.
+
+### La memoria no devuelve resultados
+
+Verifica permisos de la base SQLite y ejecuta las pruebas del paquete:
+
+```bash
+npm test
+npm run test:install
+```
+
+### Una revisión bloquea un cambio de runtime
+
+No desactives el gate para ocultar el problema. Revisa el receipt, completa la evidencia de `verify` y vuelve a ejecutar la lente que falta.
 
 ---
 
