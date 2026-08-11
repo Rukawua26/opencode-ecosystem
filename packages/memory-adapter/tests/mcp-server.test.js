@@ -1,6 +1,6 @@
 import { after, before, describe, it } from "node:test";
 import { strict as assert } from "node:assert";
-import { mkdirSync, rmSync, existsSync } from "node:fs";
+import { mkdirSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { spawn } from "node:child_process";
@@ -12,6 +12,7 @@ const PROJECT_ROOT = join(HOME, "trusted-project");
 const PROJECT_NAME = "trusted-project-test";
 const DB_PATH = join(HOME, ".local", "share", "opencode", "memory-adapter", "memory.db");
 const SERVER = fileURLToPath(new URL("../src/mcp-server.js", import.meta.url));
+const PACKAGE_JSON = fileURLToPath(new URL("../package.json", import.meta.url));
 
 describe("memory MCP server", () => {
   let child;
@@ -116,7 +117,8 @@ describe("memory MCP server", () => {
     assert.ok(names.includes("export_events"));
     assert.ok(!Object.hasOwn(exportTool.inputSchema.properties, "includePrivate"));
     assert.ok(!Object.hasOwn(exportTool.inputSchema.properties, "project"));
-    assert.strictEqual(initialized.result.serverInfo.version, "1.8.0");
+    const packageJson = JSON.parse(readFileSync(PACKAGE_JSON, "utf8"));
+    assert.strictEqual(initialized.result.serverInfo.version, packageJson.version);
   });
 
   it("rejects unknown arguments and invalid types", async () => {

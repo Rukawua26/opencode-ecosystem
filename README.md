@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg?v=1.8.0" alt="OpenCode Ecosystem" width="100%" />
+  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg?v=1.9.0" alt="OpenCode Ecosystem" width="100%" />
 </p>
 
 <p align="center">
@@ -72,6 +72,18 @@ opencode-metrics 7
 
 ---
 
+## Novedades en v1.9.0
+
+- **Instalación segura e idempotente:** una reinstalación normal preserva agentes, plugins, perfiles, skills y herramientas existentes; `--force` crea backup antes de reemplazar.
+- **Windows verificado:** `install.ps1` comparte el mismo contrato de preservación/rollback y se prueba en CI Windows.
+- **Router MCP reproducible:** el SDK queda declarado, bloqueado por lockfile e instalado con `npm ci --omit=dev --ignore-scripts`.
+- **Sandbox endurecido:** Docker recibe argumentos separados, sin shell del host; nombres de imagen con metacaracteres se rechazan.
+- **Checkpoints sin secretos:** `.env` y variantes, claves privadas, certificados y credenciales se excluyen en rutas Unix y Windows.
+- **Memoria eficiente:** SQLite + búsqueda textual + embeddings opcionales; queries vacías no arrancan Ollama y filas sin embedding usan fallback textual.
+- **CI única y bloqueante:** Linux, macOS, Alpine y Windows deben pasar antes de crear el tag y publicar en npm.
+
+---
+
 ## 🎯 Qué resuelve
 
 | Problema | Solución |
@@ -139,7 +151,7 @@ Las generaciones usan `num_ctx: 4096` y `keep_alive: 1m`. Las tareas críticas o
 
 ```mermaid
 graph TD
-    subgraph "🎯 OpenCode Ecosystem v1.8.0"
+    subgraph "🎯 OpenCode Ecosystem v1.9.0"
         A[CLI Install] --> B[config/]
         A --> C[skills/]
         A --> D[packages/]
@@ -180,7 +192,7 @@ graph TD
     R[ADR-004 docs/sources/adr-004-hypruse-analysis] -->|validates| P
 
     L[🌐 npm registry] <-->|publish| D1
-    M[📦 GitHub Releases] <-->|tag v1.8.0| H3
+    M[📦 GitHub Releases] <-->|tag v1.9.0| H3
 ```
 
 ---
@@ -298,7 +310,7 @@ Los nombres exactos dependen del instalador y del shell. Usa `doctor` si un perf
 | **Memory adapter** | SQLite + MCP server universal (OpenCode, Claude Code, Cursor, etc.) |
 | **Multi-modelo** | Routing automático de modelo por fase de trabajo |
 | **Perfiles** | work, personal, light |
-| **CI/CD** | Tests automáticos, validación de install.sh, release a npm |
+| **CI/CD** | 137 checks locales + instalación Linux/macOS/Alpine/Windows antes de release npm |
 
 ---
 
@@ -311,11 +323,11 @@ opencode-ecosystem/
 ├── packages/        # Paquetes npm (memory-adapter)
 │   └── memory-adapter/
 │       ├── src/        # Adapter, MCP server, CLI
-│       ├── tests/      # 22 tests passing
-│       └── package.json  # @rukawua26/opencode-memory-adapter@1.8.0
+│       ├── tests/      # 43 tests passing
+│       └── package.json  # @rukawua26/opencode-memory-adapter@1.9.0
 ├── docs/            # Arquitectura, guías, token-economy
 ├── tools/           # Repo map builder, scripts
-├── tests/           # Tests de skills e install.sh
+├── tests/           # Tests de skills, plugins, install.sh e install.ps1
 ├── .github/         # CI/CD workflows
 └── spec/            # SDD del propio ecosistema
 ```

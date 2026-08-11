@@ -2,6 +2,8 @@
 
 > Ecosistema open source para potenciar OpenCode con memoria persistente, SDD, skills, multi-modelo y multiagentes.
 
+Version documentada: **v1.9.0**.
+
 ## Componentes
 
 - **Memory Adapter** — SQLite + MCP server para memoria persistente entre sesiones
@@ -10,8 +12,20 @@
 - **Multi-modelo** — Routing automatico entre modelos cloud y locales (Ollama)
 - **Obsidian** — Catalogo determinista de proyectos e ingestión de fuentes con preview y escritura create-only
 - **SDD** — Spec-Driven Development con plantillas y workflows
+- **Organic RDD** — review Tier 0-3 con receipts ligados al hash del candidato
+- **Instalador seguro** — preserva customizaciones por defecto y crea rollback con `--force`
 
 ## Instalacion
+
+Instalacion completa:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.sh | bash
+```
+
+El instalador usa la release `v1.9.0` por defecto. Define `INSTALL_TAG` solo para instalar otra release explicitamente.
+
+Paquetes individuales:
 
 ```bash
 # Memory Adapter
@@ -34,6 +48,14 @@ npm install @rukawua26/opencode-skills
 - Chat y síntesis: `llama3.2:latest`
 - Razonamiento: `llama3.2:latest`
 - Contexto: `4096` tokens; retención: `1m`
+
+## Verificacion
+
+- Vitest: 67 tests
+- Router MCP: 23 tests
+- Memory adapter: 43 tests
+- Instaladores: Linux, macOS, Alpine y Windows
+- CI: lint, coverage, contratos, hooks y Organic RDD
 
 ## Enlaces
 

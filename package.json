@@ -1,6 +1,6 @@
 {
   "name": "opencode-ecosystem",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "private": true,
   "type": "module",
   "description": "Open source ecosystem for OpenCode: memory, SDD, skills, multi-model agents",
@@ -19,8 +19,9 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "c8 vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:install": "bash tests/install.test.sh",
+    "test:install:windows": "pwsh -NoProfile -File tests/install.test.ps1",
     "test:hooks": "bash tests/hooks.test.sh",
     "test:router": "node --test config/mcp/local-model-router.test.js",
     "check-docs": "node tools/scripts/check-docs.js",
@@ -28,11 +29,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@semantic-release/changelog": "^6.0.3",
-    "@semantic-release/git": "^10.0.1",
-    "c8": "^12.0.0",
-    "eslint": "^10.8.0",
-    "semantic-release": "^24.2.3",
+    "@vitest/coverage-v8": "^4.1.10",
+    "eslint": "^10.8.1",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "brace-expansion": "5.0.9",
+    "nanoid": "3.3.18"
   }
 }

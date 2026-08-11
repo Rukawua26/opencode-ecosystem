@@ -2,6 +2,8 @@
 
 Universal memory adapter with SQLite + MCP server. Works with any AI coding agent that supports MCP: OpenCode, Claude Code, Cursor, Codex, VS Code Copilot, etc.
 
+Current release: **v1.9.0**. It uses only Node.js built-ins (`node:sqlite`) and has no runtime dependencies.
+
 ## Installation
 
 ```bash
@@ -66,6 +68,8 @@ Add to your agent's MCP config:
 | `export_project` | Return shareable, non-private decisions as JSON |
 | `list_events` | List canonical non-private events filtered by kind/date/limit |
 | `export_events` | Return canonical non-private events as hash-verified JSONL |
+
+Text search remains available without Ollama. Semantic search embeds decision content, rationale and tags when Ollama is available; empty queries skip embedding generation to avoid unnecessary model loads.
 
 MCP is intentionally read-only. Persistent writes require an explicit local
 CLI command so model output cannot poison future sessions without approval.

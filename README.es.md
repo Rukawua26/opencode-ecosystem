@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg?v=1.8.0" alt="OpenCode Ecosystem" width="100%" />
+  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg?v=1.9.0" alt="OpenCode Ecosystem" width="100%" />
 </p>
 
 <p align="center">
@@ -17,6 +17,17 @@
 <p align="center">
   <i>Ecosistema open source para potenciar OpenCode con memoria persistente, SDD, skills, multi-modelo y multiagentes.</i>
 </p>
+
+---
+
+## Novedades v1.9.0
+
+- Reinstalacion sin `--force` preserva personalizaciones; `--force` crea backups antes de reemplazar.
+- `install.sh` e `install.ps1` comparten contrato y tienen pruebas Linux/macOS/Alpine/Windows.
+- Router MCP instalable desde cero con SDK y lockfile propios.
+- Sandbox Docker sin shell del host y checkpoints que excluyen secretos en Unix y Windows.
+- Memory adapter con `LIKE`, embeddings Ollama opcionales y fallback textual para filas sin embedding.
+- Un unico pipeline CI bloquea el tag y la publicacion hasta completar lint, coverage, tests, hooks e instaladores.
 
 ---
 
@@ -49,7 +60,7 @@ irm -useb https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/in
 | **Memory adapter** | SQLite + MCP server universal |
 | **Multi-modelo** | Routing automatico por fase de trabajo |
 | **Perfiles** | work, personal, light |
-| **CI/CD** | Tests automaticos, release npm, semantic-release |
+| **CI/CD** | Linux, macOS, Alpine y Windows; release npm solo tras todos los checks |
 
 ---
 
@@ -78,7 +89,7 @@ La skill vive en `skills/obsidian-ingest/` y tambien se publica dentro del paque
 | Chat y sintesis | `llama3.2:latest` |
 | Razonamiento | `llama3.2:latest` con prompt especifico |
 
-El router valida digests, reutiliza Ollama si ya esta activo y usa `num_ctx: 4096` y `keep_alive: 1m` para reducir consumo de RAM.
+El router valida digests, reutiliza Ollama si ya esta activo y usa `num_ctx: 4096` y `keep_alive: 1m` para reducir consumo de RAM. Sus dependencias MCP se instalan de forma aislada con lockfile.
 
 ---
 
@@ -106,7 +117,7 @@ opencode-ecosystem/
 opencode-doctor
 ```
 
-Verifica: dependencias, estructura, skills, memory adapter, Ollama, API keys.
+Verifica: dependencias, estructura, skills, memory adapter y router MCP. Ollama y API keys son opcionales para un entorno local-only.
 
 ### Metrics
 
@@ -148,6 +159,8 @@ git clone https://github.com/Rukawua26/opencode-ecosystem.git
 cd opencode-ecosystem
 npm ci
 npm test
+npm run test:router
+npm run test:coverage
 ```
 
 ### Devcontainer

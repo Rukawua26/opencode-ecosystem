@@ -54,3 +54,16 @@
 - [x] 40. verify.md con matriz de cumplimiento
 - [x] 41. RDD Tier 3 aprobado y gate PASS
 - [x] 42. Commits atomicos por fase
+
+## Ronda 4 — Release v1.9.0
+
+- [x] 43. Alinear versiones root, paquetes, MCP, instaladores y diagramas en `1.9.0`
+- [x] 44. Actualizar los cuatro README con hardening, memoria y CI multiplataforma
+- [x] 45. Anadir test real de `install.ps1` en Windows
+- [x] 46. Unificar tests, instaladores, tag y publicacion en un solo workflow
+- [x] 47. Retirar semantic-release y su cadena vulnerable de dependencias
+- [x] 48. Corregir coverage falso `0%` con provider oficial de Vitest
+- [x] 49. Verificar `npm audit` con 0 vulnerabilidades
+- [x] 50. Verificar paquetes npm `1.9.0` con `npm pack --dry-run`
+- [ ] 51. Aprobar receipt RDD del candidato de release
+- [ ] 52. Push, CI remoto, tag `v1.9.0`, GitHub Release y npm

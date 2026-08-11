@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.9.0
+
+- Added deterministic Obsidian project discovery and source ingestion with bounded local-first synthesis.
+- Made the local model router reproducible with isolated, locked MCP dependencies and bounded Ollama lifecycle.
+- Hardened sandbox execution and checkpoint secret exclusions across Unix and Windows paths.
+- Made installers preserve customizations by default and create rollback backups with `--force`.
+- Added text fallback for memory rows without embeddings and avoided Ollama loads for empty queries.
+- Unified blocking CI across Linux, macOS, Alpine and Windows before tagging or npm publication.
+- Removed the semantic-release dependency chain; release publication now uses the explicit package version after CI passes.
+
 ## v1.8.0
 
 - Added incremental, hash-verified memory event exports with local state, atomic writes and bounded resources.

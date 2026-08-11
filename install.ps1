@@ -9,7 +9,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoUrl = "https://github.com/Rukawua26/opencode-ecosystem.git"
-$InstallTag = if ($env:INSTALL_TAG) { $env:INSTALL_TAG } else { "v1.8.0" }
+$InstallTag = if ($env:INSTALL_TAG) { $env:INSTALL_TAG } else { "v1.9.0" }
 
 function Write-Log { param($Message) Write-Host "[opencode-ecosystem] $Message" -ForegroundColor Green }
 function Write-Warn { param($Message) Write-Host "[warn] $Message" -ForegroundColor Yellow }

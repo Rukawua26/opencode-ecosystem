@@ -29,6 +29,10 @@ jobs:
       - name: Install MCP router dependencies
         run: npm ci --prefix config/mcp --omit=dev --ignore-scripts
 
+      - name: Audit dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: npm audit --audit-level=high
+
       - name: Run lint
         run: npm run lint
 
@@ -80,6 +84,9 @@ jobs:
       - name: Run local-model-router tests (node:test)
         run: npm run test:router
 
+      - name: Run PowerShell install test
+        run: npm run test:install:windows
+
   install-validation:
     runs-on: ubuntu-latest
     container: node:22-alpine
@@ -102,3 +109,71 @@ jobs:
           test -d /tmp/test-home/.config/opencode/mcp
           test -d /tmp/test-home/opencode-custom/skills
           echo "Install validation OK"
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [test, test-windows, install-validation]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install release dependencies
+        run: npm ci
+
+      - name: Configure git remote with PAT
+        run: git remote set-url origin https://x-access-token:${{ secrets.ECOSYSTEMAPUBLISH2 }}@github.com/${{ github.repository }}.git
+
+      - name: Create version tag
+        env:
+          GH_TOKEN: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists; continuing idempotent publication checks."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Create GitHub release for latest tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --generate-notes --latest
+
+      - name: Publish memory-adapter to npm
+        working-directory: packages/memory-adapter
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1 || npm publish --access public
+
+      - name: Publish skills to npm
+        working-directory: packages/skills
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          PACKAGE_NAME=$(node -p "require('./package.json').name")
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1 || npm publish --access public
+
+      - name: Restore remote URL
+        if: always()
+        run: git remote set-url origin https://github.com/${{ github.repository }}.git

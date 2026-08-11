@@ -7,13 +7,13 @@
 | R1 | Router MCP inicia desde instalacion limpia | PASS | `test:install` verifica SDK instalado e importable; `npm run test:router` 23/23 |
 | R2 | Sandbox no usa shell:true ni interpola entrada | PASS | `sandbox-helpers.js` exporta `buildDockerArgs` (array, no string); 8 tests; lint 0 warnings |
 | R3 | Checkpoints excluye .env y credenciales | PASS | Patron unico cubre Unix, Windows, `.env-*`, claves y certificados; 8 tests |
-| R4 | CI bloquea releases ante fallos | PASS | `test.yml` sin `continue-on-error`; `semantic-release.yml` ejecuta test+router+check-docs antes de release |
-| R5 | Instalador respalda antes de sobrescribir y pin a tag | PASS | `INSTALL_TAG=v1.8.0`; reinstalacion preserva customizaciones y `--force` prueba backup antes de reemplazar |
+| R4 | CI bloquea releases ante fallos | PASS | `test.yml` unifica tests y release; el job de publicacion depende de Linux/macOS, Windows y Alpine |
+| R5 | Instalador respalda antes de sobrescribir y pin a tag | PASS | `INSTALL_TAG=v1.9.0`; reinstalacion preserva customizaciones y `--force` prueba backup antes de reemplazar |
 | R6 | Embeddings incluyen content de decisiones | PASS | `adapter.js:232` embebe `title+content+rationale+tags`; `adapter.js:251` embebe todos los campos de bugs |
 | R7 | Busqueda semantica devuelve filas sin embedding | PASS | `LEFT JOIN` + fallback textual normalizado; queries vacias no invocan embeddings ni contaminan ranking |
 | R8 | Doctor verifica SDK del router | PASS | `doctor.js` check `router package.json`, `router SDK`, `router local-model-router.js` |
 | R9 | Sin claims FTS5 en documentacion | PASS | `check-docs.js` valida 7 archivos; encontrado 0 menciones de FTS5 |
-| R10 | Workflows de release no duplicados | PASS | `release.yml` eliminado; solo `semantic-release.yml` publica |
+| R10 | Workflows de release no duplicados | PASS | `test.yml` es el unico pipeline de test/tag/publicacion; workflows redundantes eliminados |
 | R11 | Dependabot sin --admin | PASS | `dependabot-automerge.yml` usa `--squash --delete-branch` sin `--admin` |
 | R12 | MCP server version dinamica | PASS | `mcp-server.js:8` `readAdapterVersion()` lee `package.json`; `local-model-router.js:12` igual |
 | R13 | Export Obsidian sin colisiones | PASS | `adapter.js:654` append `-<id>` al nombre de archivo |
@@ -60,7 +60,7 @@
 - `install.sh` — `copy_if_ok` + `copy_dir_if_ok` + `npm ci` bloqueante + SDK import check
 - `install.ps1` — `Copy-IfOk` + `Copy-DirIfOk` + `npm ci` bloqueante
 - `.github/workflows/test.yml` — `npm ci --prefix config/mcp` + sin check-docs duplicado
-- `.github/workflows/semantic-release.yml` — `npm ci --prefix config/mcp`
+- `.github/workflows/test.yml` — pipeline unico con CI multiplataforma y release dependiente de todos los jobs
 - `tests/plugins/sandbox.test.js` — 8 tests de validacion y aislamiento
 - `tests/plugins/checkpoints.test.js` — 8 tests de secretos multiplataforma
 - `tests/plugins/plugins.test.js` — excluye `*-helpers.js`
@@ -84,6 +84,16 @@
 - Candidate: `e383a986ba4c241f95a77dfefe75baa368e43a2aae44f69370bd8c356b5f53d2`
 - Lentes: code-review PASS, verifier PASS, security-review PASS, architecture-review PASS
 - Gate: `receipt_approved` (PASS)
+
+## Release v1.9.0
+
+- Versiones alineadas: root, memory-adapter, skills y local-model-router `1.9.0`.
+- Pipeline unico: Linux/macOS + Windows + Alpine; el job de release depende de todos.
+- Coverage: provider oficial `@vitest/coverage-v8`, 100% sobre los modulos instrumentados (14 statements).
+- Supply chain: `npm audit` reporta 0 vulnerabilidades; semantic-release y 421 paquetes transitivos fueron retirados.
+- Empaquetado: `npm pack --dry-run` valido para memory-adapter (7 archivos) y skills (34 archivos).
+- Windows: `tests/install.test.ps1` cubre instalacion limpia, SDK, preservacion y rollback `-Force` en CI.
+- Estado remoto: pendiente de push y confirmacion de CI/tag/publicacion.
 
 ## Ambiente
 

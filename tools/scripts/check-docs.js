@@ -30,17 +30,20 @@ function checkFile(relPath, checks) {
 
 checkFile("README.md", [
   { name: "should not claim FTS5", pattern: /FTS5/i, shouldNotExist: true },
+  { name: "should document v1.9.0", pattern: /v1\.9\.0/, shouldNotExist: false },
   { name: "should mention local-model-router", pattern: /local-model-router/, shouldNotExist: false },
   { name: "should mention obsidian-ingest", pattern: /obsidian-ingest/, shouldNotExist: false },
 ]);
 
 checkFile("README.es.md", [
   { name: "should not claim FTS5", pattern: /FTS5/i, shouldNotExist: true },
+  { name: "should document v1.9.0", pattern: /v1\.9\.0/, shouldNotExist: false },
   { name: "should mention local-model-router or Router local", pattern: /local-model-router|Router local/, shouldNotExist: false },
 ]);
 
 checkFile("packages/memory-adapter/README.md", [
   { name: "should not claim FTS5", pattern: /FTS5/i, shouldNotExist: true },
+  { name: "should document v1.9.0", pattern: /v1\.9\.0/, shouldNotExist: false },
   { name: "should mention SQLite", pattern: /SQLite/, shouldNotExist: false },
   { name: "should mention MCP", pattern: /MCP/, shouldNotExist: false },
 ]);
@@ -71,6 +74,10 @@ checkFile("config/plugins/checkpoints.js", [
 
 checkFile("tools/scripts/doctor.js", [
   { name: "should check router SDK", pattern: /@modelcontextprotocol\/sdk/, shouldNotExist: false },
+]);
+
+checkFile("install.sh", [
+  { name: "should install v1.9.0 by default", pattern: /INSTALL_TAG=.*v1\.9\.0/, shouldNotExist: false },
 ]);
 
 if (errors === 0) {
