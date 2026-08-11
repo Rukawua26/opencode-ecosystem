@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.8.0
+
+- Added incremental, hash-verified memory event exports with local state, atomic writes and bounded resources.
+- Preserved stable preference event IDs and protected concurrent state updates.
+
+## v1.7.0
+
+- Added canonical memory event projection, bounded filters and JSONL verification.
+
 ## v1.4.1
 
 - Completed GitHub Pages routing fixes.

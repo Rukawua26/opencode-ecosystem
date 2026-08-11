@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg?v=1.6.1" alt="OpenCode Ecosystem" width="100%" />
+  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg?v=1.8.0" alt="OpenCode Ecosystem" width="100%" />
 </p>
 
 <p align="center">

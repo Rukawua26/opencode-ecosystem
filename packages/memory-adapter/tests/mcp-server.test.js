@@ -104,7 +104,7 @@ describe("memory MCP server", () => {
   });
 
   it("exposes only read-only tools without private export", async () => {
-    await request("initialize", {});
+    const initialized = await request("initialize", {});
     const response = await request("tools/list", {});
     const names = response.result.tools.map((item) => item.name);
     const exportTool = response.result.tools.find((item) => item.name === "export_project");
@@ -116,6 +116,7 @@ describe("memory MCP server", () => {
     assert.ok(names.includes("export_events"));
     assert.ok(!Object.hasOwn(exportTool.inputSchema.properties, "includePrivate"));
     assert.ok(!Object.hasOwn(exportTool.inputSchema.properties, "project"));
+    assert.strictEqual(initialized.result.serverInfo.version, "1.8.0");
   });
 
   it("rejects unknown arguments and invalid types", async () => {

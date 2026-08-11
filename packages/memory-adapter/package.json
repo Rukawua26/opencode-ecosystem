@@ -1,6 +1,6 @@
 {
   "name": "@rukawua26/opencode-memory-adapter",
-  "version": "1.6.1",
+  "version": "1.8.0",
   "description": "Universal memory adapter with SQLite and MCP server for any AI coding agent (OpenCode, Claude Code, Cursor, etc.)",
   "license": "MIT",
   "author": "Rukawua26",
@@ -16,6 +16,9 @@
     ".": "./src/adapter.js",
     "./mcp": "./src/mcp-server.js"
   },
+  "files": [
+    "src/"
+  ],
   "scripts": {
     "start": "node src/mcp-server.js",
     "cli": "node src/cli.js",

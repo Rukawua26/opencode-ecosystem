@@ -171,7 +171,7 @@ input.on("line", async (line) => {
       id,
       result: {
         protocolVersion: "2024-11-05",
-        serverInfo: { name: "memory-adapter", version: "1.6.1" },
+        serverInfo: { name: "memory-adapter", version: "1.8.0" },
         capabilities: { tools: { listChanged: false } },
       },
     });

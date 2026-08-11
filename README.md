@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg?v=1.6.1" alt="OpenCode Ecosystem" width="100%" />
+  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg?v=1.8.0" alt="OpenCode Ecosystem" width="100%" />
 </p>
 
 <p align="center">
@@ -106,7 +106,7 @@ La referencia técnica `docs/sources/hypruse-analysis.md` registra un ahorro apr
 
 ```mermaid
 graph TD
-    subgraph "🎯 OpenCode Ecosystem v1.6.1"
+    subgraph "🎯 OpenCode Ecosystem v1.8.0"
         A[CLI Install] --> B[config/]
         A --> C[skills/]
         A --> D[packages/]
@@ -147,7 +147,7 @@ graph TD
     R[ADR-004 docs/sources/adr-004-hypruse-analysis] -->|validates| P
 
     L[🌐 npm registry] <-->|publish| D1
-    M[📦 GitHub Releases] <-->|tag v1.6.1| H3
+    M[📦 GitHub Releases] <-->|tag v1.8.0| H3
 ```
 
 ---
@@ -279,7 +279,7 @@ opencode-ecosystem/
 │   └── memory-adapter/
 │       ├── src/        # Adapter, MCP server, CLI
 │       ├── tests/      # 22 tests passing
-│       └── package.json  # @rukawua26/opencode-memory-adapter@1.6.1
+│       └── package.json  # @rukawua26/opencode-memory-adapter@1.8.0
 ├── docs/            # Arquitectura, guías, token-economy
 ├── tools/           # Repo map builder, scripts
 ├── tests/           # Tests de skills e install.sh
