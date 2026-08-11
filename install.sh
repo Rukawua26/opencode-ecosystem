@@ -131,11 +131,14 @@ copy_if_ok() {
 copy_dir_if_ok() {
   local src_glob="$1" dst_dir="$2" label="$3"
   if [[ "$FORCE" == true && -d "$dst_dir" ]]; then
-    local ts_backup
-    ts_backup="$(date +%s)"
-    mkdir -p "$dst_dir.bak-$ts_backup"
-    cp -r "$dst_dir/"* "$dst_dir.bak-$ts_backup/" 2>/dev/null || true
-    info "$label backed up to $(basename "$dst_dir").bak-$ts_backup"
+    local existing_files=("$dst_dir"/*)
+    if [[ -e "${existing_files[0]}" ]]; then
+      local ts_backup
+      ts_backup="$(date +%s)"
+      mkdir -p "$dst_dir.bak-$ts_backup"
+      cp -r "$dst_dir/"* "$dst_dir.bak-$ts_backup/"
+      info "$label backed up to $(basename "$dst_dir").bak-$ts_backup"
+    fi
   fi
   for src in $src_glob; do
     [[ -f "$src" ]] || continue
@@ -143,6 +146,24 @@ copy_dir_if_ok() {
     name="$(basename "$src")"
     copy_if_ok "$src" "$dst_dir/$name"
   done
+}
+
+# Copy a directory as one managed unit, preserving an existing installation.
+copy_tree_if_ok() {
+  local src_dir="$1" dst_dir="$2" label="$3"
+  if [[ -d "$dst_dir" && "$FORCE" == false ]]; then
+    info "Skipping $label (exists): $dst_dir"
+    return 1
+  fi
+  if [[ -d "$dst_dir" && "$FORCE" == true ]]; then
+    local backup="$dst_dir.bak-$(date +%s)"
+    cp -r "$dst_dir" "$backup"
+    rm -rf "$dst_dir"
+    info "$label backed up to $(basename "$backup")"
+  fi
+  mkdir -p "$dst_dir"
+  cp -r "$src_dir/." "$dst_dir/"
+  info "$label installed: $dst_dir"
 }
 
 # Copy config
@@ -205,10 +226,16 @@ copy_config() {
   # Profiles
   log "Installing profiles..."
   if [[ -d "$repo_dir/config/profiles" ]]; then
-    cp -r "$repo_dir/config/profiles/"* "$OPENCODE_DIR/profiles/" 2>/dev/null || true
-    for profile in "$OPENCODE_DIR"/profiles/*/opencode.jsonc; do
-      [[ -f "$profile" ]] || continue
-      node -e 'const fs=require("node:fs"); const file=process.argv[1]; fs.writeFileSync(file, fs.readFileSync(file,"utf8").replaceAll("__OPENCODE_DIR__", process.argv[2]));' "$profile" "$OPENCODE_DIR"
+    for profile_dir in "$repo_dir/config/profiles"/*/; do
+      [[ -d "$profile_dir" ]] || continue
+      local profile_name
+      profile_name="$(basename "$profile_dir")"
+      if copy_tree_if_ok "$profile_dir" "$OPENCODE_DIR/profiles/$profile_name" "Profile $profile_name"; then
+        local profile="$OPENCODE_DIR/profiles/$profile_name/opencode.jsonc"
+        if [[ -f "$profile" ]]; then
+          node -e 'const fs=require("node:fs"); const file=process.argv[1]; fs.writeFileSync(file, fs.readFileSync(file,"utf8").replaceAll("__OPENCODE_DIR__", process.argv[2]));' "$profile" "$OPENCODE_DIR"
+        fi
+      fi
     done
     info "Profiles copied"
   fi
@@ -220,28 +247,26 @@ copy_config() {
     for skill_dir in "$repo_dir/skills"/*/; do
       [[ -d "$skill_dir" ]] || continue
       skill_name="$(basename "$skill_dir")"
-      mkdir -p "$HOME/opencode-custom/skills/$skill_name"
-      cp -r "$skill_dir"/* "$HOME/opencode-custom/skills/$skill_name/" 2>/dev/null || true
-      info "Skill installed: $skill_name"
+      copy_tree_if_ok "$skill_dir" "$HOME/opencode-custom/skills/$skill_name" "Skill $skill_name" || true
     done
   fi
 
   # .env.example
   if [[ -f "$repo_dir/.env.example" ]]; then
-    cp "$repo_dir/.env.example" "$OPENCODE_DIR/.env.example"
+    copy_if_ok "$repo_dir/.env.example" "$OPENCODE_DIR/.env.example"
     info ".env.example copied (configure your API keys manually)"
   fi
 
   # Global doctor command
   if [[ -f "$repo_dir/tools/scripts/doctor.js" && -f "$repo_dir/tools/scripts/opencode-doctor.sh" ]]; then
-    cp "$repo_dir/tools/scripts/doctor.js" "$OPENCODE_DIR/tools/doctor.js"
-    cp "$repo_dir/tools/scripts/opencode-doctor.sh" "$OPENCODE_BIN_DIR/opencode-doctor"
+    copy_if_ok "$repo_dir/tools/scripts/doctor.js" "$OPENCODE_DIR/tools/doctor.js"
+    copy_if_ok "$repo_dir/tools/scripts/opencode-doctor.sh" "$OPENCODE_BIN_DIR/opencode-doctor"
     chmod +x "$OPENCODE_BIN_DIR/opencode-doctor"
     info "opencode-doctor installed globally at $OPENCODE_BIN_DIR/opencode-doctor"
   fi
   if [[ -f "$repo_dir/tools/scripts/opencode-metrics.js" && -f "$repo_dir/tools/scripts/opencode-metrics.sh" ]]; then
-    cp "$repo_dir/tools/scripts/opencode-metrics.js" "$OPENCODE_DIR/tools/opencode-metrics.js"
-    cp "$repo_dir/tools/scripts/opencode-metrics.sh" "$OPENCODE_BIN_DIR/opencode-metrics"
+    copy_if_ok "$repo_dir/tools/scripts/opencode-metrics.js" "$OPENCODE_DIR/tools/opencode-metrics.js"
+    copy_if_ok "$repo_dir/tools/scripts/opencode-metrics.sh" "$OPENCODE_BIN_DIR/opencode-metrics"
     chmod +x "$OPENCODE_BIN_DIR/opencode-metrics"
     info "opencode-metrics installed globally at $OPENCODE_BIN_DIR/opencode-metrics"
   fi
@@ -263,19 +288,16 @@ install_memory() {
   fi
 
   local mem_dir="$OPENCODE_DIR/mcp/memory-adapter"
-  mkdir -p "$mem_dir"
-  cp -r "$repo_dir/packages/memory-adapter/"* "$mem_dir/"
-
-  # Install deps
-  if [[ -f "$mem_dir/package.json" ]]; then
-    log "Installing memory adapter dependencies..."
-    (cd "$mem_dir" && npm install --production 2>/dev/null) || warn "Failed to install memory adapter deps, run 'npm install' manually in $mem_dir"
+  if copy_tree_if_ok "$repo_dir/packages/memory-adapter" "$mem_dir" "Memory adapter"; then
+    # The adapter uses only Node.js built-ins and has no runtime dependencies.
     info "Memory adapter installed at $mem_dir"
+  else
+    info "Memory adapter preserved at $mem_dir"
   fi
 
   # Link global CLI through a wrapper so relative imports stay inside the package.
   if [[ -f "$mem_dir/src/cli.js" && -f "$repo_dir/tools/scripts/memory-adapter.sh" ]]; then
-    cp "$repo_dir/tools/scripts/memory-adapter.sh" "$OPENCODE_BIN_DIR/memory-adapter"
+    copy_if_ok "$repo_dir/tools/scripts/memory-adapter.sh" "$OPENCODE_BIN_DIR/memory-adapter"
     chmod +x "$OPENCODE_BIN_DIR/memory-adapter"
     info "memory-adapter CLI installed globally at $OPENCODE_BIN_DIR/memory-adapter"
   fi
@@ -327,7 +349,7 @@ verify_install() {
 
   local agent_count plugin_count skill_count
   agent_count=$(find "$OPENCODE_DIR/agents" -name "*.md" 2>/dev/null | wc -l || echo 0)
-  plugin_count=$(find "$OPENCODE_DIR/plugins" -name "*.js" 2>/dev/null | wc -l || echo 0)
+  plugin_count=$(find "$OPENCODE_DIR/plugins" -name "*.js" ! -name "*-helpers.js" 2>/dev/null | wc -l || echo 0)
   skill_count=$(find "$HOME/opencode-custom/skills" -maxdepth 1 -type d 2>/dev/null | wc -l || echo 0)
   skill_count=$((skill_count > 0 ? skill_count - 1 : 0))
 

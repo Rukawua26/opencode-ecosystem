@@ -304,7 +304,12 @@ export class MemoryAdapter {
   searchMemory({ project, projectPath, query, category, limit = 10, semantic = true }) {
     const projectId = project ? this.findProject(project, projectPath) : null;
     const results = {};
-    const likeQuery = `%${query || ""}%`;
+    const textQuery = typeof query === "string" ? query.trim() : "";
+    const normalizedTextQuery = textQuery.toLowerCase();
+    const likeQuery = `%${textQuery}%`;
+    const matchesText = (row, fields) => fields.some((field) =>
+      String(row[field] || "").toLowerCase().includes(normalizedTextQuery)
+    );
 
     if (!projectId) {
       if (!category || category === "decisions") results.decisions = [];
@@ -313,7 +318,7 @@ export class MemoryAdapter {
       return results;
     }
 
-    const queryEmbedding = semantic && this.useEmbeddings && query ? embedQuery(query) : null;
+    const queryEmbedding = semantic && this.useEmbeddings && textQuery ? embedQuery(textQuery) : null;
 
     if (!category || category === "decisions") {
       if (queryEmbedding) {
@@ -327,12 +332,8 @@ export class MemoryAdapter {
         const withEmbeddings = rows.filter((row) => row.embedding);
         const ranked = rankByEmbedding(withEmbeddings, queryEmbedding, limit);
         const withoutEmbeddings = rows.filter((row) => !row.embedding);
-        if (withoutEmbeddings.length > 0 && likeQuery.trim()) {
-          const textual = withoutEmbeddings.filter((row) =>
-            (row.title || "").includes(likeQuery.slice(1, -1)) ||
-            (row.content || "").includes(likeQuery.slice(1, -1)) ||
-            (row.tags || "").includes(likeQuery.slice(1, -1))
-          );
+        if (withoutEmbeddings.length > 0 && textQuery) {
+          const textual = withoutEmbeddings.filter((row) => matchesText(row, ["title", "content", "tags"]));
           results.decisions = [...ranked, ...textual].slice(0, limit);
         } else {
           results.decisions = ranked;
@@ -358,12 +359,8 @@ export class MemoryAdapter {
         const withEmbeddings = rows.filter((row) => row.embedding);
         const ranked = rankByEmbedding(withEmbeddings, queryEmbedding, limit);
         const withoutEmbeddings = rows.filter((row) => !row.embedding);
-        if (withoutEmbeddings.length > 0 && (likeQuery || "").trim()) {
-          const textual = withoutEmbeddings.filter((row) =>
-            (row.title || "").includes(likeQuery.slice(1, -1)) ||
-            (row.description || "").includes(likeQuery.slice(1, -1)) ||
-            (row.tags || "").includes(likeQuery.slice(1, -1))
-          );
+        if (withoutEmbeddings.length > 0 && textQuery) {
+          const textual = withoutEmbeddings.filter((row) => matchesText(row, ["title", "description", "tags"]));
           results.bugs = [...ranked, ...textual].slice(0, limit);
         } else {
           results.bugs = ranked;

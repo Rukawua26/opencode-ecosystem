@@ -5,8 +5,8 @@ export { DEFAULT_IMAGE, IMAGE_PATTERN };
 
 export function validateImage(image) {
   if (typeof image !== 'string' || !image.trim()) return DEFAULT_IMAGE;
-  if (/[;&|`$(){}\n\r]/.test(image)) throw new Error('Imagen contains shell metacharacters');
-  if (!IMAGE_PATTERN.test(image)) throw new Error('Imagen has an invalid format');
+  if (/[;&|`$(){}\n\r]/.test(image)) throw new Error('Image contains shell metacharacters');
+  if (!IMAGE_PATTERN.test(image)) throw new Error('Image has an invalid format');
   return image;
 }
 

@@ -9,7 +9,7 @@ mkdir -p "$HOME"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Run install with skip-memory (avoids npm install in test)
+# Run install without the optional memory adapter.
 bash "$REPO_DIR/install.sh" --verbose --skip-memory --force
 
 # Assertions
@@ -50,7 +50,7 @@ fi
 echo "[OK] $AGENT_COUNT agents installed"
 
 # Count plugins
-PLUGIN_COUNT=$(find "$HOME/.config/opencode/plugins" -name "*.js" | wc -l)
+PLUGIN_COUNT=$(find "$HOME/.config/opencode/plugins" -name "*.js" ! -name "*-helpers.js" | wc -l)
 if [[ $PLUGIN_COUNT -lt 5 ]]; then
   echo "[FAIL] Expected at least 5 plugins, got $PLUGIN_COUNT"
   exit 1
@@ -65,6 +65,27 @@ if [[ $SKILL_COUNT -lt 10 ]]; then
   exit 1
 fi
 echo "[OK] $SKILL_COUNT skills installed"
+
+# A normal reinstall must preserve user customizations.
+printf '%s\n' 'user-agent-marker' > "$HOME/.config/opencode/agents/ai-matcher.md"
+printf '%s\n' 'user-skill-marker' > "$HOME/opencode-custom/skills/defuddle/SKILL.md"
+printf '%s\n' 'user-profile-marker' > "$HOME/.config/opencode/profiles/work/opencode.jsonc"
+printf '%s\n' 'user-tool-marker' > "$HOME/.config/opencode/tools/doctor.js"
+bash "$REPO_DIR/install.sh" --skip-memory >/dev/null
+
+for marker_file in \
+  "$HOME/.config/opencode/agents/ai-matcher.md:user-agent-marker" \
+  "$HOME/opencode-custom/skills/defuddle/SKILL.md:user-skill-marker" \
+  "$HOME/.config/opencode/profiles/work/opencode.jsonc:user-profile-marker" \
+  "$HOME/.config/opencode/tools/doctor.js:user-tool-marker"; do
+  file="${marker_file%%:*}"
+  marker="${marker_file##*:}"
+  if [[ "$(<"$file")" != "$marker" ]]; then
+    echo "[FAIL] Reinstall overwrote: $file"
+    exit 1
+  fi
+done
+echo "[OK] Reinstall preserved agents, skills, profiles, and tools"
 
 # Cleanup
 rm -rf "$HOME"

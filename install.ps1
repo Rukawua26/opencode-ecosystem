@@ -72,7 +72,8 @@ function Copy-IfOk { param($Src, $Dst)
 
 # Copy dir with backup on Force
 function Copy-DirIfOk { param($SrcDir, $DstDir, $Label)
-    if ($Force -and (Test-Path $DstDir)) {
+    $ExistingFiles = @(Get-ChildItem $DstDir -ErrorAction SilentlyContinue)
+    if ($Force -and $ExistingFiles.Count -gt 0) {
         $ts = [int][double]::Parse((Get-Date -UFormat %s))
         $BakDir = "$DstDir.bak-$ts"
         Copy-Item $DstDir $BakDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -80,6 +81,24 @@ function Copy-DirIfOk { param($SrcDir, $DstDir, $Label)
     }
     $Files = Get-ChildItem $SrcDir -ErrorAction SilentlyContinue
     foreach ($f in $Files) { Copy-IfOk $f.FullName (Join-Path $DstDir $f.Name) }
+}
+
+function Copy-TreeIfOk { param($SrcDir, $DstDir, $Label)
+    if ((Test-Path $DstDir) -and -not $Force) {
+        Write-Info "Skipping $Label (exists): $DstDir"
+        return $false
+    }
+    if ((Test-Path $DstDir) -and $Force) {
+        $ts = [int][double]::Parse((Get-Date -UFormat %s))
+        $BakDir = "$DstDir.bak-$ts"
+        Copy-Item $DstDir $BakDir -Recurse -Force
+        Remove-Item $DstDir -Recurse -Force
+        Write-Info "$Label backed up to $(Split-Path $BakDir -Leaf)"
+    }
+    New-Item -ItemType Directory -Force -Path $DstDir | Out-Null
+    Copy-Item (Join-Path $SrcDir "*") $DstDir -Recurse -Force
+    Write-Info "$Label installed: $DstDir"
+    return $true
 }
 
 # Copy config
@@ -149,11 +168,11 @@ Write-Log "Installing profiles..."
 $ProfileDirs = Get-ChildItem (Join-Path $RepoDir "config\profiles") -Directory -ErrorAction SilentlyContinue
 foreach ($d in $ProfileDirs) {
     $dest = Join-Path $OpenCodeDir "profiles" $d.Name
-    New-Item -ItemType Directory -Force -Path $dest | Out-Null
-    Copy-Item (Join-Path $d.FullName "*") $dest -Recurse -Force
-    $ProfileConfig = Join-Path $dest "opencode.jsonc"
-    if (Test-Path $ProfileConfig) {
-        (Get-Content $ProfileConfig -Raw).Replace("__OPENCODE_DIR__", $OpenCodeDir.Replace("\", "/")) | Set-Content $ProfileConfig -Encoding UTF8
+    if (Copy-TreeIfOk $d.FullName $dest "Profile $($d.Name)") {
+        $ProfileConfig = Join-Path $dest "opencode.jsonc"
+        if (Test-Path $ProfileConfig) {
+            (Get-Content $ProfileConfig -Raw).Replace("__OPENCODE_DIR__", $OpenCodeDir.Replace("\", "/")) | Set-Content $ProfileConfig -Encoding UTF8
+        }
     }
 }
 Write-Info "Profiles copied: $($ProfileDirs.Count)"
@@ -164,29 +183,33 @@ $SkillsDir = Join-Path $env:USERPROFILE "opencode-custom\skills"
 $SkillDirs = Get-ChildItem (Join-Path $RepoDir "skills") -Directory -ErrorAction SilentlyContinue
 foreach ($d in $SkillDirs) {
     $dest = Join-Path $SkillsDir $d.Name
-    New-Item -ItemType Directory -Force -Path $dest | Out-Null
-    Copy-Item (Join-Path $d.FullName "*") $dest -Recurse -Force
-    Write-Info "Skill installed: $($d.Name)"
+    $null = Copy-TreeIfOk $d.FullName $dest "Skill $($d.Name)"
 }
 
 # .env.example
 $EnvExample = Join-Path $OpenCodeDir ".env.example"
 if (Test-Path (Join-Path $RepoDir ".env.example")) {
-    Copy-Item (Join-Path $RepoDir ".env.example") $EnvExample -Force
+    Copy-IfOk (Join-Path $RepoDir ".env.example") $EnvExample
     Write-Info ".env.example copied (configure your API keys manually)"
 }
 
 # Global doctor command
 $DoctorSource = Join-Path $RepoDir "tools\scripts\doctor.js"
 if (Test-Path $DoctorSource) {
-    Copy-Item $DoctorSource (Join-Path $ToolsDir "doctor.js") -Force
-    '@node "%USERPROFILE%\.config\opencode\tools\doctor.js" %*' | Set-Content (Join-Path $OpenCodeBinDir "opencode-doctor.cmd") -Encoding Ascii
+    Copy-IfOk $DoctorSource (Join-Path $ToolsDir "doctor.js")
+    $DoctorCommand = Join-Path $OpenCodeBinDir "opencode-doctor.cmd"
+    if ($Force -or -not (Test-Path $DoctorCommand)) {
+        '@node "%USERPROFILE%\.config\opencode\tools\doctor.js" %*' | Set-Content $DoctorCommand -Encoding Ascii
+    }
     Write-Info "opencode-doctor installed at $OpenCodeBinDir\opencode-doctor.cmd"
 }
 $MetricsSource = Join-Path $RepoDir "tools\scripts\opencode-metrics.js"
 if (Test-Path $MetricsSource) {
-    Copy-Item $MetricsSource (Join-Path $ToolsDir "opencode-metrics.js") -Force
-    '@node "%USERPROFILE%\.config\opencode\tools\opencode-metrics.js" %*' | Set-Content (Join-Path $OpenCodeBinDir "opencode-metrics.cmd") -Encoding Ascii
+    Copy-IfOk $MetricsSource (Join-Path $ToolsDir "opencode-metrics.js")
+    $MetricsCommand = Join-Path $OpenCodeBinDir "opencode-metrics.cmd"
+    if ($Force -or -not (Test-Path $MetricsCommand)) {
+        '@node "%USERPROFILE%\.config\opencode\tools\opencode-metrics.js" %*' | Set-Content $MetricsCommand -Encoding Ascii
+    }
     Write-Info "opencode-metrics installed at $OpenCodeBinDir\opencode-metrics.cmd"
 }
 
@@ -194,17 +217,15 @@ if (Test-Path $MetricsSource) {
 if (-not $SkipMemory) {
     Write-Log "Installing memory adapter..."
     $MemDir = Join-Path $OpenCodeDir "mcp\memory-adapter"
-    New-Item -ItemType Directory -Force -Path $MemDir | Out-Null
-    Copy-Item (Join-Path $RepoDir "packages\memory-adapter\*") $MemDir -Recurse -Force
+    $null = Copy-TreeIfOk (Join-Path $RepoDir "packages\memory-adapter") $MemDir "Memory adapter"
     $PkgPath = Join-Path $MemDir "package.json"
     if (Test-Path $PkgPath) {
-        Write-Info "Installing memory adapter dependencies..."
-        Push-Location $MemDir
-        npm install --production 2>$null
-        Pop-Location
         Write-Info "Memory adapter installed at $MemDir"
     }
-    '@node "%USERPROFILE%\.config\opencode\mcp\memory-adapter\src\cli.js" %*' | Set-Content (Join-Path $OpenCodeBinDir "memory-adapter.cmd") -Encoding Ascii
+    $MemoryCommand = Join-Path $OpenCodeBinDir "memory-adapter.cmd"
+    if ($Force -or -not (Test-Path $MemoryCommand)) {
+        '@node "%USERPROFILE%\.config\opencode\mcp\memory-adapter\src\cli.js" %*' | Set-Content $MemoryCommand -Encoding Ascii
+    }
 } else {
     Write-Warn "Skipping memory adapter (--skip-memory)"
 }
@@ -233,7 +254,7 @@ Assert-Path (Join-Path $OpenCodeBinDir "opencode-metrics.cmd") "opencode-metrics
 if (-not $SkipMemory) { Assert-Path (Join-Path $OpenCodeBinDir "memory-adapter.cmd") "memory-adapter command" }
 
 $agentCount = (Get-ChildItem (Join-Path $OpenCodeDir "agents") -Filter "*.md" -ErrorAction SilentlyContinue).Count
-$pluginCount = (Get-ChildItem (Join-Path $OpenCodeDir "plugins") -Filter "*.js" -ErrorAction SilentlyContinue).Count
+$pluginCount = (Get-ChildItem (Join-Path $OpenCodeDir "plugins") -Filter "*.js" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*-helpers.js" }).Count
 $skillCount = (Get-ChildItem (Join-Path $SkillsDir) -Directory -ErrorAction SilentlyContinue | Measure-Object).Count
 $skillCount = if ($skillCount -gt 0) { $skillCount } else { 0 }
 

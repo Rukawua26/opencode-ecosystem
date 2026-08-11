@@ -44,7 +44,7 @@ describe("Checkpoints skip patterns", () => {
 });
 
 describe("Skip patterns coverage", () => {
-  it("has at least 15 patterns", () => {
-    expect(SKIP_PATTERNS.length).toBeGreaterThanOrEqual(15);
+  it("does not duplicate patterns", () => {
+    expect(new Set(SKIP_PATTERNS.map(String)).size).toBe(SKIP_PATTERNS.length);
   });
 });

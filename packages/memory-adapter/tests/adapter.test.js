@@ -365,6 +365,31 @@ describe("MemoryAdapter", () => {
   });
 
   describe("searchMemory", () => {
+    it("treats whitespace-only queries as unranked text searches", () => {
+      adapter.saveDecision({
+        project: "whitespace-project",
+        projectPath: join(TMP_ROOT, "whitespace"),
+        title: "First decision",
+        content: "First content",
+      });
+      adapter.saveDecision({
+        project: "whitespace-project",
+        projectPath: join(TMP_ROOT, "whitespace"),
+        title: "Second decision",
+        content: "Second content",
+      });
+
+      const results = adapter.searchMemory({
+        project: "whitespace-project",
+        projectPath: join(TMP_ROOT, "whitespace"),
+        query: "   ",
+        semantic: true,
+      });
+
+      assert.strictEqual(results.decisions.length, 2);
+      assert.ok(results.decisions.every((decision) => decision.score === undefined));
+    });
+
     it("should search across all categories when no category specified", () => {
       adapter.saveDecision({
         project: "test-project",
