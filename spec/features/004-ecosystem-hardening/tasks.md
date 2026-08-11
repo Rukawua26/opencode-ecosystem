@@ -1,48 +1,45 @@
-# Tasks: Ecosystem Hardening
+# Tasks: Ecosystem Hardening (Ronda 1 + Ronda 2)
+
+## Ronda 1 — Correcciones de auditoria (10 hallazgos)
 
 - [x] 0. Crear spec/plan SDD 004
 - [x] 1. Router MCP reproducible
-  - [x] 1.1 Crear `config/mcp/package.json` con SDK
-  - [x] 1.2 Instalar SDK y generar lockfile
-  - [x] 1.3 Hacer rutas del test relativas
-  - [x] 1.4 Version dinamica en router
-  - [x] 1.5 Anadir `test:router` a `package.json`
-  - [x] 1.6 Incluir router tests en CI
 - [x] 2. Sandbox sin shell injection
-  - [x] 2.1 Reescribir `dockerCmd` sin shell
-  - [x] 2.2 Allowlist de imagenes
-  - [x] 2.3 Tests de seguridad existentes pasan
 - [x] 3. Checkpoints excluye .env
-  - [x] 3.1 Anadir patrones de exclusion (.env, .pem, .key, credenciales)
-  - [x] 3.2 Permisos 0700/0600 en backups
-  - [x] 3.3 Tests de exclusion existentes pasan
 - [x] 4. CI bloqueante
-  - [x] 4.1 Quitar continue-on-error de lint, coverage, Windows
-  - [x] 4.2 Anadir router tests y check-docs al CI
-  - [x] 4.3 Unificar workflows de release (eliminar release.yml)
-  - [x] 4.4 Sin --admin en dependabot
-- [x] 5. Instalador seguro
-  - [x] 5.1 Pin a tag (INSTALL_TAG=v1.8.0) en clone remoto
-  - [x] 5.2 Backup antes de sobrescribir con --force
-  - [x] 5.3 Instalar deps del router MCP (npm ci --omit=dev)
-  - [x] 5.4 Instalador no usa || true en copas de package.json
-- [x] 6. Memoria adapter
-  - [x] 6.1 Embeddings de content en decisiones (title+content+rationale+tags)
-  - [x] 6.2 LEFT JOIN para filas sin embedding + fallback textual
-  - [x] 6.3 Version dinamica en mcp-server
-  - [x] 6.4 Sin colision en export Obsidian (append row ID)
+- [x] 5. Instalador seguro (tag pinning + backup)
+- [x] 6. Memoria adapter (embeddings de content + LEFT JOIN)
 - [x] 7. Doctor verifica router
-  - [x] 7.1 Check de package.json del router
-  - [x] 7.2 Check de SDK instalado
-  - [x] 7.3 Check de local-model-router.js
-- [x] 8. Documentacion
-  - [x] 8.1 Sin FTS5 en diagramas, READMEs y hero.svg
-  - [x] 8.2 Separar capas en diagramas (embeddings opcionales)
-  - [x] 8.3 `check-docs.js` determinista anadido al CI
-- [x] 9. Verificacion final
-  - [x] 9.1 npm test (51/51)
-  - [x] 9.2 npm run lint (0 errors, 0 warnings)
-  - [x] 9.3 test:router (23/23)
-  - [x] 9.4 test:install (PASS)
-  - [x] 9.5 check-docs (OK)
-  - [x] 9.6 Commits atomicos (6 commits por fase)
+- [x] 8. Documentacion (sin FTS5 + check-docs.js)
+- [x] 9. Verificacion final (51/51 + 23/23 + 42/42)
+
+## Ronda 2 — Pendientes detectados tras revision
+
+- [x] 10. Fix pathToFileURL → fileURLToPath en router
+- [x] 11. CI: npm ci --prefix config/mcp antes de test:router
+- [x] 12. Test handshake: asertar version dinamica del router
+- [x] 13. Instalador: no sobrescribir sin --force (copy_if_ok)
+- [x] 14. Instalador: npm ci bloqueante (no || true ni 2>/dev/null)
+- [x] 15. Instalador: verificar import del SDK en verify_install
+- [x] 16. install.ps1: misma logica de no-sobrescribir + npm ci bloqueante
+- [x] 17. Sandbox: eliminar rama sg, extraer helpers testeables
+- [x] 18. Sandbox: fix regex metacharacters (\\n literal vs \n)
+- [x] 19. Checkpoints: extraer isSkippable/SKIP_PATTERNS a helpers
+- [x] 20. Tests reales: sandbox allowlist + metachar (16 tests)
+- [x] 21. Tests reales: checkpoints .env/private key/.pem exclusion (13 tests)
+- [x] 22. Memoria docs: documentar fallback textual en search_memory_semantic
+- [x] 23. Doctor: API keys como opcional (no blocking)
+- [x] 24. Limpiar workflow duplicado (check-docs dos veces en test.yml)
+
+## Verificacion Final
+
+- [x] 25. npm run lint (0 errors, 0 warnings)
+- [x] 26. npm test (67/67)
+- [x] 27. npm run test:router (23/23)
+- [x] 28. node --test packages/memory-adapter (42/42)
+- [x] 29. npm run check-docs (OK)
+- [x] 30. npm run test:install (PASS, SDK verified)
+- [x] 31. node tools/scripts/doctor.js (16/17, 1 optional skip)
+- [x] 32. verify.md con matriz de cumplimiento
+- [x] 33. RDD Tier 3 (start/capture/verify/finalize/gate)
+- [x] 34. Commits atomicos por fase
