@@ -65,5 +65,5 @@
 - [x] 48. Corregir coverage falso `0%` con provider oficial de Vitest
 - [x] 49. Verificar `npm audit` con 0 vulnerabilidades
 - [x] 50. Verificar paquetes npm `1.9.0` con `npm pack --dry-run`
-- [ ] 51. Aprobar receipt RDD del candidato de release
-- [ ] 52. Push, CI remoto, tag `v1.9.0`, GitHub Release y npm
+- [x] 51. Aprobar receipt RDD del candidato de release
+- [x] 52. Push, CI remoto, tag `v1.9.0`, GitHub Release y npm

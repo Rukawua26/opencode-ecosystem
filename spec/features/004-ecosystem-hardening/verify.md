@@ -92,8 +92,12 @@
 - Coverage: provider oficial `@vitest/coverage-v8`, 100% sobre los modulos instrumentados (14 statements).
 - Supply chain: `npm audit` reporta 0 vulnerabilidades; semantic-release y 421 paquetes transitivos fueron retirados.
 - Empaquetado: `npm pack --dry-run` valido para memory-adapter (7 archivos) y skills (34 archivos).
-- Windows: `tests/install.test.ps1` cubre instalacion limpia, SDK, preservacion y rollback `-Force` en CI.
-- Estado remoto: pendiente de push y confirmacion de CI/tag/publicacion.
+- Windows: `tests/install.test.ps1` cubre instalacion limpia, SDK, preservacion y rollback `-Force`; PASS en CI.
+- RDD release: `r_1786490161597_285f9806-14a4-480d-adf8-29f18d536270`, gate PASS.
+- RDD fixes multiplataforma: `r_1786491497562_caa492ad-8ac6-4966-855e-f989c2865148` y `r_1786491675801_1ef12edd-6918-4729-b2c7-75d39ce06687`, gates PASS.
+- CI remoto: [run 31547474673](https://github.com/Rukawua26/opencode-ecosystem/actions/runs/31547474673) PASS en Linux, macOS, Windows y Alpine; CodeQL PASS.
+- Release: [`v1.9.0`](https://github.com/Rukawua26/opencode-ecosystem/releases/tag/v1.9.0) publicada el 2026-08-11.
+- npm: `@rukawua26/opencode-memory-adapter@1.9.0` y `@rukawua26/opencode-skills@1.9.0` publicados y verificados en registry.
 
 ## Ambiente
 
