@@ -27,7 +27,7 @@ graph TD
         C --> C5[security]
 
         D --> D1[memory-adapter]
-        D1 --> D1a[SQLite + FTS5]
+        D1 --> D1a[SQLite + LIKE + optional embeddings]
         D1 --> D1b[MCP Server]
         D1 --> D1c[CLI + Context7]
 

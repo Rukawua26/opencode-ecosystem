@@ -77,7 +77,7 @@ opencode-metrics 7
 | Problema | Solución |
 |---|---|
 | Contexto grande y conversaciones monolíticas | Skills y subagentes cargados bajo demanda |
-| Memoria dispersa | `memory-adapter`: SQLite + FTS5 + MCP |
+| Memoria dispersa | `memory-adapter`: SQLite + MCP |
 | Modelo caro para cualquier tarea | `local-model-router` y perfiles por coste/capacidad |
 | Cambios difíciles de revisar | SDD para planificar y Organic RDD para verificar evidencia |
 | Configuración frágil | Instalador, perfiles, backups, guardrails y `doctor` |
@@ -99,6 +99,39 @@ La filosofía es **local-first, YAGNI y ahorro de tokens**: reutilizar lo existe
 | `opencode-metrics` | Mide tokens, compactaciones y fallos para ajustar el sistema |
 
 La referencia técnica `docs/sources/hypruse-analysis.md` registra un ahorro aproximado del **61% de contexto estático** frente a una configuración completa equivalente, manteniendo la ejecución local cuando es suficiente.
+
+---
+
+## 🧠 Obsidian: conocimiento e ingestión
+
+El ecosistema incluye dos flujos complementarios para `~/docs`:
+
+- **Catálogo determinista de proyectos**: descubre proyectos locales sin usar tokens LLM, crea notas solo cuando faltan y regenera el Canvas, `_MOC.md` y `grafo.html` de forma idempotente.
+- **`obsidian-ingest`**: convierte URLs, PDFs, videos de YouTube y archivos locales en notas de fuente enlazadas, con extracción acotada, síntesis local-first, preview obligatorio y escritura create-only.
+
+```bash
+# Previsualizar el catálogo sin escribir
+python3 ~/docs/scripts/discover_projects.py --dry-run
+
+# Aplicar notas faltantes y regenerar el grafo
+python3 ~/docs/scripts/discover_projects.py --apply
+```
+
+La skill `obsidian-ingest` se instala desde `skills/obsidian-ingest/` y mantiene copias idénticas en el paquete npm y en la instalación global. Sus reglas completas están en `~/docs/templates/ingest-rules.md`.
+
+---
+
+## 🤖 Router local
+
+`local-model-router` valida el digest del modelo antes de generar, reutiliza un servidor Ollama ya activo y limita el contexto para ajustarse a máquinas con 8 GB de RAM:
+
+| Rol | Modelo |
+|---|---|
+| Código | `qwen2.5-coder:3b` |
+| Chat y síntesis | `llama3.2:latest` |
+| Razonamiento | `llama3.2:latest` con prompt específico |
+
+Las generaciones usan `num_ctx: 4096` y `keep_alive: 1m`. Las tareas críticas o confidenciales permanecen en el modelo cloud actual salvo autorización explícita.
 
 ---
 
@@ -129,7 +162,7 @@ graph TD
         C --> C5[security]
 
         D --> D1[memory-adapter]
-        D1 --> D1a[SQLite + FTS5]
+        D1 --> D1a[SQLite + LIKE + embeddings]
         D1 --> D1b[MCP Server]
         D1 --> D1c[CLI + Context7]
 

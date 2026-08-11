@@ -53,6 +53,35 @@ irm -useb https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/in
 
 ---
 
+## Obsidian: conocimiento e ingestion
+
+El ecosistema incluye dos flujos para el vault `~/docs`:
+
+- **Catalogo determinista de proyectos**: descubre proyectos locales sin tokens LLM, crea solo notas faltantes y regenera Canvas, `_MOC.md` y `grafo.html` de forma idempotente.
+- **`obsidian-ingest`**: procesa URLs, PDFs, videos de YouTube y archivos locales con extraccion acotada, sintesis local-first, preview obligatorio y escritura create-only.
+
+```bash
+# Previsualizar sin escribir
+python3 ~/docs/scripts/discover_projects.py --dry-run
+
+# Aplicar notas faltantes y regenerar el grafo
+python3 ~/docs/scripts/discover_projects.py --apply
+```
+
+La skill vive en `skills/obsidian-ingest/` y tambien se publica dentro del paquete npm.
+
+## Router local
+
+| Rol | Modelo |
+|---|---|
+| Codigo | `qwen2.5-coder:3b` |
+| Chat y sintesis | `llama3.2:latest` |
+| Razonamiento | `llama3.2:latest` con prompt especifico |
+
+El router valida digests, reutiliza Ollama si ya esta activo y usa `num_ctx: 4096` y `keep_alive: 1m` para reducir consumo de RAM.
+
+---
+
 ## Estructura
 
 ```
