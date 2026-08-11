@@ -245,7 +245,7 @@ Assert-Path (Join-Path $OpenCodeDir "agents") "agents dir"
 Assert-Path (Join-Path $OpenCodeDir "plugins") "plugins dir"
 Assert-Path (Join-Path $OpenCodeDir "mcp") "mcp dir"
 Assert-Path (Join-Path $OpenCodeDir "profiles") "profiles dir"
-Assert-Path (Join-Path $SkillsDir) "skills dir"
+Assert-Path $SkillsDir "skills dir"
 Assert-Path $EnvExample ".env.example"
 Assert-Path (Join-Path $ToolsDir "doctor.js") "doctor.js"
 Assert-Path (Join-Path $OpenCodeBinDir "opencode-doctor.cmd") "opencode-doctor command"
@@ -255,7 +255,7 @@ if (-not $SkipMemory) { Assert-Path (Join-Path $OpenCodeBinDir "memory-adapter.c
 
 $agentCount = (Get-ChildItem (Join-Path $OpenCodeDir "agents") -Filter "*.md" -ErrorAction SilentlyContinue).Count
 $pluginCount = (Get-ChildItem (Join-Path $OpenCodeDir "plugins") -Filter "*.js" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*-helpers.js" }).Count
-$skillCount = (Get-ChildItem (Join-Path $SkillsDir) -Directory -ErrorAction SilentlyContinue | Measure-Object).Count
+$skillCount = (Get-ChildItem $SkillsDir -Directory -ErrorAction SilentlyContinue | Measure-Object).Count
 $skillCount = if ($skillCount -gt 0) { $skillCount } else { 0 }
 
 Write-Host ""
