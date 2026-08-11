@@ -90,7 +90,7 @@ La filosofía es **local-first, YAGNI y ahorro de tokens**: reutilizar lo existe
 
 | Mecanismo | Cómo ahorra |
 |---|---|
-| Skills on-demand | No carga las 20 skills en cada conversación |
+| Skills on-demand | No carga las 21 skills en cada conversación |
 | Subagentes especializados | Cada tarea recibe contexto fresco y acotado |
 | `local-model-router` | Enruta tareas simples a Ollama/modelos ligeros |
 | Memory adapter | Recupera decisiones y bugs relevantes, no todo el historial |
@@ -122,7 +122,7 @@ graph TD
         B --> B4[mcp]
         B --> B5[profiles]
 
-        C --> C1[20 Skills]
+        C --> C1[21 Skills]
         C --> C2[modes]
         C --> C3[prompts]
         C --> C4[debug]
@@ -259,7 +259,7 @@ Los nombres exactos dependen del instalador y del shell. Usa `doctor` si un perf
 | Componente | Descripción |
 |---|---|
 | **16 agentes** | Especializados: backend, frontend, security, devops, etc. |
-| **20 skills** | SDD, modes, prompts, debug, security, Obsidian y TDD |
+| **21 skills** | SDD, modes, prompts, debug, security, Obsidian y TDD |
 | **8 plugins** | Kanban, guardrails, checkpoints, sandbox, personalities, validator, metrics y auto-memory |
 | **4 MCP servers** | memory-adapter, local-model-router, context7 y diagram-generator |
 | **Memory adapter** | SQLite + MCP server universal (OpenCode, Claude Code, Cursor, etc.) |
@@ -274,7 +274,7 @@ Los nombres exactos dependen del instalador y del shell. Usa `doctor` si un perf
 ```
 opencode-ecosystem/
 ├── config/          # opencode.jsonc, agents, plugins, mcp, profiles
-├── skills/          # 20 skills exportables
+├── skills/          # 21 skills exportables
 ├── packages/        # Paquetes npm (memory-adapter)
 │   └── memory-adapter/
 │       ├── src/        # Adapter, MCP server, CLI

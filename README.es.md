@@ -43,7 +43,7 @@ irm -useb https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/in
 | Componente | Descripcion |
 |---|---|
 | **16+ agentes** | Especializados: backend, frontend, security, devops, etc. |
-| **20 skills** | SDD, modes, prompts, debug, security, Obsidian y TDD |
+| **21 skills** | SDD, modes, prompts, debug, security, Obsidian y TDD |
 | **8 plugins** | Kanban, guardrails, checkpoints, sandbox, personalities, validator, metrics y auto-memory |
 | **4 MCP servers** | memory-adapter, local-model-router, context7 y diagram-generator |
 | **Memory adapter** | SQLite + MCP server universal |
@@ -58,7 +58,7 @@ irm -useb https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/in
 ```
 opencode-ecosystem/
 ├── config/          # opencode.jsonc, agents, plugins, mcp, profiles
-├── skills/          # 20 skills exportables
+├── skills/          # 21 skills exportables
 ├── packages/        # Paquetes npm (memory-adapter, skills)
 ├── docs/            # Documentacion, guias, diagramas
 ├── tools/           # Scripts, scaffolders

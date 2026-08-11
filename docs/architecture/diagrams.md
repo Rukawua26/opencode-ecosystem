@@ -20,7 +20,7 @@ graph TD
         B --> B4[mcp]
         B --> B5[profiles]
 
-        C --> C1[20 Skills]
+        C --> C1[21 Skills]
         C --> C2[modes]
         C --> C3[prompts]
         C --> C4[debug]

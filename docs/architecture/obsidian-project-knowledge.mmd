@@ -1,0 +1,19 @@
+flowchart LR
+    subgraph Local[Deterministic local catalog - zero LLM tokens]
+        Home[Top-level home directories] --> Discover[discover_projects.py]
+        Discover -->|create-only| Notes[Obsidian project notes]
+        Discover --> Canvas[JSON Canvas project map]
+        Notes --> Graph[existing graph-viz.sh]
+        Graph --> MOC[_MOC.md Mermaid]
+        Graph --> HTML[grafo.html]
+    end
+
+    subgraph Ingest[OpenCode on-demand ingestion]
+        Source[URL, PDF, YouTube, local text] --> Extract[Defuddle, WebFetch, pdftotext, yt-dlp, Read]
+        Extract --> Search[Targeted Grep, max five notes]
+        Search --> Router[local-model-router ask_chat_model]
+        Router --> Preview[Exact preview and human approval]
+        Preview -->|create-only| SourceNote[Obsidian source note]
+    end
+
+    SourceNote --> Notes

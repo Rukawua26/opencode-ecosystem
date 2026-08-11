@@ -5,7 +5,7 @@
 ## Componentes
 
 - **Memory Adapter** — SQLite + MCP server para memoria persistente entre sesiones
-- **Skills** — 20 skills exportables (SDD, debug, security, prompts, etc.)
+- **Skills** — 21 skills exportables (SDD, debug, security, prompts, etc.)
 - **Agentes** — 16+ agentes especializados (trading, backend, frontend, design, android)
 - **Multi-modelo** — Routing automatico entre modelos cloud y locales (Ollama)
 - **SDD** — Spec-Driven Development con plantillas y workflows
