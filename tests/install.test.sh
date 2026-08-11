@@ -87,6 +87,23 @@ for marker_file in \
 done
 echo "[OK] Reinstall preserved agents, skills, profiles, and tools"
 
+# A forced reinstall must back up customizations before replacement.
+bash "$REPO_DIR/install.sh" --skip-memory --force >/dev/null
+profile_backups=("$HOME/.config/opencode/profiles/work.bak-"*)
+if [[ ! -f "${profile_backups[-1]}/opencode.jsonc" ]]; then
+  echo "[FAIL] Forced reinstall did not create a profile backup"
+  exit 1
+fi
+if [[ "$(<"${profile_backups[-1]}/opencode.jsonc")" != "user-profile-marker" ]]; then
+  echo "[FAIL] Forced reinstall backup did not preserve profile customization"
+  exit 1
+fi
+if [[ "$(<"$HOME/.config/opencode/profiles/work/opencode.jsonc")" == "user-profile-marker" ]]; then
+  echo "[FAIL] Forced reinstall did not replace the managed profile"
+  exit 1
+fi
+echo "[OK] Forced reinstall backed up customization before replacement"
+
 # Cleanup
 rm -rf "$HOME"
 

@@ -2,7 +2,7 @@ export const SKIP_PATTERNS = [
   /node_modules/,
   /\.git\//,
   /\.local\/share\/opencode\/plugins-data/,
-  /(?:^|\/)\.env(?:$|\.)/,
+  /\.env(?:$|[.\\/_-])/i,
   /id_rsa/i,
   /id_ed25519/i,
   /id_ecdsa/i,

@@ -6,6 +6,11 @@ describe("Checkpoints skip patterns", () => {
     expect(isSkippable("/home/user/.config/opencode/.env")).toBe(true);
     expect(isSkippable("/home/user/.config/opencode/.env.local")).toBe(true);
     expect(isSkippable("/home/user/.config/opencode/.env.production")).toBe(true);
+    expect(isSkippable("/home/user/.config/opencode/.env-dev")).toBe(true);
+    expect(isSkippable("/home/user/.config/opencode/.env/secret")).toBe(true);
+    expect(isSkippable("/home/user/project/foo.env")).toBe(true);
+    expect(isSkippable("C:\\Users\\user\\.config\\opencode\\.env")).toBe(true);
+    expect(isSkippable("C:\\Users\\user\\project\\.env.local")).toBe(true);
   });
 
   it("excludes private keys", () => {
