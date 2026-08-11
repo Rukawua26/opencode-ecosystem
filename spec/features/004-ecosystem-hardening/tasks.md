@@ -1,47 +1,48 @@
 # Tasks: Ecosystem Hardening
 
 - [x] 0. Crear spec/plan SDD 004
-- [ ] 1. Router MCP reproducible
-  - [ ] 1.1 Crear `config/mcp/package.json` con SDK
-  - [ ] 1.2 Instalar SDK y generar lockfile
-  - [ ] 1.3 Hacer rutas del test relativas
-  - [ ] 1.4 Version dinamica en router
-  - [ ] 1.5 Anadir `test:router` a `package.json`
-  - [ ] 1.6 Incluir router tests en `vitest.config.js`
-- [ ] 2. Sandbox sin shell injection
-  - [ ] 2.1 Reescribir `dockerCmd` sin shell
-  - [ ] 2.2 Allowlist de imagenes
-  - [ ] 2.3 Tests de seguridad
-- [ ] 3. Checkpoints excluye .env
-  - [ ] 3.1 Anadir patrones de exclusion
-  - [ ] 3.2 Permisos en backups
-  - [ ] 3.3 Tests de exclusion
-- [ ] 4. CI bloqueante
-  - [ ] 4.1 Quitar continue-on-error
-  - [ ] 4.2 Anadir router tests al CI
-  - [ ] 4.3 Unificar workflows de release
-  - [ ] 4.4 Sin --admin en dependabot
-- [ ] 5. Instalador seguro
-  - [ ] 5.1 Pin a tag en clone remoto
-  - [ ] 5.2 Backup antes de sobrescribir
-  - [ ] 5.3 Instalar deps del router MCP
-  - [ ] 5.4 Sin `|| true` en copas criticas
-- [ ] 6. Memoria adapter
-  - [ ] 6.1 Embeddings de content en decisiones
-  - [ ] 6.2 LEFT JOIN para filas sin embedding
-  - [ ] 6.3 Version dinamica en mcp-server
-  - [ ] 6.4 Sin colision en export Obsidian
-- [ ] 7. Doctor verifica router
-  - [ ] 7.1 Check de SDK
-  - [ ] 7.2 Check de handshake MCP
-- [ ] 8. Documentacion
-  - [ ] 8.1 Sin FTS5 en diagramas y READMEs
-  - [ ] 8.2 Separar capas en diagramas
-  - [ ] 8.3 `check-docs.js` determinista
-- [ ] 9. Verificacion final
-  - [ ] 9.1 npm test
-  - [ ] 9.2 npm run lint
-  - [ ] 9.3 test:router
-  - [ ] 9.4 test:install
-  - [ ] 9.5 RDD Tier 3
-  - [ ] 9.6 Commits
+- [x] 1. Router MCP reproducible
+  - [x] 1.1 Crear `config/mcp/package.json` con SDK
+  - [x] 1.2 Instalar SDK y generar lockfile
+  - [x] 1.3 Hacer rutas del test relativas
+  - [x] 1.4 Version dinamica en router
+  - [x] 1.5 Anadir `test:router` a `package.json`
+  - [x] 1.6 Incluir router tests en CI
+- [x] 2. Sandbox sin shell injection
+  - [x] 2.1 Reescribir `dockerCmd` sin shell
+  - [x] 2.2 Allowlist de imagenes
+  - [x] 2.3 Tests de seguridad existentes pasan
+- [x] 3. Checkpoints excluye .env
+  - [x] 3.1 Anadir patrones de exclusion (.env, .pem, .key, credenciales)
+  - [x] 3.2 Permisos 0700/0600 en backups
+  - [x] 3.3 Tests de exclusion existentes pasan
+- [x] 4. CI bloqueante
+  - [x] 4.1 Quitar continue-on-error de lint, coverage, Windows
+  - [x] 4.2 Anadir router tests y check-docs al CI
+  - [x] 4.3 Unificar workflows de release (eliminar release.yml)
+  - [x] 4.4 Sin --admin en dependabot
+- [x] 5. Instalador seguro
+  - [x] 5.1 Pin a tag (INSTALL_TAG=v1.8.0) en clone remoto
+  - [x] 5.2 Backup antes de sobrescribir con --force
+  - [x] 5.3 Instalar deps del router MCP (npm ci --omit=dev)
+  - [x] 5.4 Instalador no usa || true en copas de package.json
+- [x] 6. Memoria adapter
+  - [x] 6.1 Embeddings de content en decisiones (title+content+rationale+tags)
+  - [x] 6.2 LEFT JOIN para filas sin embedding + fallback textual
+  - [x] 6.3 Version dinamica en mcp-server
+  - [x] 6.4 Sin colision en export Obsidian (append row ID)
+- [x] 7. Doctor verifica router
+  - [x] 7.1 Check de package.json del router
+  - [x] 7.2 Check de SDK instalado
+  - [x] 7.3 Check de local-model-router.js
+- [x] 8. Documentacion
+  - [x] 8.1 Sin FTS5 en diagramas, READMEs y hero.svg
+  - [x] 8.2 Separar capas en diagramas (embeddings opcionales)
+  - [x] 8.3 `check-docs.js` determinista anadido al CI
+- [x] 9. Verificacion final
+  - [x] 9.1 npm test (51/51)
+  - [x] 9.2 npm run lint (0 errors, 0 warnings)
+  - [x] 9.3 test:router (23/23)
+  - [x] 9.4 test:install (PASS)
+  - [x] 9.5 check-docs (OK)
+  - [x] 9.6 Commits atomicos (6 commits por fase)
