@@ -230,7 +230,7 @@ export class MemoryAdapter {
     ).run(projectId, category, title, content, rationale || null, tags || null, isPrivate ? 1 : 0);
 
     if (this.useEmbeddings) {
-      const embedding = embedQuery(title + " " + (rationale || ""));
+      const embedding = embedQuery(`${title} ${content} ${rationale || ""} ${tags || ""}`);
       if (embedding) {
         this.db.prepare("INSERT INTO decision_embeddings (decision_id, embedding) VALUES (?, ?)")
           .run(result.lastInsertRowid, JSON.stringify(embedding));
@@ -248,7 +248,7 @@ export class MemoryAdapter {
     ).run(projectId, title, description, rootCause || null, fix, lesson || null, tags || null);
 
     if (this.useEmbeddings) {
-      const embedding = embedQuery(title + " " + (description || "") + " " + (fix || ""));
+      const embedding = embedQuery(`${title} ${description || ""} ${rootCause || ""} ${fix || ""} ${lesson || ""} ${tags || ""}`);
       if (embedding) {
         this.db.prepare("INSERT INTO bug_embedding_cache (bug_id, embedding) VALUES (?, ?)")
           .run(result.lastInsertRowid, JSON.stringify(embedding));
@@ -321,10 +321,22 @@ export class MemoryAdapter {
             `SELECT d.id, d.category, d.title, d.content, d.rationale, d.tags, d.created_at,
                      de.embedding
              FROM decisions d
-             JOIN decision_embeddings de ON d.id = de.decision_id
+             LEFT JOIN decision_embeddings de ON d.id = de.decision_id
              WHERE d.project_id = ? AND d.is_private = 0`
           ).all(projectId);
-        results.decisions = rankByEmbedding(rows, queryEmbedding, limit);
+        const withEmbeddings = rows.filter((row) => row.embedding);
+        const ranked = rankByEmbedding(withEmbeddings, queryEmbedding, limit);
+        const withoutEmbeddings = rows.filter((row) => !row.embedding);
+        if (withoutEmbeddings.length > 0 && likeQuery.trim()) {
+          const textual = withoutEmbeddings.filter((row) =>
+            (row.title || "").includes(likeQuery.slice(1, -1)) ||
+            (row.content || "").includes(likeQuery.slice(1, -1)) ||
+            (row.tags || "").includes(likeQuery.slice(1, -1))
+          );
+          results.decisions = [...ranked, ...textual].slice(0, limit);
+        } else {
+          results.decisions = ranked;
+        }
       } else {
         results.decisions = this.db.prepare(
           `SELECT id, category, title, content, rationale, tags, created_at
@@ -340,10 +352,22 @@ export class MemoryAdapter {
             `SELECT b.id, b.title, b.description, b.root_cause, b.fix, b.lesson, b.tags, b.created_at,
                      be.embedding
              FROM bug_fixes b
-             JOIN bug_embedding_cache be ON b.id = be.bug_id
+             LEFT JOIN bug_embedding_cache be ON b.id = be.bug_id
              WHERE b.project_id = ?`
           ).all(projectId);
-        results.bugs = rankByEmbedding(rows, queryEmbedding, limit);
+        const withEmbeddings = rows.filter((row) => row.embedding);
+        const ranked = rankByEmbedding(withEmbeddings, queryEmbedding, limit);
+        const withoutEmbeddings = rows.filter((row) => !row.embedding);
+        if (withoutEmbeddings.length > 0 && (likeQuery || "").trim()) {
+          const textual = withoutEmbeddings.filter((row) =>
+            (row.title || "").includes(likeQuery.slice(1, -1)) ||
+            (row.description || "").includes(likeQuery.slice(1, -1)) ||
+            (row.tags || "").includes(likeQuery.slice(1, -1))
+          );
+          results.bugs = [...ranked, ...textual].slice(0, limit);
+        } else {
+          results.bugs = ranked;
+        }
       } else {
         results.bugs = this.db.prepare(
           `SELECT id, title, description, root_cause, fix, lesson, tags, created_at
@@ -648,7 +672,8 @@ export class MemoryAdapter {
     }
 
     for (const d of decisions) {
-      const fileName = d.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".md";
+      const slug = d.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const fileName = `${slug}-${d.id}.md`;
       const content = `---
 title: "${d.title}"
 category: "${d.category}"
@@ -672,7 +697,8 @@ ${d.rationale || "N/A"}
     }
 
     for (const b of bugs) {
-      const fileName = "bug-" + b.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".md";
+      const slug = b.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      const fileName = `bug-${slug}-${b.id}.md`;
       const content = `---
 title: "${b.title}"
 tags: [${b.tags || ""}]

@@ -1,7 +1,19 @@
 import { createInterface } from "node:readline";
 import { createHash } from "node:crypto";
-import { basename, resolve } from "node:path";
+import { basename, resolve, dirname, join } from "node:path";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { MemoryAdapter } from "./adapter.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+function readAdapterVersion() {
+  try {
+    const pkg = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
+    return pkg.version || "1.0.0";
+  } catch {
+    return "1.0.0";
+  }
+}
 
 const adapter = new MemoryAdapter().init();
 const PROJECT_ROOT = resolve(process.env.OPENCODE_PROJECT_ROOT || process.cwd());
@@ -171,7 +183,7 @@ input.on("line", async (line) => {
       id,
       result: {
         protocolVersion: "2024-11-05",
-        serverInfo: { name: "memory-adapter", version: "1.8.0" },
+        serverInfo: { name: "memory-adapter", version: readAdapterVersion() },
         capabilities: { tools: { listChanged: false } },
       },
     });
