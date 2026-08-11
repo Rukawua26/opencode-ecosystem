@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { readFileSync } from "node:fs";
@@ -8,7 +8,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-const __dirname = dirname(pathToFileURL(import.meta.url).pathname);
+const __dirname = dirname(fileURLToPath(import.meta.url));
 function readRouterVersion() {
   try {
     const pkg = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf-8"));
