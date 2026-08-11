@@ -33,6 +33,13 @@ jobs:
           test -d /tmp/home/.config/opencode/mcp
           test -d /tmp/home/opencode-custom/skills
 
+      - name: Verify MCP router SDK
+        run: |
+          test -f /tmp/home/.config/opencode/mcp/package.json
+          test -f /tmp/home/.config/opencode/mcp/local-model-router.js
+          test -d /tmp/home/.config/opencode/mcp/node_modules/@modelcontextprotocol/sdk
+          echo "MCP router SDK OK"
+
   test-install-alpine:
     runs-on: ubuntu-latest
     container: node:22-alpine
@@ -52,6 +59,12 @@ jobs:
           test -d /tmp/home/.config/opencode/mcp
           test -d /tmp/home/opencode-custom/skills
 
+      - name: Verify MCP router SDK
+        run: |
+          test -f /tmp/home/.config/opencode/mcp/package.json
+          test -d /tmp/home/.config/opencode/mcp/node_modules/@modelcontextprotocol/sdk
+          echo "MCP router SDK OK"
+
   test-install-macos:
     runs-on: macos-latest
     steps:
@@ -70,3 +83,9 @@ jobs:
           test -d /tmp/home/.config/opencode/plugins
           test -d /tmp/home/.config/opencode/mcp
           test -d /tmp/home/opencode-custom/skills
+
+      - name: Verify MCP router SDK
+        run: |
+          test -f /tmp/home/.config/opencode/mcp/package.json
+          test -d /tmp/home/.config/opencode/mcp/node_modules/@modelcontextprotocol/sdk
+          echo "MCP router SDK OK"

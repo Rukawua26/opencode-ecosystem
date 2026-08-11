@@ -30,6 +30,16 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Run documentation and contract checks
+        run: npm run check-docs
+
+
+      - name: Run memory-adapter tests (node:test)
+        run: node --test packages/memory-adapter/tests/*.test.js
+
+      - name: Run local-model-router tests (node:test)
+        run: npm run test:router
+
       - name: Configure git remote with PAT
         run: |
           git remote set-url origin https://x-access-token:${{ secrets.ECOSYSTEMAPUBLISH2 }}@github.com/${{ github.repository }}.git

@@ -48,6 +48,6 @@ jobs:
           GH_TOKEN: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
 
       - name: Merge Dependabot PR
-        run: gh pr merge ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --squash --delete-branch --admin
+        run: gh pr merge ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --squash --delete-branch
         env:
           GH_TOKEN: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
