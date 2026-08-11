@@ -8,6 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_URL="https://github.com/Rukawua26/opencode-ecosystem.git"
+INSTALL_TAG="${INSTALL_TAG:-v1.8.0}"
 OPENCODE_DIR="$HOME/.config/opencode"
 OPENCODE_BIN_DIR="$HOME/.opencode/bin"
 VERBOSE=false
@@ -106,9 +107,9 @@ clone_repo() {
   local clone_dir="$SCRIPT_DIR"
   if [[ ! -f "$SCRIPT_DIR/config/opencode.jsonc" || ! -d "$SCRIPT_DIR/skills" ]]; then
     clone_dir="$(mktemp -d)"
-    log "Cloning repo to $clone_dir..."
-    git clone --depth 1 "$REPO_URL" "$clone_dir"
-    info "Repo cloned"
+    log "Cloning repo (tag $INSTALL_TAG) to $clone_dir..."
+    git clone --depth 1 --branch "$INSTALL_TAG" "$REPO_URL" "$clone_dir"
+    info "Repo cloned at tag $INSTALL_TAG"
   else
     info "Using local distribution files"
   fi
@@ -125,6 +126,9 @@ copy_config() {
     warn "opencode.jsonc already exists; preserving it (use --force to replace)"
     cp "$OPENCODE_DIR/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc.bak"
   else
+    if [[ -f "$OPENCODE_DIR/opencode.jsonc" && "$FORCE" == true ]]; then
+      cp "$OPENCODE_DIR/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc.bak"
+    fi
     cp "$repo_dir/config/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc"
     info "opencode.jsonc installed"
   fi
@@ -132,6 +136,13 @@ copy_config() {
   # Agents
   log "Installing agents..."
   if [[ -d "$repo_dir/config/agents" ]]; then
+    if [[ "$FORCE" == true && -d "$OPENCODE_DIR/agents" ]]; then
+      local ts_backup
+      ts_backup="$(date +%s)"
+      mkdir -p "$OPENCODE_DIR/agents.bak-$ts_backup"
+      cp -r "$OPENCODE_DIR/agents/"*.md "$OPENCODE_DIR/agents.bak-$ts_backup/" 2>/dev/null || true
+      info "Agents backed up to agents.bak-$ts_backup"
+    fi
     cp -r "$repo_dir/config/agents/"*.md "$OPENCODE_DIR/agents/"
     info "Agents copied"
   fi
@@ -139,7 +150,14 @@ copy_config() {
   # Plugins
   log "Installing plugins..."
   if [[ -d "$repo_dir/config/plugins" ]]; then
-    cp -r "$repo_dir/config/plugins/"*.js "$OPENCODE_DIR/plugins/" 2>/dev/null || true
+    if [[ "$FORCE" == true && -d "$OPENCODE_DIR/plugins" ]]; then
+      local ts_backup
+      ts_backup="$(date +%s)"
+      mkdir -p "$OPENCODE_DIR/plugins.bak-$ts_backup"
+      cp -r "$OPENCODE_DIR/plugins/"*.js "$OPENCODE_DIR/plugins.bak-$ts_backup/" 2>/dev/null || true
+      info "Plugins backed up to plugins.bak-$ts_backup"
+    fi
+    cp -r "$repo_dir/config/plugins/"*.js "$OPENCODE_DIR/plugins/"
     info "Plugins copied"
   fi
 
@@ -152,7 +170,14 @@ copy_config() {
   log "Installing MCP servers..."
   if [[ -d "$repo_dir/config/mcp" ]]; then
     cp -r "$repo_dir/config/mcp/"*.js "$OPENCODE_DIR/mcp/" 2>/dev/null || true
+    cp "$repo_dir/config/mcp/package.json" "$OPENCODE_DIR/mcp/package.json" 2>/dev/null || true
+    cp "$repo_dir/config/mcp/package-lock.json" "$OPENCODE_DIR/mcp/package-lock.json" 2>/dev/null || true
     info "MCP servers copied"
+    if [[ -f "$OPENCODE_DIR/mcp/package.json" ]]; then
+      log "Installing MCP router dependencies..."
+      (cd "$OPENCODE_DIR/mcp" && npm ci --omit=dev 2>/dev/null) || warn "Failed to install MCP deps, run 'npm ci' manually in $OPENCODE_DIR/mcp"
+      info "MCP router dependencies installed"
+    fi
   fi
 
   # Profiles

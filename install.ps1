@@ -9,6 +9,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoUrl = "https://github.com/Rukawua26/opencode-ecosystem.git"
+$InstallTag = if ($env:INSTALL_TAG) { $env:INSTALL_TAG } else { "v1.8.0" }
 
 function Write-Log { param($Message) Write-Host "[opencode-ecosystem] $Message" -ForegroundColor Green }
 function Write-Warn { param($Message) Write-Host "[warn] $Message" -ForegroundColor Yellow }
@@ -53,10 +54,10 @@ if ((Test-Path (Join-Path $ScriptDir "config\opencode.jsonc")) -and (Test-Path (
 } else {
     $TempDir = [System.IO.Path]::GetTempFileName() | ForEach-Object { [System.IO.Path]::ChangeExtension($_, '') }
     New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
-    Write-Log "Cloning repo to $TempDir..."
-    git clone --depth 1 $RepoUrl $TempDir
+    Write-Log "Cloning repo (tag $InstallTag) to $TempDir..."
+    git clone --depth 1 --branch $InstallTag $RepoUrl $TempDir
     $RepoDir = $TempDir
-    Write-Info "Repo cloned"
+    Write-Info "Repo cloned at tag $InstallTag"
 }
 
 # Copy config
@@ -91,8 +92,21 @@ Write-Info "Plugin libraries copied: $($LibraryFiles.Count)"
 # MCP servers
 Write-Log "Installing MCP servers..."
 $McpFiles = Get-ChildItem (Join-Path $RepoDir "config\mcp") -Filter "*.js" -ErrorAction SilentlyContinue
-foreach ($f in $McpFiles) { Copy-Item $f.FullName (Join-Path $OpenCodeDir "mcp") -Force }
-Write-Info "MCP servers copied: $($McpFiles.Count)"
+foreach ($f in $McpFiles) { Copy-Item $f.FullName (Join-Path $OpenCodeDir "mcp") -Force
+Write-Info "MCP servers copied: $($McpFiles.Count)"}
+
+# MCP router package.json and lockfile
+$McpPkg = Join-Path $RepoDir "config\mcp\package.json"
+$McpLock = Join-Path $RepoDir "config\mcp\package-lock.json"
+if (Test-Path $McpPkg) {
+    Copy-Item $McpPkg (Join-Path $OpenCodeDir "mcp\package.json") -Force
+    if (Test-Path $McpLock) { Copy-Item $McpLock (Join-Path $OpenCodeDir "mcp\package-lock.json") -Force }
+    Write-Info "Installing MCP router dependencies..."
+    Push-Location (Join-Path $OpenCodeDir "mcp")
+    npm ci --omit=dev 2>$null
+    Pop-Location
+    Write-Info "MCP router dependencies installed"
+}
 
 # Profiles
 Write-Log "Installing profiles..."

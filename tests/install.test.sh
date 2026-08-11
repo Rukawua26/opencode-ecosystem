@@ -35,6 +35,12 @@ assert_exists "$HOME/.opencode/bin/opencode-doctor"
 assert_exists "$HOME/.config/opencode/lib/session-metrics.js"
 assert_exists "$HOME/.opencode/bin/opencode-metrics"
 
+# Verify MCP router SDK
+assert_exists "$HOME/.config/opencode/mcp/package.json"
+assert_exists "$HOME/.config/opencode/mcp/local-model-router.js"
+assert_exists "$HOME/.config/opencode/mcp/node_modules/@modelcontextprotocol/sdk/package.json"
+echo "[OK] MCP router SDK installed"
+
 # Count agents
 AGENT_COUNT=$(find "$HOME/.config/opencode/agents" -name "*.md" | wc -l)
 if [[ $AGENT_COUNT -lt 10 ]]; then
