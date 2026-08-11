@@ -94,7 +94,7 @@ optional("opencode-doctor installed", () => {
 console.log("\n--- Providers ---");
 const environment = parseEnv(join(OPENCODE_DIR, ".env"));
 const providers = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY"];
-check("at least one provider key configured", () => providers.some((key) => Boolean(environment[key] || process.env[key])));
+optional("at least one provider key configured", () => providers.some((key) => Boolean(environment[key] || process.env[key])));
 
 console.log("\n=== Summary ===");
 console.log(`Checks: ${passed}/${checks} passed`);

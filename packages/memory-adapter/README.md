@@ -59,8 +59,8 @@ Add to your agent's MCP config:
 
 | Tool | Description |
 |---|---|
-| `search_memory` | Search past decisions, bugs, architecture (text-based) |
-| `search_memory_semantic` | Search using semantic embeddings (requires Ollama) |
+| `search_memory` | Search past decisions, bugs, architecture (text-based `LIKE`) |
+| `search_memory_semantic` | Search using semantic embeddings when Ollama is available; falls back to text search when Ollama is absent or a row has no embedding |
 | `get_context` | Get recent context for a project (use at session start) |
 | `get_history` | Get session history log |
 | `export_project` | Return shareable, non-private decisions as JSON |
