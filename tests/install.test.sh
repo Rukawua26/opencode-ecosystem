@@ -90,11 +90,12 @@ echo "[OK] Reinstall preserved agents, skills, profiles, and tools"
 # A forced reinstall must back up customizations before replacement.
 bash "$REPO_DIR/install.sh" --skip-memory --force >/dev/null
 profile_backups=("$HOME/.config/opencode/profiles/work.bak-"*)
-if [[ ! -f "${profile_backups[-1]}/opencode.jsonc" ]]; then
+profile_backup="${profile_backups[${#profile_backups[@]} - 1]}"
+if [[ ! -f "$profile_backup/opencode.jsonc" ]]; then
   echo "[FAIL] Forced reinstall did not create a profile backup"
   exit 1
 fi
-if [[ "$(<"${profile_backups[-1]}/opencode.jsonc")" != "user-profile-marker" ]]; then
+if [[ "$(<"$profile_backup/opencode.jsonc")" != "user-profile-marker" ]]; then
   echo "[FAIL] Forced reinstall backup did not preserve profile customization"
   exit 1
 fi

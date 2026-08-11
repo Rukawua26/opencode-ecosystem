@@ -237,7 +237,7 @@ $checks = 0; $passed = 0
 function Assert-Path($Path, $Desc) {
     $script:checks++
     if (Test-Path $Path) { $script:passed++; Write-Host "[OK] $Desc" -ForegroundColor Green }
-    else { Write-Warn "[MISSING] $Desc: $Path" }
+    else { Write-Warn "[MISSING] ${Desc}: $Path" }
 }
 
 Assert-Path $ConfigPath "opencode.jsonc"
