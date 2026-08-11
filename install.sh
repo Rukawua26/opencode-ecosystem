@@ -116,6 +116,35 @@ clone_repo() {
   printf '%s\n' "$clone_dir"
 }
 
+# Copy a file only if it does not exist or FORCE is true
+copy_if_ok() {
+  local src="$1" dst="$2"
+  if [[ -f "$dst" && "$FORCE" == false ]]; then
+    info "Skipping (exists): $dst"
+    return 0
+  fi
+  cp "$src" "$dst"
+  info "Installed: $dst"
+}
+
+# Copy all matching files into a dir, skipping existing unless FORCE
+copy_dir_if_ok() {
+  local src_glob="$1" dst_dir="$2" label="$3"
+  if [[ "$FORCE" == true && -d "$dst_dir" ]]; then
+    local ts_backup
+    ts_backup="$(date +%s)"
+    mkdir -p "$dst_dir.bak-$ts_backup"
+    cp -r "$dst_dir/"* "$dst_dir.bak-$ts_backup/" 2>/dev/null || true
+    info "$label backed up to $(basename "$dst_dir").bak-$ts_backup"
+  fi
+  for src in $src_glob; do
+    [[ -f "$src" ]] || continue
+    local name
+    name="$(basename "$src")"
+    copy_if_ok "$src" "$dst_dir/$name"
+  done
+}
+
 # Copy config
 copy_config() {
   local repo_dir="$1"
@@ -124,10 +153,10 @@ copy_config() {
   # opencode.jsonc
   if [[ -f "$OPENCODE_DIR/opencode.jsonc" && "$FORCE" == false ]]; then
     warn "opencode.jsonc already exists; preserving it (use --force to replace)"
-    cp "$OPENCODE_DIR/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc.bak"
   else
     if [[ -f "$OPENCODE_DIR/opencode.jsonc" && "$FORCE" == true ]]; then
       cp "$OPENCODE_DIR/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc.bak"
+      info "Backed up opencode.jsonc to opencode.jsonc.bak"
     fi
     cp "$repo_dir/config/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc"
     info "opencode.jsonc installed"
@@ -136,46 +165,39 @@ copy_config() {
   # Agents
   log "Installing agents..."
   if [[ -d "$repo_dir/config/agents" ]]; then
-    if [[ "$FORCE" == true && -d "$OPENCODE_DIR/agents" ]]; then
-      local ts_backup
-      ts_backup="$(date +%s)"
-      mkdir -p "$OPENCODE_DIR/agents.bak-$ts_backup"
-      cp -r "$OPENCODE_DIR/agents/"*.md "$OPENCODE_DIR/agents.bak-$ts_backup/" 2>/dev/null || true
-      info "Agents backed up to agents.bak-$ts_backup"
-    fi
-    cp -r "$repo_dir/config/agents/"*.md "$OPENCODE_DIR/agents/"
+    copy_dir_if_ok "$repo_dir/config/agents/*.md" "$OPENCODE_DIR/agents" "Agents"
     info "Agents copied"
   fi
 
   # Plugins
   log "Installing plugins..."
   if [[ -d "$repo_dir/config/plugins" ]]; then
-    if [[ "$FORCE" == true && -d "$OPENCODE_DIR/plugins" ]]; then
-      local ts_backup
-      ts_backup="$(date +%s)"
-      mkdir -p "$OPENCODE_DIR/plugins.bak-$ts_backup"
-      cp -r "$OPENCODE_DIR/plugins/"*.js "$OPENCODE_DIR/plugins.bak-$ts_backup/" 2>/dev/null || true
-      info "Plugins backed up to plugins.bak-$ts_backup"
-    fi
-    cp -r "$repo_dir/config/plugins/"*.js "$OPENCODE_DIR/plugins/"
+    copy_dir_if_ok "$repo_dir/config/plugins/*.js" "$OPENCODE_DIR/plugins" "Plugins"
     info "Plugins copied"
   fi
 
   if [[ -d "$repo_dir/config/lib" ]]; then
-    cp -r "$repo_dir/config/lib/"*.js "$OPENCODE_DIR/lib/" 2>/dev/null || true
+    copy_dir_if_ok "$repo_dir/config/lib/*.js" "$OPENCODE_DIR/lib" "Plugin libraries"
     info "Plugin libraries copied"
   fi
 
   # MCP servers
   log "Installing MCP servers..."
   if [[ -d "$repo_dir/config/mcp" ]]; then
-    cp -r "$repo_dir/config/mcp/"*.js "$OPENCODE_DIR/mcp/" 2>/dev/null || true
-    cp "$repo_dir/config/mcp/package.json" "$OPENCODE_DIR/mcp/package.json" 2>/dev/null || true
-    cp "$repo_dir/config/mcp/package-lock.json" "$OPENCODE_DIR/mcp/package-lock.json" 2>/dev/null || true
+    for f in "$repo_dir/config/mcp/"*.js; do
+      [[ -f "$f" ]] || continue
+      copy_if_ok "$f" "$OPENCODE_DIR/mcp/$(basename "$f")"
+    done
+    copy_if_ok "$repo_dir/config/mcp/package.json" "$OPENCODE_DIR/mcp/package.json"
+    copy_if_ok "$repo_dir/config/mcp/package-lock.json" "$OPENCODE_DIR/mcp/package-lock.json"
     info "MCP servers copied"
     if [[ -f "$OPENCODE_DIR/mcp/package.json" ]]; then
       log "Installing MCP router dependencies..."
-      (cd "$OPENCODE_DIR/mcp" && npm ci --omit=dev 2>/dev/null) || warn "Failed to install MCP deps, run 'npm ci' manually in $OPENCODE_DIR/mcp"
+      (cd "$OPENCODE_DIR/mcp" && npm ci --omit=dev --ignore-scripts) || {
+        error "Failed to install MCP router dependencies in $OPENCODE_DIR/mcp"
+        error "Run 'npm ci --omit=dev --ignore-scripts' manually in $OPENCODE_DIR/mcp"
+        exit 1
+      }
       info "MCP router dependencies installed"
     fi
   fi
@@ -285,6 +307,22 @@ verify_install() {
   if [[ "$SKIP_MEMORY" != true ]]; then
     check "$OPENCODE_DIR/mcp/memory-adapter/package.json"
     check "$OPENCODE_BIN_DIR/memory-adapter"
+  fi
+
+  # Verify MCP router SDK can import
+  check "$OPENCODE_DIR/mcp/package.json"
+  check "$OPENCODE_DIR/mcp/local-model-router.js"
+  if [[ -f "$OPENCODE_DIR/mcp/node_modules/@modelcontextprotocol/sdk/package.json" ]]; then
+    checks=$((checks+1))
+    if node -e "import('$OPENCODE_DIR/mcp/local-model-router.js').then(m => { if (m.TOOL_DEFINITIONS.length === 5) process.exit(0); else process.exit(1); }).catch(() => process.exit(1))" 2>/dev/null; then
+      passed=$((passed+1))
+      info "MCP router SDK import OK"
+    else
+      warn "MCP router SDK import failed"
+    fi
+  else
+    checks=$((checks+1))
+    warn "Missing MCP router SDK"
   fi
 
   local agent_count plugin_count skill_count

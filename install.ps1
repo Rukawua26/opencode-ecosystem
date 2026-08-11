@@ -60,6 +60,28 @@ if ((Test-Path (Join-Path $ScriptDir "config\opencode.jsonc")) -and (Test-Path (
     Write-Info "Repo cloned at tag $InstallTag"
 }
 
+# Copy file only if it does not exist or Force is set
+function Copy-IfOk { param($Src, $Dst)
+    if ((Test-Path $Dst) -and -not $Force) {
+        Write-Info "Skipping (exists): $Dst"
+        return
+    }
+    Copy-Item $Src $Dst -Force
+    Write-Info "Installed: $Dst"
+}
+
+# Copy dir with backup on Force
+function Copy-DirIfOk { param($SrcDir, $DstDir, $Label)
+    if ($Force -and (Test-Path $DstDir)) {
+        $ts = [int][double]::Parse((Get-Date -UFormat %s))
+        $BakDir = "$DstDir.bak-$ts"
+        Copy-Item $DstDir $BakDir -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Info "$Label backed up to $(Split-Path $BakDir -Leaf)"
+    }
+    $Files = Get-ChildItem $SrcDir -ErrorAction SilentlyContinue
+    foreach ($f in $Files) { Copy-IfOk $f.FullName (Join-Path $DstDir $f.Name) }
+}
+
 # Copy config
 Write-Log "Installing config..."
 
@@ -67,43 +89,57 @@ Write-Log "Installing config..."
 $ConfigPath = Join-Path $OpenCodeDir "opencode.jsonc"
 if ((Test-Path $ConfigPath) -and -not $Force) {
     Write-Warn "opencode.jsonc already exists; preserving it (use -Force to replace)"
-    Copy-Item $ConfigPath "$ConfigPath.bak" -Force
 } else {
+    if ((Test-Path $ConfigPath) -and $Force) {
+        Copy-Item $ConfigPath "$ConfigPath.bak" -Force
+        Write-Info "Backed up opencode.jsonc"
+    }
     Copy-Item (Join-Path $RepoDir "config\opencode.jsonc") $ConfigPath -Force
     Write-Info "opencode.jsonc installed"
 }
 
 # Agents
 Write-Log "Installing agents..."
-$AgentFiles = Get-ChildItem (Join-Path $RepoDir "config\agents") -Filter "*.md" -ErrorAction SilentlyContinue
-foreach ($f in $AgentFiles) { Copy-Item $f.FullName (Join-Path $OpenCodeDir "agents") -Force }
-Write-Info "Agents copied: $($AgentFiles.Count)"
+if (Test-Path (Join-Path $RepoDir "config\agents")) {
+    Copy-DirIfOk (Join-Path $RepoDir "config\agents") (Join-Path $OpenCodeDir "agents") "Agents"
+    Write-Info "Agents copied"
+}
 
 # Plugins
 Write-Log "Installing plugins..."
-$PluginFiles = Get-ChildItem (Join-Path $RepoDir "config\plugins") -Filter "*.js" -ErrorAction SilentlyContinue
-foreach ($f in $PluginFiles) { Copy-Item $f.FullName (Join-Path $OpenCodeDir "plugins") -Force }
-Write-Info "Plugins copied: $($PluginFiles.Count)"
+if (Test-Path (Join-Path $RepoDir "config\plugins")) {
+    Copy-DirIfOk (Join-Path $RepoDir "config\plugins") (Join-Path $OpenCodeDir "plugins") "Plugins"
+    Write-Info "Plugins copied"
+}
 
-$LibraryFiles = Get-ChildItem (Join-Path $RepoDir "config\lib") -Filter "*.js" -ErrorAction SilentlyContinue
-foreach ($f in $LibraryFiles) { Copy-Item $f.FullName (Join-Path $OpenCodeDir "lib") -Force }
-Write-Info "Plugin libraries copied: $($LibraryFiles.Count)"
+if (Test-Path (Join-Path $RepoDir "config\lib")) {
+    Copy-DirIfOk (Join-Path $RepoDir "config\lib") (Join-Path $OpenCodeDir "lib") "Plugin libraries"
+    Write-Info "Plugin libraries copied"
+}
 
 # MCP servers
 Write-Log "Installing MCP servers..."
-$McpFiles = Get-ChildItem (Join-Path $RepoDir "config\mcp") -Filter "*.js" -ErrorAction SilentlyContinue
-foreach ($f in $McpFiles) { Copy-Item $f.FullName (Join-Path $OpenCodeDir "mcp") -Force
-Write-Info "MCP servers copied: $($McpFiles.Count)"}
+if (Test-Path (Join-Path $RepoDir "config\mcp")) {
+    $McpFiles = Get-ChildItem (Join-Path $RepoDir "config\mcp") -Filter "*.js" -ErrorAction SilentlyContinue
+    foreach ($f in $McpFiles) { Copy-IfOk $f.FullName (Join-Path $OpenCodeDir "mcp" $f.Name) }
+    Write-Info "MCP servers copied: $($McpFiles.Count)"
+}
 
 # MCP router package.json and lockfile
 $McpPkg = Join-Path $RepoDir "config\mcp\package.json"
 $McpLock = Join-Path $RepoDir "config\mcp\package-lock.json"
 if (Test-Path $McpPkg) {
-    Copy-Item $McpPkg (Join-Path $OpenCodeDir "mcp\package.json") -Force
-    if (Test-Path $McpLock) { Copy-Item $McpLock (Join-Path $OpenCodeDir "mcp\package-lock.json") -Force }
+    Copy-IfOk $McpPkg (Join-Path $OpenCodeDir "mcp\package.json")
+    if (Test-Path $McpLock) { Copy-IfOk $McpLock (Join-Path $OpenCodeDir "mcp\package-lock.json") }
     Write-Info "Installing MCP router dependencies..."
     Push-Location (Join-Path $OpenCodeDir "mcp")
-    npm ci --omit=dev 2>$null
+    npm ci --omit=dev --ignore-scripts
+    if ($LASTEXITCODE -ne 0) {
+        Pop-Location
+        Write-Err "Failed to install MCP router dependencies"
+        Write-Err "Run 'npm ci --omit=dev --ignore-scripts' manually in $(Join-Path $OpenCodeDir 'mcp')"
+        exit 1
+    }
     Pop-Location
     Write-Info "MCP router dependencies installed"
 }
