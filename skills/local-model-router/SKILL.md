@@ -1,6 +1,6 @@
 ---
 name: local-model-router
-description: Use when selecting or consulting local Ollama models for coding, explanations, logical reasoning, or deciding whether a task should stay on the cloud model. Routes qwen coder, qwen chat, and phi reasoning through the local-model-router MCP.
+description: Use when selecting or consulting local Ollama models for coding, explanations, logical reasoning, or deciding whether a task should stay on the cloud model. Routes qwen coder and llama general roles through the local-model-router MCP.
 ---
 
 # Local Model Router
@@ -10,8 +10,8 @@ Use the MCP tools to delegate bounded subtasks without changing the main OpenCod
 ## Selection
 
 - Code/functions/tests/refactors: `ask_code_model` (`qwen2.5-coder:3b`).
-- Explanation/teaching/summary/chat: `ask_chat_model` (`qwen3.5:4b`).
-- Logic/root cause/planning/decision: `ask_reasoning_model` (`phi4-mini:latest`).
+- Explanation/teaching/summary/chat: `ask_chat_model` (`llama3.2:latest`).
+- Logic/root cause/planning/decision: `ask_reasoning_model` (`llama3.2:latest`, reasoning prompt).
 - Unclear task: call `route_model` first.
 - Automatic bounded delegation: call `ask_best_model`.
 

@@ -5,8 +5,8 @@ Deterministic MCP router for local Ollama delegation from OpenCode.
 ## Routes
 
 - Code, functions, tests, refactors: `qwen2.5-coder:3b`
-- Explanations, teaching, summaries: `qwen3.5:4b`
-- Logic, diagnosis, planning, decisions: `phi4-mini:latest`
+- Explanations, teaching, summaries: `llama3.2:latest`
+- Logic, diagnosis, planning, decisions: `llama3.2:latest` with a reasoning-specific system prompt
 - Critical, broad, production, payment, or architecture work: keep the current OpenCode cloud model;
   the router returns a local fallback but does not execute it unless `force_local` is explicit.
 
@@ -20,11 +20,15 @@ Deterministic MCP router for local Ollama delegation from OpenCode.
 `route_model` never starts Ollama. The `ask_*` tools start `ollama.service` lazily, wait up to 15
 seconds for readiness, and arm `ollama-idle-stop.timer`. The timer survives OpenCode exits and stops
 Ollama once `/api/ps` reports no loaded models, then deactivates itself until the next local ask.
+If an Ollama server already responds on localhost, the router reuses it without starting or stopping
+the managed systemd unit.
 
 ## Boundaries
 
 - Ollama endpoint is fixed to `http://127.0.0.1:11434`.
 - Task limit: 2,000 characters. Prompt limit: 6,000 characters.
+- Generation context is pinned to 4,096 tokens so text models fit the 8 GB workstation.
+- Models remain loaded for one minute after a request to limit RAM overlap between specialists.
 - Pinned model names and digests are verified before every generation.
 - Credential/private-key detection is best-effort, not a DLP guarantee. Never submit confidential
   production data, credentials, `.env` files, or private keys.

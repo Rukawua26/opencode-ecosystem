@@ -32,13 +32,13 @@ test("routes coding work to qwen coder", () => {
   assert.equal(route.model, MODELS.code);
 });
 
-test("routes explanations to qwen chat", () => {
+test("routes explanations to the chat model", () => {
   const route = routeTask("Explícame este concepto con un ejemplo");
   assert.equal(route.role, "chat");
   assert.equal(route.model, MODELS.chat);
 });
 
-test("routes logical diagnosis to phi", () => {
+test("routes logical diagnosis to the reasoning model", () => {
   const route = routeTask("Analiza la causa raíz y decide entre dos algoritmos");
   assert.equal(route.role, "reasoning");
   assert.equal(route.model, MODELS.reasoning);
@@ -105,13 +105,15 @@ test("direct specialist success metadata follows requested role", async () => {
   const originalFetch = globalThis.fetch;
   const restoreLifecycle = installFakeLifecycle();
   let calls = 0;
-  globalThis.fetch = async () => {
+  let generationBody;
+  globalThis.fetch = async (_url, options) => {
     calls += 1;
     if (calls === 1) {
       return new Response(
         JSON.stringify({ models: [{ name: MODELS.chat, digest: MODEL_DIGESTS.chat }] }),
       );
     }
+    generationBody = JSON.parse(options.body);
     return new Response(JSON.stringify({ response: "CHAT_OK" }));
   };
   try {
@@ -124,6 +126,8 @@ test("direct specialist success metadata follows requested role", async () => {
     assert.equal(payload.model, MODELS.chat);
     assert.equal(payload.requested_role, "chat");
     assert.equal(payload.untrusted_response, "CHAT_OK");
+    assert.equal(generationBody.keep_alive, "1m");
+    assert.equal(generationBody.options.num_ctx, 4096);
   } finally {
     globalThis.fetch = originalFetch;
     restoreLifecycle();
@@ -276,6 +280,23 @@ test("rejects concurrent local generation", async () => {
 
 test("lifecycle starts Ollama and arms the durable idle timer", async () => {
   const actions = [];
+  let ready = false;
+  const lifecycle = createOllamaLifecycle({
+    run: async (action) => {
+      actions.push(action);
+      if (action === "start") ready = true;
+    },
+    probe: async () => ready,
+  });
+
+  await lifecycle.ensureRunning();
+  lifecycle.scheduleIdleStop();
+
+  assert.deepEqual(actions, ["start", "start-idle-timer"]);
+});
+
+test("lifecycle reuses an existing Ollama server without managing it", async () => {
+  const actions = [];
   const lifecycle = createOllamaLifecycle({
     run: async (action) => actions.push(action),
     probe: async () => true,
@@ -284,7 +305,25 @@ test("lifecycle starts Ollama and arms the durable idle timer", async () => {
   await lifecycle.ensureRunning();
   lifecycle.scheduleIdleStop();
 
-  assert.deepEqual(actions, ["start", "start-idle-timer"]);
+  assert.deepEqual(actions, []);
+});
+
+test("idle timer failure does not crash the MCP process", async () => {
+  let ready = false;
+  const lifecycle = createOllamaLifecycle({
+    run: async (action) => {
+      if (action === "start") {
+        ready = true;
+        return;
+      }
+      throw new Error("timer unavailable");
+    },
+    probe: async () => ready,
+  });
+
+  await lifecycle.ensureRunning();
+  lifecycle.scheduleIdleStop();
+  await Promise.resolve();
 });
 
 test("route_model never starts Ollama", async () => {

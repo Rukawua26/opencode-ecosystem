@@ -8,13 +8,13 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 
 export const MODELS = Object.freeze({
   code: "qwen2.5-coder:3b",
-  chat: "qwen3.5:4b",
-  reasoning: "phi4-mini:latest",
+  chat: "llama3.2:latest",
+  reasoning: "llama3.2:latest",
 });
 export const MODEL_DIGESTS = Object.freeze({
   code: "f72c60cabf6237b07f6e632b2c48d533cef25eda2efbd34bed21c5e9c01e6225",
-  chat: "2a654d98e6fba55d452b7043684e9b57a947e393bbffa62485a7aac05ee4eefd",
-  reasoning: "78fad5d182a7c33065e153a5f8ba210754207ba9d91973f57dffa7f487363753",
+  chat: "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
+  reasoning: "a80c4f17acd55265feec403c7aef86be0c25983ab279d83f3bcd3abbcb5b8b72",
 });
 
 const OLLAMA_URL = "http://127.0.0.1:11434";
@@ -118,6 +118,10 @@ export function createOllamaLifecycle({
 
   async function ensureRunning() {
     cancelIdleStop();
+    if (await probe()) {
+      managed = false;
+      return;
+    }
     try {
       await run("start");
     } catch {
@@ -134,7 +138,7 @@ export function createOllamaLifecycle({
 
   function scheduleIdleStop() {
     if (!managed) return;
-    void run("start-idle-timer");
+    void run("start-idle-timer").catch(() => {});
   }
 
   return { ensureRunning, scheduleIdleStop, cancelIdleStop };
@@ -304,8 +308,9 @@ export async function askLocalModel(role, prompt) {
         prompt: safePrompt,
         stream: false,
         think: false,
-        keep_alive: "5m",
+        keep_alive: "1m",
         options: {
+          num_ctx: 4096,
           temperature: role === "chat" ? 0.4 : role === "reasoning" ? 0.2 : 0.1,
           num_predict: role === "reasoning" ? 192 : role === "chat" ? 384 : 512,
         },
