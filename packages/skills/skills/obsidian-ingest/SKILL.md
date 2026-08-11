@@ -49,7 +49,7 @@ Do not install dependencies automatically. Do not copy source payloads into the 
 
 ## Phase 3: Synthesize local-first
 
-Call `ask_chat_model` once with a bounded prompt containing:
+For a short source, call `ask_chat_model` once with a bounded prompt containing:
 
 - the minimum extracted source text or chunk summaries;
 - source metadata and completeness;
@@ -60,7 +60,7 @@ Ask for a Spanish summary, durable key ideas, evidence/quotes, limitations, tags
 
 If the router refuses local execution or recommends cloud, do not force local. Continue with the current OpenCode model only when the user's confidentiality policy permits it; otherwise stop with the extracted local draft.
 
-For long sources, summarize chunks independently, then run one bounded consolidation pass over chunk summaries. Never send the same full source repeatedly.
+For long sources, summarize bounded chunks independently, then run one bounded consolidation pass over chunk summaries. Count every chunk and consolidation call, keep the total within the user's approved budget, and never send the same full source repeatedly.
 
 ## Phase 4: Build the preview
 
