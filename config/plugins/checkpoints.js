@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, copyFileSync, readdirSync, rmSync, cpSync } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, readdirSync, rmSync, cpSync, chmodSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tool } from "@opencode-ai/plugin";
 
@@ -7,7 +7,24 @@ const CHECKPOINT_DIR = join(HOME, '.local/share/opencode/plugins-data/checkpoint
 const CONFIG_BACKUP_DIR = join(HOME, '.local/share/opencode/config-backups');
 const MAX_SNAPSHOTS = 10;
 const MAX_CONFIG_BACKUPS = 10;
-const SKIP_PATTERNS = [/node_modules/, /\.git\//, /\.local\/share\/opencode\/plugins-data/];
+const SKIP_PATTERNS = [
+  /node_modules/,
+  /\.git\//,
+  /\.local\/share\/opencode\/plugins-data/,
+  /\.env$/,
+  /\.env\./,
+  /\.env\b/,
+  /id_rsa/i,
+  /id_ed25519/i,
+  /id_ecdsa/i,
+  /id_dsa/i,
+  /\.pem$/i,
+  /\.key$/i,
+  /\.pfx$/i,
+  /\.p12$/i,
+  /credentials\.json$/i,
+  /service-account.*\.json$/i,
+];
 const OPENTCODE_CONFIG_DIR = join(HOME, '.config/opencode');
 
 function isSkippable(absPath) {
@@ -15,7 +32,10 @@ function isSkippable(absPath) {
 }
 
 function ensureDir(p) {
-  if (!existsSync(p)) mkdirSync(p, { recursive: true });
+  if (!existsSync(p)) {
+    mkdirSync(p, { recursive: true, mode: 0o700 });
+    if (process.platform !== "win32") chmodSync(p, 0o700);
+  }
 }
 
 function snapshotFile(filePath) {
@@ -30,7 +50,9 @@ function snapshotFile(filePath) {
   const dir = join(CHECKPOINT_DIR, safeName);
 
   ensureDir(dir);
-  copyFileSync(absPath, join(dir, `${ts}.bak`));
+  const bakPath = join(dir, `${ts}.bak`);
+  copyFileSync(absPath, bakPath);
+  if (process.platform !== 'win32') chmodSync(bakPath, 0o600);
 
   const snapshots = readdirSync(dir)
     .filter(f => f.endsWith('.bak'))
@@ -68,7 +90,11 @@ function snapshotConfigFull() {
 
   const ts = Date.now();
   const backupDir = join(CONFIG_BACKUP_DIR, `opencode-${ts}`);
-  cpSync(OPENTCODE_CONFIG_DIR, backupDir, { recursive: true, filter: (src) => !SKIP_PATTERNS.some(p => p.test(src)) });
+  cpSync(OPENTCODE_CONFIG_DIR, backupDir, {
+    recursive: true,
+    filter: (src) => !SKIP_PATTERNS.some(p => p.test(src)),
+  });
+  if (process.platform !== 'win32') chmodSync(backupDir, 0o700);
 
   const backups = readdirSync(CONFIG_BACKUP_DIR)
     .filter(f => f.startsWith('opencode-'))

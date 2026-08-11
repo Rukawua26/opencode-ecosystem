@@ -4,27 +4,37 @@ import { tool } from "@opencode-ai/plugin";
 const DEFAULT_IMAGE = 'alpine:latest';
 const HAS_SG = spawnSync('which', ['sg'], { encoding: 'utf-8', timeout: 3000 }).status === 0;
 
+const IMAGE_PATTERN = /^[a-z0-9][a-z0-9._/:@-]{0,127}$/i;
+
+function validateImage(image) {
+  if (typeof image !== 'string' || !image.trim()) return DEFAULT_IMAGE;
+  if (/[;&|`$(){}\\n\\r]/.test(image)) throw new Error('Imagen contains shell metacharacters');
+  if (!IMAGE_PATTERN.test(image)) throw new Error('Imagen has an invalid format');
+  return image;
+}
+
 function dockerCmd(args, opts = {}) {
+  const timeout = opts.timeout || 30000;
+  const maxBuffer = 1024 * 100;
   if (HAS_SG) {
-    return spawnSync('sg', ['docker', '-c', `docker ${args}`], {
-      shell: true, encoding: 'utf-8', timeout: opts.timeout || 30000, maxBuffer: 1024 * 100,
+    return spawnSync('sg', ['docker', '-c', 'docker', ...args], {
+      encoding: 'utf-8', timeout, maxBuffer,
     });
   }
-  return spawnSync('docker', args.split(/\s+/), {
-    encoding: 'utf-8', timeout: opts.timeout || 30000, maxBuffer: 1024 * 100,
+  return spawnSync('docker', args, {
+    encoding: 'utf-8', timeout, maxBuffer,
   });
 }
 
 function checkDocker() {
-  const r = dockerCmd('info', { timeout: 5000 });
+  const r = dockerCmd(['info'], { timeout: 5000 });
   return r.status === 0;
 }
 
 function runInDocker(command, image) {
-  const r = dockerCmd(
-    `run --rm -i --network none --read-only --memory 512m --cpus 1 ${image || DEFAULT_IMAGE} sh -c ${JSON.stringify(command)}`,
-    { timeout: 30000 }
-  );
+  const safeImage = validateImage(image);
+  const args = ['run', '--rm', '-i', '--network', 'none', '--read-only', '--memory', '512m', '--cpus', '1', safeImage, 'sh', '-c', command];
+  const r = dockerCmd(args, { timeout: 30000 });
   if (r.error) {
     const msg = r.error.message.toLowerCase();
     if (msg.includes('permission denied') || msg.includes('connect') || msg.includes('eacces'))
