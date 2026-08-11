@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import {
   MODELS,
@@ -15,6 +17,11 @@ import {
   routeTask,
   setOllamaLifecycleForTests,
 } from "./local-model-router.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROUTER_PATH = join(__dirname, "local-model-router.js");
+const NODE_BIN = process.execPath;
+const MCP_DIR = __dirname;
 
 function installFakeLifecycle(overrides = {}) {
   return setOllamaLifecycleForTests({
@@ -363,14 +370,13 @@ test("service start failure returns controlled cloud guidance", async () => {
 
 test("MCP SDK handshake works under sanitized environment", { timeout: 10_000 }, async () => {
   const transport = new StdioClientTransport({
-    command: "/usr/bin/env",
-    args: [
-      "-i",
-      "HOME=/home/miguel",
-      "PATH=/usr/bin:/bin",
-      "/usr/bin/node",
-      "/home/miguel/.config/opencode/mcp/local-model-router.js",
-    ],
+    command: NODE_BIN,
+    args: [ROUTER_PATH],
+    env: {
+      HOME: MCP_DIR,
+      PATH: process.env.PATH || "/usr/bin:/bin",
+      NODE_PATH: join(MCP_DIR, "node_modules"),
+    },
   });
   const client = new Client({ name: "router-test", version: "1.0.0" });
   try {

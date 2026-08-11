@@ -22,6 +22,8 @@
     "test:coverage": "c8 vitest run",
     "test:install": "bash tests/install.test.sh",
     "test:hooks": "bash tests/hooks.test.sh",
+    "test:router": "node --test config/mcp/local-model-router.test.js",
+    "check-docs": "node tools/scripts/check-docs.js",
     "lint": "eslint ."
   },
   "devDependencies": {

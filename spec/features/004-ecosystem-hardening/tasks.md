@@ -1,0 +1,47 @@
+# Tasks: Ecosystem Hardening
+
+- [x] 0. Crear spec/plan SDD 004
+- [ ] 1. Router MCP reproducible
+  - [ ] 1.1 Crear `config/mcp/package.json` con SDK
+  - [ ] 1.2 Instalar SDK y generar lockfile
+  - [ ] 1.3 Hacer rutas del test relativas
+  - [ ] 1.4 Version dinamica en router
+  - [ ] 1.5 Anadir `test:router` a `package.json`
+  - [ ] 1.6 Incluir router tests en `vitest.config.js`
+- [ ] 2. Sandbox sin shell injection
+  - [ ] 2.1 Reescribir `dockerCmd` sin shell
+  - [ ] 2.2 Allowlist de imagenes
+  - [ ] 2.3 Tests de seguridad
+- [ ] 3. Checkpoints excluye .env
+  - [ ] 3.1 Anadir patrones de exclusion
+  - [ ] 3.2 Permisos en backups
+  - [ ] 3.3 Tests de exclusion
+- [ ] 4. CI bloqueante
+  - [ ] 4.1 Quitar continue-on-error
+  - [ ] 4.2 Anadir router tests al CI
+  - [ ] 4.3 Unificar workflows de release
+  - [ ] 4.4 Sin --admin en dependabot
+- [ ] 5. Instalador seguro
+  - [ ] 5.1 Pin a tag en clone remoto
+  - [ ] 5.2 Backup antes de sobrescribir
+  - [ ] 5.3 Instalar deps del router MCP
+  - [ ] 5.4 Sin `|| true` en copas criticas
+- [ ] 6. Memoria adapter
+  - [ ] 6.1 Embeddings de content en decisiones
+  - [ ] 6.2 LEFT JOIN para filas sin embedding
+  - [ ] 6.3 Version dinamica en mcp-server
+  - [ ] 6.4 Sin colision en export Obsidian
+- [ ] 7. Doctor verifica router
+  - [ ] 7.1 Check de SDK
+  - [ ] 7.2 Check de handshake MCP
+- [ ] 8. Documentacion
+  - [ ] 8.1 Sin FTS5 en diagramas y READMEs
+  - [ ] 8.2 Separar capas en diagramas
+  - [ ] 8.3 `check-docs.js` determinista
+- [ ] 9. Verificacion final
+  - [ ] 9.1 npm test
+  - [ ] 9.2 npm run lint
+  - [ ] 9.3 test:router
+  - [ ] 9.4 test:install
+  - [ ] 9.5 RDD Tier 3
+  - [ ] 9.6 Commits

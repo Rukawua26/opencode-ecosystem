@@ -1,0 +1,10 @@
+{
+  "name": "local-model-router",
+  "version": "1.8.0",
+  "private": true,
+  "type": "module",
+  "description": "Local model router MCP server dependencies",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
+  }
+}

@@ -2,9 +2,21 @@
 import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+
+const __dirname = dirname(pathToFileURL(import.meta.url).pathname);
+function readRouterVersion() {
+  try {
+    const pkg = JSON.parse(readFileSync(join(__dirname, "package.json"), "utf-8"));
+    return pkg.version || "1.0.0";
+  } catch {
+    return "1.0.0";
+  }
+}
 
 export const MODELS = Object.freeze({
   code: "qwen2.5-coder:3b",
@@ -431,7 +443,7 @@ export async function callTool(name, args = {}) {
 
 export async function startServer() {
   const server = new Server(
-    { name: "local-model-router", version: "1.0.0" },
+    { name: "local-model-router", version: readRouterVersion() },
     { capabilities: { tools: {} } },
   );
   server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOL_DEFINITIONS }));

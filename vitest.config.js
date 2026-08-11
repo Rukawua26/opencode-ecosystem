@@ -9,6 +9,7 @@ export default defineConfig({
     ],
     exclude: [
       "packages/**",
+      "**/node_modules/**",
     ],
     coverage: {
       reporter: ["text", "json-summary"],

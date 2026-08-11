@@ -75,6 +75,15 @@ for (const file of ["package.json", join("src", "adapter.js"), join("src", "mcp-
   check(`memory-adapter/${file}`, () => existsSync(join(memoryDir, file)));
 }
 
+console.log("\n--- Local model router ---");
+const mcpDir = join(OPENCODE_DIR, "mcp");
+check("router package.json", () => existsSync(join(mcpDir, "package.json")));
+check("router local-model-router.js", () => existsSync(join(mcpDir, "local-model-router.js")));
+check("router @modelcontextprotocol/sdk installed", () => {
+  const sdkPath = join(mcpDir, "node_modules", "@modelcontextprotocol", "sdk", "package.json");
+  return existsSync(sdkPath);
+});
+
 console.log("\n--- Optional services ---");
 optional("Ollama server", () => commandWorks("ollama", ["list"]));
 optional("opencode-doctor installed", () => {
