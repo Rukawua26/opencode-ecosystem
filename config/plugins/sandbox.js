@@ -1,26 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { tool } from "@opencode-ai/plugin";
-
-const DEFAULT_IMAGE = 'alpine:latest';
-const HAS_SG = spawnSync('which', ['sg'], { encoding: 'utf-8', timeout: 3000 }).status === 0;
-
-const IMAGE_PATTERN = /^[a-z0-9][a-z0-9._/:@-]{0,127}$/i;
-
-function validateImage(image) {
-  if (typeof image !== 'string' || !image.trim()) return DEFAULT_IMAGE;
-  if (/[;&|`$(){}\\n\\r]/.test(image)) throw new Error('Imagen contains shell metacharacters');
-  if (!IMAGE_PATTERN.test(image)) throw new Error('Imagen has an invalid format');
-  return image;
-}
+import { buildDockerArgs, DEFAULT_IMAGE } from './sandbox-helpers.js';
 
 function dockerCmd(args, opts = {}) {
   const timeout = opts.timeout || 30000;
   const maxBuffer = 1024 * 100;
-  if (HAS_SG) {
-    return spawnSync('sg', ['docker', '-c', 'docker', ...args], {
-      encoding: 'utf-8', timeout, maxBuffer,
-    });
-  }
   return spawnSync('docker', args, {
     encoding: 'utf-8', timeout, maxBuffer,
   });
@@ -32,8 +16,7 @@ function checkDocker() {
 }
 
 function runInDocker(command, image) {
-  const safeImage = validateImage(image);
-  const args = ['run', '--rm', '-i', '--network', 'none', '--read-only', '--memory', '512m', '--cpus', '1', safeImage, 'sh', '-c', command];
+  const args = buildDockerArgs(command, image);
   const r = dockerCmd(args, { timeout: 30000 });
   if (r.error) {
     const msg = r.error.message.toLowerCase();

@@ -8,7 +8,7 @@ const pluginsDir = join(__dirname, "..", "..", "config", "plugins");
 
 function getPluginFiles() {
   if (!existsSync(pluginsDir)) return [];
-  return readdirSync(pluginsDir).filter((f) => f.endsWith(".js"));
+  return readdirSync(pluginsDir).filter((f) => f.endsWith(".js") && !f.endsWith("-helpers.js"));
 }
 
 function readPlugin(name) {

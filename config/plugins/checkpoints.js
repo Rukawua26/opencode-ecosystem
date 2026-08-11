@@ -1,35 +1,14 @@
 import { existsSync, mkdirSync, copyFileSync, readdirSync, rmSync, cpSync, chmodSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tool } from "@opencode-ai/plugin";
+import { SKIP_PATTERNS, isSkippable } from './checkpoints-helpers.js';
 
 const HOME = process.env.HOME || process.env.USERPROFILE || '/tmp';
 const CHECKPOINT_DIR = join(HOME, '.local/share/opencode/plugins-data/checkpoints');
 const CONFIG_BACKUP_DIR = join(HOME, '.local/share/opencode/config-backups');
 const MAX_SNAPSHOTS = 10;
 const MAX_CONFIG_BACKUPS = 10;
-const SKIP_PATTERNS = [
-  /node_modules/,
-  /\.git\//,
-  /\.local\/share\/opencode\/plugins-data/,
-  /\.env$/,
-  /\.env\./,
-  /\.env\b/,
-  /id_rsa/i,
-  /id_ed25519/i,
-  /id_ecdsa/i,
-  /id_dsa/i,
-  /\.pem$/i,
-  /\.key$/i,
-  /\.pfx$/i,
-  /\.p12$/i,
-  /credentials\.json$/i,
-  /service-account.*\.json$/i,
-];
 const OPENTCODE_CONFIG_DIR = join(HOME, '.config/opencode');
-
-function isSkippable(absPath) {
-  return SKIP_PATTERNS.some(p => p.test(absPath));
-}
 
 function ensureDir(p) {
   if (!existsSync(p)) {
