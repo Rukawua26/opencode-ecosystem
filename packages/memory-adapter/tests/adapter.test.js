@@ -147,14 +147,14 @@ describe("MemoryAdapter", () => {
 
   describe("savePreference", () => {
     it("should save and update a preference", () => {
-      adapter.savePreference({
+      const first = adapter.savePreference({
         project: "test-project",
         projectPath: join(TMP_ROOT, "test"),
         key: "linting",
         value: "eslint",
       });
 
-      adapter.savePreference({
+      const second = adapter.savePreference({
         project: "test-project",
         projectPath: join(TMP_ROOT, "test"),
         key: "linting",
@@ -169,6 +169,7 @@ describe("MemoryAdapter", () => {
       const pref = context.preferences.find((p) => p.key === "linting");
       assert.ok(pref);
       assert.strictEqual(pref.value, "biome");
+      assert.strictEqual(second.id, first.id);
     });
   });
 
@@ -544,6 +545,67 @@ describe("MemoryAdapter", () => {
         () => adapter.validateEventsJsonl(jsonl.replace("Canonical projection", "Modified")),
         /hash mismatch/,
       );
+    });
+
+    it("finds missing events behind known rows before applying the final limit", () => {
+      const projectPath = join(TMP_ROOT, "incremental-limit");
+      for (const title of ["Oldest", "Middle", "Newest"]) {
+        adapter.saveDecision({
+          project: "incremental-limit",
+          projectPath,
+          title,
+          content: title,
+        });
+      }
+
+      const knownEvents = adapter.listEvents({
+        project: "incremental-limit",
+        projectPath,
+        kind: "decision",
+        limit: 2,
+      });
+      const delta = adapter.listChangedEvents({
+        project: "incremental-limit",
+        projectPath,
+        kind: "decision",
+        limit: 1,
+        knownEvents,
+      });
+
+      assert.deepStrictEqual(delta.map((event) => event.content.title), ["Oldest"]);
+    });
+
+    it("reexports a known event when its canonical content changes", () => {
+      const projectPath = join(TMP_ROOT, "incremental-change");
+      const saved = adapter.savePreference({
+        project: "incremental-change",
+        projectPath,
+        key: "theme",
+        value: "light",
+      });
+      const knownEvents = adapter.listEvents({
+        project: "incremental-change",
+        projectPath,
+        kind: "preference",
+      });
+
+      const updated = adapter.savePreference({
+        project: "incremental-change",
+        projectPath,
+        key: "theme",
+        value: "dark",
+      });
+      const delta = adapter.listChangedEvents({
+        project: "incremental-change",
+        projectPath,
+        kind: "preference",
+        knownEvents,
+      });
+
+      assert.strictEqual(updated.id, saved.id);
+      assert.strictEqual(saved.id, Number(delta[0].event_id.split(":").at(-1)));
+      assert.strictEqual(delta[0].content.value, "dark");
+      assert.notStrictEqual(delta[0].content_hash, knownEvents[0].content_hash);
     });
   });
 });

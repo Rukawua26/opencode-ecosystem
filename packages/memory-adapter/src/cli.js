@@ -1,11 +1,24 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { exit } from "node:process";
 import { MemoryAdapter } from "./adapter.js";
+import { mergeEventState, serializeEventJsonl } from "./memory-events.js";
 
 const DEFAULT_DB_PATH = join(
   process.env.HOME || process.env.USERPROFILE || "/tmp",
@@ -15,6 +28,7 @@ const DEFAULT_DB_PATH = join(
   "memory-adapter",
   "memory.db",
 );
+const MAX_STATE_BYTES = 64 * 1024 * 1024;
 
 function requireOption(args, name) {
   if (!args[name]) throw new Error(`--${name} required`);
@@ -36,12 +50,105 @@ function writeJson(filePath, data) {
   return target;
 }
 
-function writeText(filePath, data) {
+function writeTextAtomic(filePath, data) {
   const target = resolve(filePath);
   mkdirSync(dirname(target), { recursive: true, mode: 0o700 });
-  writeFileSync(target, data, { mode: 0o600 });
-  chmodSync(target, 0o600);
-  return target;
+  const temporary = join(dirname(target), `.${basename(target)}.${randomUUID()}.tmp`);
+  try {
+    writeFileSync(temporary, data, { mode: 0o600 });
+    chmodSync(temporary, 0o600);
+    renameSync(temporary, target);
+    chmodSync(target, 0o600);
+    return target;
+  } finally {
+    rmSync(temporary, { force: true });
+  }
+}
+
+function canonicalFilePath(filePath) {
+  const suffix = [];
+  let existing = resolve(filePath);
+  while (!existsSync(existing)) {
+    const parent = dirname(existing);
+    if (parent === existing) break;
+    suffix.unshift(basename(existing));
+    existing = parent;
+  }
+  const canonical = resolve(existsSync(existing) ? realpathSync(existing) : existing, ...suffix);
+  return process.platform === "win32" ? canonical.toLowerCase() : canonical;
+}
+
+function pathsReferToSameFile(left, right) {
+  if (canonicalFilePath(left) === canonicalFilePath(right)) return true;
+  if (!existsSync(left) || !existsSync(right)) return false;
+  const leftStat = statSync(left);
+  const rightStat = statSync(right);
+  return leftStat.dev === rightStat.dev && leftStat.ino === rightStat.ino;
+}
+
+function readEventState(filePath) {
+  const size = statSync(filePath).size;
+  if (size > MAX_STATE_BYTES) throw new Error("invalid: event state exceeds 64 MiB; rotate or replace the --state file");
+  const contents = readFileSync(filePath, "utf8");
+  if (Buffer.byteLength(contents) > MAX_STATE_BYTES) {
+    throw new Error("invalid: event state exceeds 64 MiB; rotate or replace the --state file");
+  }
+  return contents;
+}
+
+function ensureStateSize(contents) {
+  if (Buffer.byteLength(contents) > MAX_STATE_BYTES) {
+    throw new Error("invalid: event state exceeds 64 MiB; rotate or replace the --state file");
+  }
+  return contents;
+}
+
+function processIsRunning(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error.code !== "ESRCH";
+  }
+}
+
+function acquireStateLock(lockPath) {
+  let descriptor;
+  try {
+    descriptor = openSync(lockPath, "wx", 0o600);
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    try {
+      const metadata = JSON.parse(readFileSync(lockPath, "utf8"));
+      if (Number.isInteger(metadata.pid) && metadata.pid > 0 && !processIsRunning(metadata.pid)) {
+        rmSync(lockPath, { force: true });
+        return acquireStateLock(lockPath);
+      }
+    } catch {
+      // Unknown lock contents fail closed and require explicit cleanup.
+    }
+    throw new Error(`event state is locked; remove stale lock if no export is running: ${lockPath}`);
+  }
+  try {
+    writeFileSync(descriptor, JSON.stringify({ pid: process.pid, created_at: new Date().toISOString() }));
+    return descriptor;
+  } catch (error) {
+    closeSync(descriptor);
+    rmSync(lockPath, { force: true });
+    throw error;
+  }
+}
+
+function withStateLock(statePath, callback) {
+  const lockPath = `${canonicalFilePath(statePath)}.lock`;
+  mkdirSync(dirname(lockPath), { recursive: true, mode: 0o700 });
+  const descriptor = acquireStateLock(lockPath);
+  try {
+    return callback();
+  } finally {
+    closeSync(descriptor);
+    rmSync(lockPath, { force: true });
+  }
 }
 
 function optionalInteger(value, name) {
@@ -145,17 +252,36 @@ const commands = {
   "export-events": {
     description: "Export canonical memory events to verified JSONL",
     run: (args) => withAdapter(args, async (adapter) => {
-      const jsonl = adapter.exportEventsJsonl({
-        project: projectIdentity(args),
-        projectPath: args.path || process.cwd(),
-        kind: args.kind,
-        since: args.since,
-        until: args.until,
-        limit: optionalInteger(args.limit, "limit"),
-        includePrivate: Boolean(args["include-private"]),
-      });
-      const target = writeText(args.out || "memory-events.jsonl", jsonl);
-      console.log(`[OK] Exported ${jsonl ? jsonl.trim().split("\n").length : 0} events to ${target}`);
+      if (args.state !== undefined && typeof args.state !== "string") {
+        throw new Error("--state requires a file path");
+      }
+      const state = args.state ? canonicalFilePath(args.state) : null;
+      const output = canonicalFilePath(args.out || "memory-events.jsonl");
+      if (state && pathsReferToSameFile(state, output)) {
+        throw new Error("--state and --out must be different files, not aliases of the same file");
+      }
+      const performExport = () => {
+        const knownEvents = state && existsSync(state)
+          ? adapter.validateEventsJsonl(readEventState(state))
+          : [];
+        const jsonl = adapter.exportEventsJsonl({
+          project: projectIdentity(args),
+          projectPath: args.path || process.cwd(),
+          kind: args.kind,
+          since: args.since,
+          until: args.until,
+          limit: optionalInteger(args.limit, "limit"),
+          includePrivate: Boolean(args["include-private"]),
+          ...(state ? { knownEvents } : {}),
+        });
+        const stateJsonl = state
+          ? ensureStateSize(serializeEventJsonl(mergeEventState(knownEvents, adapter.validateEventsJsonl(jsonl))))
+          : null;
+        const target = writeTextAtomic(output, jsonl);
+        if (state) writeTextAtomic(state, stateJsonl);
+        console.log(`[OK] Exported ${jsonl ? jsonl.trim().split("\n").length : 0} events to ${target}`);
+      };
+      return state ? withStateLock(state, performExport) : performExport();
     }),
   },
   "verify-events": {
@@ -248,7 +374,7 @@ if (!command || !commands[command]) {
   for (const [name, definition] of Object.entries(commands)) {
     console.log(`  ${name.padEnd(18)} ${definition.description}`);
   }
-  console.log("\nOptions: --db --project --path --out --file --title --content --description --fix --tags --kind --since --until --limit --private --include-private --include-operational --commit");
+  console.log("\nOptions: --db --project --path --out --state --file --title --content --description --fix --tags --kind --since --until --limit --private --include-private --include-operational --commit");
   exit(command ? 1 : 0);
 }
 

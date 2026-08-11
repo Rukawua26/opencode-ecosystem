@@ -116,3 +116,26 @@ export function parseEventJsonl(jsonl, maxEvents = 10000) {
     }
   });
 }
+
+export function serializeEventJsonl(events, maxEvents = 10000) {
+  if (!Array.isArray(events)) throw new Error("invalid: events must be an array");
+  if (events.length > maxEvents) throw new Error(`invalid: JSONL exceeds ${maxEvents} events`);
+  const validated = events.map(validateMemoryEvent);
+  return validated.length ? `${validated.map((event) => JSON.stringify(event)).join("\n")}\n` : "";
+}
+
+export function mergeEventState(existingEvents, newEvents, maxEvents = 10000) {
+  if (!Array.isArray(existingEvents) || !Array.isArray(newEvents)) {
+    throw new Error("invalid: event state must contain arrays");
+  }
+  const byId = new Map();
+  for (const event of [...existingEvents, ...newEvents]) {
+    const validated = validateMemoryEvent(event);
+    byId.set(validated.event_id, validated);
+  }
+  if (byId.size > maxEvents) {
+    throw new Error(`invalid: event state exceeds ${maxEvents} events; rotate or replace the --state file`);
+  }
+  return [...byId.values()].sort((left, right) => right.created_at.localeCompare(left.created_at)
+    || right.event_id.localeCompare(left.event_id));
+}

@@ -1,7 +1,9 @@
 import { describe, it } from "node:test";
 import { strict as assert } from "node:assert";
 import {
+  mergeEventState,
   parseEventJsonl,
+  serializeEventJsonl,
   toMemoryEvent,
   validateMemoryEvent,
 } from "../src/memory-events.js";
@@ -52,5 +54,16 @@ describe("memory event projection", () => {
     const modified = { ...event, content: { ...event.content, title: "Tampered" } };
     assert.throws(() => validateMemoryEvent(modified), /hash mismatch/);
     assert.throws(() => parseEventJsonl(`${JSON.stringify(modified)}\n`), /line 1/);
+  });
+
+  it("merges changed event versions by id and serializes valid JSONL", () => {
+    const first = toMemoryEvent(decision, "decision", "opencode-ecosystem");
+    const changed = toMemoryEvent({ ...decision, content: "Updated decision" }, "decision", "opencode-ecosystem");
+    const second = toMemoryEvent({ ...decision, id: 8 }, "decision", "opencode-ecosystem");
+
+    const merged = mergeEventState([first], [changed, second]);
+    assert.strictEqual(merged.length, 2);
+    assert.strictEqual(merged.find((event) => event.event_id === first.event_id).content_hash, changed.content_hash);
+    assert.deepStrictEqual(parseEventJsonl(serializeEventJsonl(merged)), merged);
   });
 });

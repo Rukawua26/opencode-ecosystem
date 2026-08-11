@@ -3,7 +3,12 @@ import { chmodSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseEventJsonl, toMemoryEvent } from "./memory-events.js";
+import {
+  parseEventJsonl,
+  serializeEventJsonl,
+  toMemoryEvent,
+  validateMemoryEvent,
+} from "./memory-events.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_PATH = join(__dirname, "schema.sql");
@@ -264,10 +269,27 @@ export class MemoryAdapter {
 
   savePreference({ project, projectPath, key, value }) {
     const projectId = project ? this.getOrCreateProject(project, projectPath) : null;
-    this.db.prepare("DELETE FROM preferences WHERE project_id IS ? AND key = ?").run(projectId, key);
-    const result = this.db.prepare("INSERT INTO preferences (project_id, key, value) VALUES (?, ?, ?)")
-      .run(projectId, key, value);
-    return { id: result.lastInsertRowid, saved: true };
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      const existing = this.db.prepare(
+        "SELECT id FROM preferences WHERE project_id IS ? AND key = ? ORDER BY id DESC LIMIT 1",
+      ).get(projectId, key);
+      let id;
+      if (existing) {
+        this.db.prepare("DELETE FROM preferences WHERE project_id IS ? AND key = ? AND id <> ?")
+          .run(projectId, key, existing.id);
+        this.db.prepare("UPDATE preferences SET value = ? WHERE id = ?").run(value, existing.id);
+        id = existing.id;
+      } else {
+        id = this.db.prepare("INSERT INTO preferences (project_id, key, value) VALUES (?, ?, ?)")
+          .run(projectId, key, value).lastInsertRowid;
+      }
+      this.db.exec("COMMIT");
+      return { id, saved: true };
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   saveSessionAction({ project, projectPath, sessionId, action, detail, result, filesTouched }) {
@@ -434,9 +456,80 @@ export class MemoryAdapter {
       .slice(0, normalizedLimit);
   }
 
+  listChangedEvents({
+    project,
+    projectPath,
+    kind,
+    since,
+    until,
+    limit,
+    includePrivate = false,
+    references,
+    knownEvents = [],
+  }) {
+    if (!Array.isArray(knownEvents)) throw new Error("invalid: knownEvents must be an array");
+    if (knownEvents.length > 10000) {
+      throw new Error("invalid: event state exceeds 10000 events; rotate or replace the --state file");
+    }
+    const knownHashes = new Map(knownEvents.map((event) => {
+      const validated = validateMemoryEvent(event);
+      return [validated.event_id, validated.content_hash];
+    }));
+    const projectId = this.findProject(project, projectPath);
+    if (!projectId) return [];
+
+    const kinds = kind === undefined ? Object.keys(EVENT_SOURCES) : (Array.isArray(kind) ? kind : [kind]);
+    for (const eventKind of kinds) {
+      if (!EVENT_SOURCES[eventKind]) throw new Error(`invalid: unsupported event kind ${eventKind}`);
+    }
+    const normalizedSince = eventTimestamp(since, "since");
+    const normalizedUntil = eventTimestamp(until, "until");
+    if (normalizedSince && normalizedUntil && normalizedSince > normalizedUntil) {
+      throw new Error("invalid: since must be before until");
+    }
+    const normalizedLimit = eventLimit(limit);
+
+    const events = [];
+    for (const eventKind of kinds) {
+      const source = EVENT_SOURCES[eventKind];
+      const conditions = ["project_id = ?"];
+      const params = [projectId];
+      if (eventKind === "decision" && !includePrivate) conditions.push("is_private = 0");
+      if (normalizedSince) {
+        conditions.push("created_at >= ?");
+        params.push(normalizedSince);
+      }
+      if (normalizedUntil) {
+        conditions.push("created_at <= ?");
+        params.push(normalizedUntil);
+      }
+
+      const rows = this.db.prepare(
+        `SELECT ${source.columns} FROM ${source.table}
+         WHERE ${conditions.join(" AND ")}
+         ORDER BY created_at DESC, id DESC`,
+      ).iterate(...params);
+      let changedForKind = 0;
+      for (const row of rows) {
+        const event = toMemoryEvent(row, eventKind, project, references);
+        if (knownHashes.get(event.event_id) === event.content_hash) continue;
+        events.push(event);
+        changedForKind += 1;
+        if (changedForKind >= normalizedLimit) break;
+      }
+    }
+
+    return events
+      .sort((left, right) => right.created_at.localeCompare(left.created_at)
+        || right.event_id.localeCompare(left.event_id))
+      .slice(0, normalizedLimit);
+  }
+
   exportEventsJsonl(options) {
-    const events = this.listEvents(options);
-    return events.length ? `${events.map((event) => JSON.stringify(event)).join("\n")}\n` : "";
+    const events = options.knownEvents === undefined
+      ? this.listEvents(options)
+      : this.listChangedEvents(options);
+    return serializeEventJsonl(events);
   }
 
   validateEventsJsonl(jsonl) {
