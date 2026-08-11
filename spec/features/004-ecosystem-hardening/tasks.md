@@ -11,7 +11,7 @@
 - [x] 6. Memoria adapter (embeddings de content + LEFT JOIN)
 - [x] 7. Doctor verifica router
 - [x] 8. Documentacion (sin FTS5 + check-docs.js)
-- [x] 9. Verificacion final (51/51 + 23/23 + 42/42)
+- [x] 9. Verificacion final inicial (51/51 + 23/23 + 42/42)
 
 ## Ronda 2 — Pendientes detectados tras revision
 
@@ -31,15 +31,26 @@
 - [x] 23. Doctor: API keys como opcional (no blocking)
 - [x] 24. Limpiar workflow duplicado (check-docs dos veces en test.yml)
 
+## Ronda 3 — Hallazgos de Organic RDD
+
+- [x] 25. Mensajes de validacion del sandbox consistentes en ingles
+- [x] 26. Query semantica vacia normalizada y sin fallback contaminado
+- [x] 27. Fallback textual case-insensitive sin reconstruir query desde `%...%`
+- [x] 28. Patron `.env` unico para Unix, Windows y variantes `.env-*`
+- [x] 29. Reinstalacion normal preserva agentes, skills, perfiles y herramientas
+- [x] 30. Reinstalacion `--force` prueba backup antes de reemplazar
+- [x] 31. Memory adapter omite `npm install` porque no tiene dependencias runtime
+
 ## Verificacion Final
 
-- [x] 25. npm run lint (0 errors, 0 warnings)
-- [x] 26. npm test (67/67)
-- [x] 27. npm run test:router (23/23)
-- [x] 28. node --test packages/memory-adapter (42/42)
-- [x] 29. npm run check-docs (OK)
-- [x] 30. npm run test:install (PASS, SDK verified)
-- [x] 31. node tools/scripts/doctor.js (16/17, 1 optional skip)
-- [x] 32. verify.md con matriz de cumplimiento
-- [x] 33. RDD Tier 3 (start/capture/verify/finalize/gate)
-- [x] 34. Commits atomicos por fase
+- [x] 32. npm run lint (0 errors, 0 warnings)
+- [x] 33. npm test (67/67)
+- [x] 34. npm run test:router (23/23)
+- [x] 35. node --test packages/memory-adapter (43/43)
+- [x] 36. npm run check-docs (OK)
+- [x] 37. npm run test:hooks (PASS)
+- [x] 38. npm run test:install (PASS, preserve + rollback + SDK)
+- [x] 39. node tools/scripts/doctor.js (16/17, provider opcional)
+- [x] 40. verify.md con matriz de cumplimiento
+- [x] 41. RDD Tier 3 aprobado y gate PASS
+- [x] 42. Commits atomicos por fase
