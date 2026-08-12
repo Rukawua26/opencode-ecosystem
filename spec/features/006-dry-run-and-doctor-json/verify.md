@@ -98,3 +98,17 @@
 - `opencode.jsonc` SHA-256 antes y despues identico:
   `a53b0ffa1ed20be4745755bbb110402d42553abdbd1a8538455a68ba3916cb73`.
 - `opencode-doctor --json` instalado: schema v1, required 18/18, manifest 85/85.
+
+## CI Remota
+
+- PR #35 fusionado a `main` como squash `c1bc8f6`.
+- **CI - Tests** (`31634445060`): ubuntu-latest, macos-latest y windows-latest SUCCESS.
+  - macOS: 93 tests Vitest + coverage + install test PASS (find -printf reemplazado).
+  - Windows: 93 tests Vitest + PowerShell install PASS (LOCALAPPDATA y shell:true).
+  - Ubuntu: 93 tests Vitest + coverage + install + hooks + audit PASS.
+- **CodeQL** (`31634445104`): SUCCESS.
+- **install-validation**: PASS.
+- **Pages**: deployment SUCCESS.
+- Fix aplicado: `find -printf` BSD no portable reemplazado por snapshot Bash;
+  `commandWorks` usa `shell:true` en Windows; fixture crea `plugins-data` bajo
+  ambas rutas `HOME/.local/share` y `LOCALAPPDATA/opencode`.
