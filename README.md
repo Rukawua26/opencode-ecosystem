@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/hero.svg?v=1.9.0" alt="OpenCode Ecosystem" width="100%" />
+  <img src="assets/hero.svg" alt="OpenCode Ecosystem: workspace local-first para agentes, memoria y modelos" width="100%" />
 </p>
 
 <p align="center">
@@ -10,8 +10,32 @@
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License" />
 </p>
 
-<p align="center"><b>Un comando. Cualquier agente. Cualquier OS.</b></p>
-<p align="center">Configuracion reproducible para OpenCode con memoria local, skills, agentes, routing de modelos y verificacion por riesgo.</p>
+<h3 align="center">Tu entorno de agentes, instalado como software serio.</h3>
+
+<p align="center">
+  Configuracion reproducible para OpenCode con memoria local, skills bajo demanda,<br />
+  routing de modelos y revision verificable. Linux, macOS y Windows.
+</p>
+
+<p align="center">
+  <a href="#quick-start"><b>Instalar</b></a> ·
+  <a href="#componentes"><b>Explorar componentes</b></a> ·
+  <a href="#seguridad-y-persistencia"><b>Revisar seguridad</b></a> ·
+  <a href="docs/README.md"><b>Leer documentacion</b></a>
+</p>
+
+<br />
+
+<p align="center">
+  <img src="assets/toolkit.svg" alt="Toolkit de OpenCode con terminal, memoria SQLite, receipt de revision y controles de seguridad" width="100%" />
+</p>
+
+| Lo que obtienes | Para que sirve |
+|---|---|
+| **Memoria local y explicita** | Conserva decisiones y contexto en SQLite sin convertir la memoria automatica en autoridad. |
+| **Agentes y skills bajo demanda** | Carga especialistas para codigo, seguridad, producto, SDD, TDD y documentacion cuando hacen falta. |
+| **Routing local-first** | Usa Ollama para tareas acotadas y reserva el modelo cloud para riesgo o contexto alto. |
+| **Cambios revisables** | Preview read-only, backups, doctor JSON, tests y receipts ligados al candidato exacto. |
 
 ## Quick Start
 
@@ -20,26 +44,44 @@ Requiere **Node.js 22+**, npm y Git.
 ### Linux / macOS
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.sh | bash
+EXPECTED_COMMIT="36f41541536747c74d467856ca7cfede8f28c028"
+git clone --branch v1.9.0 --depth 1 https://github.com/Rukawua26/opencode-ecosystem.git
+cd opencode-ecosystem
+test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT" || { echo "Commit inesperado" >&2; exit 1; }
+bash install.sh
 ```
 
 ### Windows
 
 ```powershell
-irm -useb https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.ps1 | iex
+$expectedCommit = "36f41541536747c74d467856ca7cfede8f28c028"
+git clone --branch v1.9.0 --depth 1 https://github.com/Rukawua26/opencode-ecosystem.git
+Set-Location opencode-ecosystem
+if ((git rev-parse HEAD) -ne $expectedCommit) { throw "Commit inesperado" }
+.\install.ps1
 ```
 
 Los instaladores descargan `v1.9.0` por defecto. Una reinstalacion normal conserva los archivos existentes. `main` incorpora un modo de sincronizacion que se publicara en la siguiente release; para probarlo sin sustituir `opencode.jsonc` ni archivos custom:
 
 ```bash
-git clone --depth 1 https://github.com/Rukawua26/opencode-ecosystem.git
+SYNC_COMMIT="5b42e7f7be280911982e80be5c3d8476a97fd134"
+git init opencode-ecosystem
 cd opencode-ecosystem
+git remote add origin https://github.com/Rukawua26/opencode-ecosystem.git
+git fetch --depth 1 origin "$SYNC_COMMIT"
+git checkout --detach FETCH_HEAD
+test "$(git rev-parse HEAD)" = "$SYNC_COMMIT" || { echo "Commit inesperado" >&2; exit 1; }
 bash install.sh --sync
 ```
 
 ```powershell
-git clone --depth 1 https://github.com/Rukawua26/opencode-ecosystem.git
+$syncCommit = "5b42e7f7be280911982e80be5c3d8476a97fd134"
+git init opencode-ecosystem
 Set-Location opencode-ecosystem
+git remote add origin https://github.com/Rukawua26/opencode-ecosystem.git
+git fetch --depth 1 origin $syncCommit
+git checkout --detach FETCH_HEAD
+if ((git rev-parse HEAD) -ne $syncCommit) { throw "Commit inesperado" }
 .\install.ps1 -Sync
 ```
 
@@ -104,7 +146,7 @@ La release `v1.9.0` introdujo:
 - `sandbox_exec` ejecuta Docker mediante argumentos separados; el shell utilizado vive dentro del contenedor.
 - El contenedor usa `--network none`, filesystem read-only, `512m` de memoria y `1` CPU.
 - Los checkpoints omiten secretos por ruta y limitan la retencion; sync respalda solo los archivos gestionados que reemplaza o retira.
-- El router rechaza credenciales y bloques internos antes de delegar al modelo local.
+- El router rechaza patrones comunes de credenciales y bloques internos antes de delegar al modelo local.
 - El MCP de memoria expone lecturas; las escrituras persistentes requieren CLI local explicita.
 - `security-review` es una guia de revision, no una frontera de seguridad runtime.
 
@@ -206,24 +248,23 @@ El manifiesto actual no contiene hashes, por lo que el JSON reporta
 
 `opencode-metrics` registra tokens, coste, modelos, herramientas, delegaciones, lecturas amplias, compactaciones, loops y errores. Las cifras de ahorro se consideran hipotesis hasta compararlas con una linea base real; consulta [`docs/token-economy/measurement.md`](docs/token-economy/measurement.md).
 
-## Arquitectura
+## Diseno Del Ecosistema
 
-```mermaid
-flowchart LR
-    U[Usuario] --> O[OpenCode]
-    O --> A[Agentes y skills on-demand]
-    O --> P[Plugins runtime]
-    O --> M[Memory adapter MCP]
-    O --> R[Local model router MCP]
-    R --> L[Ollama local]
-    R --> C[Modelo cloud para riesgo alto]
-    I[Installer] --> F[Config gestionada]
-    I --> S[Skills]
-    I --> B[Backups y manifiesto]
-    T[CI multiplataforma] --> N[npm y GitHub Release]
-```
+El repositorio combina piezas pequenas y reemplazables en lugar de ocultarlas
+detras de una aplicacion monolitica:
 
-Detalles adicionales:
+- el instalador gestiona configuracion, skills y comandos publicos sin apropiarse
+  de `opencode.jsonc` ni de archivos personalizados;
+- los agentes y skills viven como definiciones legibles, cargadas solo cuando la
+  tarea las necesita;
+- `memory-adapter` mantiene la persistencia local y deja las escrituras como una
+  accion explicita;
+- `local-model-router` separa trabajo local acotado de tareas que requieren el
+  modelo cloud;
+- doctor, tests, CI y Organic RDD producen evidencia independiente del discurso
+  del agente.
+
+Documentacion tecnica:
 
 - [Arquitectura](docs/architecture/overview.md)
 - [Sincronizacion del instalador](docs/architecture/installer-sync.mmd)

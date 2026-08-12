@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 500" role="img" aria-labelledby="title desc">
+  <title id="title">OpenCode local toolkit</title>
+  <desc id="desc">A still-life illustration of memory, agent profiles, security, model routing and verification tools.</desc>
+  <defs>
+    <linearGradient id="desk" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eef1eb"/>
+      <stop offset="1" stop-color="#dfe5df"/>
+    </linearGradient>
+    <linearGradient id="terminal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#121a22"/>
+      <stop offset="1" stop-color="#1d2934"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="150%" height="160%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#2b3330" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="500" rx="28" fill="url(#desk)"/>
+  <circle cx="1090" cy="68" r="130" fill="#f7d154" opacity="0.34"/>
+  <circle cx="110" cy="430" r="160" fill="#65b8ff" opacity="0.13"/>
+  <path d="M0 430 C260 390 460 466 720 420 C950 380 1070 405 1200 372 V500 H0Z" fill="#d4dbd5"/>
+
+  <g transform="translate(72 70)" filter="url(#shadow)">
+    <rect width="520" height="330" rx="20" fill="url(#terminal)"/>
+    <rect width="520" height="45" rx="20" fill="#25323e"/>
+    <rect y="27" width="520" height="18" fill="#25323e"/>
+    <circle cx="24" cy="22" r="5.5" fill="#ff6b5f"/>
+    <circle cx="43" cy="22" r="5.5" fill="#f7c948"/>
+    <circle cx="62" cy="22" r="5.5" fill="#55c98b"/>
+    <text x="260" y="27" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#9aa7b3">local workspace</text>
+
+    <g transform="translate(30 82)" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
+      <text x="0" y="0" font-size="14" fill="#f7d154">$ opencode</text>
+      <text x="0" y="36" font-size="13" fill="#96a6b5">profile</text>
+      <text x="92" y="36" font-size="13" fill="#e5ecf2">work</text>
+      <text x="0" y="65" font-size="13" fill="#96a6b5">memory</text>
+      <text x="92" y="65" font-size="13" fill="#55c98b">local / ready</text>
+      <text x="0" y="94" font-size="13" fill="#96a6b5">router</text>
+      <text x="92" y="94" font-size="13" fill="#65b8ff">local-first</text>
+      <text x="0" y="123" font-size="13" fill="#96a6b5">review</text>
+      <text x="92" y="123" font-size="13" fill="#f7d154">managed</text>
+    </g>
+
+    <g transform="translate(30 230)">
+      <rect width="138" height="62" rx="10" fill="#202c37" stroke="#344554"/>
+      <text x="16" y="25" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" font-weight="700" fill="#8c9aa8">AGENTS</text>
+      <text x="16" y="47" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#e8edf1">specialists</text>
+      <rect x="156" width="138" height="62" rx="10" fill="#202c37" stroke="#344554"/>
+      <text x="172" y="25" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" font-weight="700" fill="#8c9aa8">SKILLS</text>
+      <text x="172" y="47" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#e8edf1">on demand</text>
+      <rect x="312" width="138" height="62" rx="10" fill="#202c37" stroke="#344554"/>
+      <text x="328" y="25" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="11" font-weight="700" fill="#8c9aa8">DOCTOR</text>
+      <text x="328" y="47" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#55c98b">JSON ready</text>
+    </g>
+  </g>
+
+  <g transform="translate(640 72)" filter="url(#shadow)">
+    <g transform="translate(0 178)">
+      <ellipse cx="125" cy="112" rx="118" ry="34" fill="#8f6a44" opacity="0.18"/>
+      <rect x="20" y="0" width="210" height="112" fill="#f9faf7" stroke="#9aa7a0" stroke-width="2"/>
+      <ellipse cx="125" cy="0" rx="105" ry="31" fill="#f9faf7" stroke="#9aa7a0" stroke-width="2"/>
+      <ellipse cx="125" cy="112" rx="105" ry="31" fill="#e8ece8" stroke="#9aa7a0" stroke-width="2"/>
+      <ellipse cx="125" cy="0" rx="78" ry="20" fill="#f7d154" opacity="0.68"/>
+      <path d="M47 45 C88 67 162 67 203 45" fill="none" stroke="#bcc6c0" stroke-width="2"/>
+      <path d="M47 77 C88 99 162 99 203 77" fill="none" stroke="#bcc6c0" stroke-width="2"/>
+      <text x="125" y="58" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" font-weight="700" fill="#26313a">LOCAL MEMORY</text>
+      <text x="125" y="81" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#63716b">SQLite / explicit writes</text>
+    </g>
+
+    <g transform="translate(245 0) rotate(5 100 150)">
+      <rect x="16" y="8" width="190" height="286" rx="12" fill="#1e2b36" opacity="0.2"/>
+      <rect width="190" height="286" rx="12" fill="#f9faf7" stroke="#8f9d96" stroke-width="2"/>
+      <rect width="190" height="62" rx="12" fill="#f7d154"/>
+      <rect y="50" width="190" height="12" fill="#f7d154"/>
+      <text x="24" y="36" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="18" font-weight="800" fill="#252017">REVIEW RECEIPT</text>
+      <text x="24" y="96" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#52605a">CODE LENS</text>
+      <rect x="148" y="86" width="16" height="16" rx="4" fill="#f7d154"/>
+      <text x="24" y="136" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#52605a">RISK LENS</text>
+      <rect x="148" y="126" width="16" height="16" rx="4" fill="#65b8ff"/>
+      <text x="24" y="176" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="11" fill="#52605a">VERIFY LENS</text>
+      <rect x="148" y="166" width="16" height="16" rx="4" fill="#55c98b"/>
+      <line x1="24" y1="215" x2="166" y2="215" stroke="#c8d0cc"/>
+      <text x="24" y="244" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700" fill="#26313a">REVIEW EVIDENCE</text>
+      <text x="24" y="266" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="10" fill="#5d6a64">hash-bound candidate</text>
+    </g>
+  </g>
+
+  <g transform="translate(880 310)" filter="url(#shadow)">
+    <path d="M70 0 L132 22 V74 C132 122 105 151 70 171 C35 151 8 122 8 74 V22Z" fill="#263746"/>
+    <path d="M70 20 L111 35 V74 C111 105 94 127 70 143 C46 127 29 105 29 74 V35Z" fill="#65b8ff" opacity="0.85"/>
+    <path d="M50 76 l14 14 27-35" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="70" y="180" text-anchor="middle" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="13" font-weight="800" fill="#26313a">SECURITY CONTROLS</text>
+  </g>
+</svg>
