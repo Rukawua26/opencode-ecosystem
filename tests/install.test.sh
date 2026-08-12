@@ -9,6 +9,24 @@ mkdir -p "$HOME"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+snapshot_home() {
+  local root="$1" current="$1"
+  local entry path rel stats target
+  while IFS= read -r -d '' entry; do
+    path="${entry}"
+    rel="${path#"$root"/}"
+    stats=''
+    if [[ -L "$path" ]]; then
+      target="$(readlink "$path")"
+      printf '%s|link|%s\n' "$rel" "$target"
+    elif [[ -d "$path" ]]; then
+      printf '%s|dir|%s\n' "$rel" "$(ls -1 "$path" | wc -l | tr -d ' ')"
+    else
+      printf '%s|file|%s\n' "$rel" "$(wc -c < "$path" | tr -d ' ')"
+    fi
+  done < <(find "$root" -mindepth 1 -print0 2>/dev/null) | sort
+}
+
 # A clean dry-run must describe the plan without creating HOME or running apply-only work.
 DRY_RUN_HOME="/tmp/test-install-dry-run-home"
 rm -rf "$DRY_RUN_HOME"
@@ -104,10 +122,10 @@ printf '%s\n' 'user-agent-marker' > "$HOME/.config/opencode/agents/ai-matcher.md
 printf '%s\n' 'user-skill-marker' > "$HOME/opencode-custom/skills/defuddle/SKILL.md"
 printf '%s\n' 'user-profile-marker' > "$HOME/.config/opencode/profiles/work/opencode.jsonc"
 printf '%s\n' 'user-tool-marker' > "$HOME/.config/opencode/tools/doctor.js"
-POPULATED_BEFORE="$(find "$HOME" -printf '%P|%y|%s|%T@|%l\n' | sort)"
+POPULATED_BEFORE="$(snapshot_home "$HOME")"
 NORMAL_DRY_RUN_OUTPUT="$(bash "$REPO_DIR/install.sh" --skip-memory --dry-run 2>&1)"
 FORCE_DRY_RUN_OUTPUT="$(bash "$REPO_DIR/install.sh" --skip-memory --force --dry-run 2>&1)"
-POPULATED_AFTER="$(find "$HOME" -printf '%P|%y|%s|%T@|%l\n' | sort)"
+POPULATED_AFTER="$(snapshot_home "$HOME")"
 if [[ "$POPULATED_BEFORE" != "$POPULATED_AFTER" ]]; then
   echo "[FAIL] Normal or force dry-run changed a populated installation"
   exit 1
@@ -170,9 +188,9 @@ printf '%s\n' 'sync-profile-marker' > "$HOME/.config/opencode/profiles/work/open
 for index in $(seq 1 12); do mkdir -p "$HOME/.local/share/opencode/install-backups/10000000$index-1"; done
 
 # Sync dry-run must project backup/pruning while preserving every byte and path.
-DRY_RUN_BEFORE="$(find "$HOME" -printf '%P|%y|%s|%T@|%l\n' | sort)"
+DRY_RUN_BEFORE="$(snapshot_home "$HOME")"
 DRY_RUN_SYNC_OUTPUT="$(bash "$REPO_DIR/install.sh" --skip-memory --sync --dry-run 2>&1)"
-DRY_RUN_AFTER="$(find "$HOME" -printf '%P|%y|%s|%T@|%l\n' | sort)"
+DRY_RUN_AFTER="$(snapshot_home "$HOME")"
 if [[ "$DRY_RUN_BEFORE" != "$DRY_RUN_AFTER" ]]; then
   echo "[FAIL] Sync dry-run changed the installation"
   exit 1

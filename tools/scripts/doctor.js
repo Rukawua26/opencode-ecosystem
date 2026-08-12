@@ -40,7 +40,7 @@ function addCheck(id, section, name, required, test) {
 }
 
 function commandWorks(command, commandArgs = ["--version"]) {
-  return spawnSync(command, commandArgs, { stdio: "ignore", timeout: 5000 }).status === 0;
+  return spawnSync(command, commandArgs, { stdio: "ignore", timeout: 5000, shell: process.platform === "win32" }).status === 0;
 }
 
 function parseEnv(filePath) {
