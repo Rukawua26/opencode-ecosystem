@@ -17,4 +17,4 @@
 - [x] 14. Aislar los tests de scaffolders fuera del checkout
 - [x] 15. Endurecer nombres y ejecucion de scaffolders
 - [x] 16. Actualizar README y evidencia de verificacion
-- [ ] 17. Completar Organic RDD del fix y confirmar CI remota
+- [x] 17. Completar Organic RDD del fix y confirmar CI remota

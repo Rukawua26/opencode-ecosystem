@@ -12,7 +12,7 @@
 | R6 Paridad | PASS | Bash PASS local; PowerShell PASS en CI Windows del commit `4e71d59` |
 | R7 Eval local | PASS | Comando opt-in fuera de CI; primera medicion 1/3 JSON estricto |
 | R8 Mejoras locales | PASS | Guardrails/metrics integrados con 5 tests de comportamiento |
-| R9 Scaffolders seguros | LOCAL PASS | Sandbox temporal, timeout, `allowOnly: false`, skip POSIX en Windows, nombres hostiles/reservados y symlinks; falta nuevo CI remoto |
+| R9 Scaffolders seguros | PASS | Sandbox temporal, timeout, `allowOnly: false`, skip POSIX en Windows, nombres hostiles/reservados y symlinks; CI remota `123e9ae` PASS |
 
 ## Verificaciones Locales
 
@@ -47,17 +47,31 @@ Esta medicion evalua un caso por rol y no permite inferir calidad general ni
 comparar con modelos cloud. Sirve como baseline reproducible para ampliar un
 dataset solo cuando exista una necesidad concreta.
 
-## CI Y Limitaciones
+## CI Remota
 
-- PowerShell no se ejecuta localmente porque `pwsh` no esta instalado.
-- Windows completo, incluido `tests/install.test.ps1`, paso en el run del commit
-  `4e71d59`.
-- macOS detecto una carrera: `scaffolders.test.js` creaba
+El commit `123e9ae` (`fix: isolate scaffolder tests and harden name validation`)
+paso todas las checks remotas:
+
+- **CI - Tests** (`31607303590`): ubuntu-latest, macos-latest y windows-latest SUCCESS.
+  - macOS: 84 tests Vitest + coverage PASS (carrera eliminada).
+  - Windows: 84 tests Vitest + PowerShell install PASS.
+  - Ubuntu: 84 tests Vitest + coverage + install + hooks + audit PASS.
+- **CodeQL** (`31607303602`): SUCCESS.
+- **install-validation** (Alpine): PASS.
+- **release**: tag `v1.9.0` idempotente, npm publish idempotente.
+- **Pages**: deployment SUCCESS.
+
+Receipt Organic RDD aprobado:
+`r_1786502587294_32ff64de-c528-4637-b31e-585d3989f8e7` (Tier 3, 4 lentes PASS).
+
+## Limitaciones
+
+- PowerShell no se ejecuta localmente porque `pwsh` no esta instalado; su coverage
+  se confirma via CI Windows.
+- macOS detecto originalmente una carrera: `scaffolders.test.js` creaba
   `config/plugins/zz-test-scaffold-plugin.js` mientras `plugins.test.js` lo
   enumeraba para coverage. El candidato actual ejecuta copias reales de los
   scripts en un `mkdtemp` unico y no escribe en el checkout.
-- La confirmacion final de macOS, Windows y README remoto requiere el siguiente
-  commit/push.
 
 ## Hallazgos De Primera Revision
 
