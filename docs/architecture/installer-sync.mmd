@@ -1,0 +1,14 @@
+flowchart LR
+    A[Installer --sync] --> B[Build current manifest]
+    B --> C{Previous manifest exists?}
+    C -- No --> D[Do not prune unknown files]
+    C -- Yes --> E[Select prior managed paths absent now]
+    E --> F[Validate logical path]
+    F --> G[Backup then remove stale managed file]
+    D --> H[Backup and update current managed files]
+    G --> H
+    H --> R[Retain latest 10 backup runs]
+    R --> I[Install dependencies and verify]
+    I --> J[Atomically replace managed manifest]
+    K[Unknown user files] --> L[Preserved]
+    M[opencode.jsonc] --> L

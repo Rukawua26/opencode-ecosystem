@@ -88,10 +88,7 @@ User Input → OpenCode (orchestrator) → Subagent (leaf context)
 
 ## Token Economy
 
-| Estrategia | Ahorro estimado |
-|---|---|
-| Subagentes en hoja en blanco | 50-70% |
-| Memoria estructurada (no chat) | 30-40% |
-| Skills cargadas por necesidad | 20-30% |
-| Multi-modelo (ligero para tareas simples) | 20-40% |
-| Compaction con prune | 15-25% |
+El ecosistema reduce contexto mediante subagentes acotados, memoria estructurada,
+skills bajo demanda, routing de modelos y compaction. No se asigna un porcentaje
+sin una linea base comparable; consulta
+[`../token-economy/measurement.md`](../token-economy/measurement.md).

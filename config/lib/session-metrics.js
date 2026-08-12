@@ -25,6 +25,10 @@ export function metricFromMessage(info, state = {}) {
     tools: Number(state.tools || 0),
     delegations: Number(state.delegations || 0),
     compactions: Number(state.compactions || 0),
+    reads_broad: Number(state.reads_broad || 0),
+    effort_mode: state.effort_mode || null,
+    verified: Boolean(state.verified),
+    loop_detected: Boolean(state.loop_detected),
     failed: Boolean(info.error),
   };
 }

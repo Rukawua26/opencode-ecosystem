@@ -13,7 +13,12 @@ OPENCODE_DIR="$HOME/.config/opencode"
 OPENCODE_BIN_DIR="$HOME/.opencode/bin"
 VERBOSE=false
 FORCE=false
+SYNC=false
 SKIP_MEMORY=false
+MANIFEST_FILE="$OPENCODE_DIR/.ecosystem-managed-files"
+CURRENT_MANIFEST=""
+SYNC_BACKUP_DIR=""
+MAX_INSTALL_BACKUPS=10
 
 # Colors
 RED='\033[0;31m'
@@ -33,13 +38,15 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --verbose|-v) VERBOSE=true; shift ;;
     --force|-f) FORCE=true; shift ;;
+    --sync) SYNC=true; shift ;;
     --skip-memory) SKIP_MEMORY=true; shift ;;
     --help|-h)
-      echo "Usage: install.sh [--verbose] [--force] [--skip-memory]"
+      echo "Usage: install.sh [--verbose] [--force | --sync] [--skip-memory]"
       echo ""
       echo "Options:"
       echo "  --verbose, -v    Show detailed output"
       echo "  --force, -f      Overwrite existing config"
+      echo "  --sync           Update managed files and prune known stale files"
       echo "  --skip-memory    Skip memory adapter installation"
       echo "  --help, -h       Show this help"
       exit 0
@@ -47,6 +54,11 @@ while [[ $# -gt 0 ]]; do
     *) error "Unknown option: $1"; exit 1 ;;
   esac
 done
+
+if [[ "$FORCE" == true && "$SYNC" == true ]]; then
+  error "--force and --sync cannot be used together"
+  exit 1
+fi
 
 # Detect OS
 detect_os() {
@@ -116,13 +128,174 @@ clone_repo() {
   printf '%s\n' "$clone_dir"
 }
 
+managed_path_for() {
+  local path="$1"
+  case "$path" in
+    "$OPENCODE_DIR"/*) printf 'opencode/%s\n' "${path#"$OPENCODE_DIR"/}" ;;
+    "$HOME/opencode-custom/skills"/*) printf 'skills/%s\n' "${path#"$HOME/opencode-custom/skills"/}" ;;
+    "$OPENCODE_BIN_DIR"/*) printf 'bin/%s\n' "${path#"$OPENCODE_BIN_DIR"/}" ;;
+    *) return 1 ;;
+  esac
+}
+
+managed_destination_for() {
+  local logical="$1"
+  case "$logical" in
+    opencode/*) printf '%s/%s\n' "$OPENCODE_DIR" "${logical#opencode/}" ;;
+    skills/*) printf '%s/%s\n' "$HOME/opencode-custom/skills" "${logical#skills/}" ;;
+    bin/*) printf '%s/%s\n' "$OPENCODE_BIN_DIR" "${logical#bin/}" ;;
+    *) return 1 ;;
+  esac
+}
+
+is_safe_managed_path() {
+  local logical="$1"
+  [[ "$logical" == opencode/* || "$logical" == skills/* || "$logical" == bin/* ]] || return 1
+  [[ "$logical" != *"../"* && "$logical" != *"/.."* && "$logical" != *"//"* ]] || return 1
+  [[ "$logical" != *\\* && "$logical" != *:* && "$logical" != /* ]] || return 1
+  return 0
+}
+
+register_managed() {
+  local logical
+  logical="$(managed_path_for "$1")" || return 0
+  printf '%s\n' "$logical" >> "$CURRENT_MANIFEST"
+}
+
+preserve_manifest_prefix() {
+  local prefix="$1"
+  [[ -f "$MANIFEST_FILE" ]] || return 0
+  while IFS= read -r logical; do
+    logical="${logical%$'\r'}"
+    if [[ "$logical" == "$prefix"* ]]; then
+      printf '%s\n' "$logical" >> "$CURRENT_MANIFEST"
+    fi
+  done < "$MANIFEST_FILE"
+  return 0
+}
+
+is_protected_managed_path() {
+  case "$1" in
+    opencode/opencode.jsonc|opencode/.ecosystem-managed-files) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+retain_install_backups() {
+  local root="$HOME/.local/share/opencode/install-backups" backups=()
+  [[ -d "$root" ]] || return 0
+  local backup path index
+  while IFS= read -r backup; do backups+=("$backup"); done < <(
+    for path in "$root"/*; do
+      if [[ -d "$path" ]]; then basename "$path"; fi
+    done | sort -r
+  )
+  for ((index=MAX_INSTALL_BACKUPS; index<${#backups[@]}; index++)); do
+    rm -rf "$root/${backups[$index]}"
+  done
+}
+
+assert_no_symlink_components() {
+  local path="$1" root="$2" relative current segment
+  relative="${path#"$root"/}"
+  [[ "$relative" != "$path" ]] || { error "Managed path is outside its root: $path"; exit 1; }
+  current="$root"
+  IFS='/' read -r -a segments <<< "$relative"
+  for segment in "${segments[@]}"; do
+    current="$current/$segment"
+    if [[ -L "$current" ]]; then
+      error "Refusing managed path with symbolic-link component: $current"
+      exit 1
+    fi
+  done
+}
+
+assert_managed_path_safe() {
+  local path="$1"
+  case "$path" in
+    "$OPENCODE_DIR"/*) assert_no_symlink_components "$path" "$OPENCODE_DIR" ;;
+    "$HOME/opencode-custom/skills"/*) assert_no_symlink_components "$path" "$HOME/opencode-custom/skills" ;;
+    "$OPENCODE_BIN_DIR"/*) assert_no_symlink_components "$path" "$OPENCODE_BIN_DIR" ;;
+    *) error "Managed path is outside allowed roots: $path"; exit 1 ;;
+  esac
+}
+
+backup_sync_file() {
+  local path="$1" logical backup
+  [[ "$SYNC" == true && -f "$path" ]] || return 0
+  assert_managed_path_safe "$path"
+  logical="$(managed_path_for "$path")" || return 0
+  if [[ -z "$SYNC_BACKUP_DIR" ]]; then
+    SYNC_BACKUP_DIR="$HOME/.local/share/opencode/install-backups/$(date +%s)-$$"
+    mkdir -p "$SYNC_BACKUP_DIR"
+    retain_install_backups
+  fi
+  backup="$SYNC_BACKUP_DIR/$logical"
+  mkdir -p "$(dirname "$backup")"
+  cp -p "$path" "$backup"
+}
+
+prune_stale_managed() {
+  [[ "$SYNC" == true && -f "$MANIFEST_FILE" ]] || return 0
+  local logical destination
+  while IFS= read -r logical; do
+    logical="${logical%$'\r'}"
+    [[ -n "$logical" ]] || continue
+    if ! is_safe_managed_path "$logical"; then
+      warn "Ignoring unsafe managed path in manifest: $logical"
+      continue
+    fi
+    if is_protected_managed_path "$logical"; then
+      warn "Ignoring protected path in manifest: $logical"
+      continue
+    fi
+    if grep -Fqx "$logical" "$CURRENT_MANIFEST"; then
+      continue
+    fi
+    destination="$(managed_destination_for "$logical")" || continue
+    assert_managed_path_safe "$destination"
+    if [[ -f "$destination" ]]; then
+      backup_sync_file "$destination"
+      rm -f "$destination"
+      info "Removed stale managed file: $logical"
+    fi
+  done < "$MANIFEST_FILE"
+}
+
+finalize_manifest() {
+  prune_stale_managed
+  if [[ "$SYNC" == false && "$FORCE" == false && -f "$MANIFEST_FILE" ]]; then
+    local previous
+    while IFS= read -r previous; do
+      previous="${previous%$'\r'}"
+      if is_safe_managed_path "$previous" && ! is_protected_managed_path "$previous"; then
+        printf '%s\n' "$previous" >> "$CURRENT_MANIFEST"
+      fi
+    done < "$MANIFEST_FILE"
+  fi
+  local next_manifest="$MANIFEST_FILE.next"
+  sort -u "$CURRENT_MANIFEST" > "$next_manifest"
+  mv "$next_manifest" "$MANIFEST_FILE"
+  info "Managed manifest updated: $MANIFEST_FILE"
+}
+
 # Copy a file only if it does not exist or FORCE is true
 copy_if_ok() {
-  local src="$1" dst="$2"
-  if [[ -f "$dst" && "$FORCE" == false ]]; then
+  local src="$1" dst="$2" managed="${3:-true}"
+  if [[ "$managed" == true ]]; then
+    register_managed "$dst"
+  fi
+  if [[ "$SYNC" == true ]]; then
+    assert_managed_path_safe "$dst"
+  fi
+  if [[ -f "$dst" && "$FORCE" == false && "$SYNC" == false ]]; then
     info "Skipping (exists): $dst"
     return 0
   fi
+  if [[ "$SYNC" == true ]]; then
+    backup_sync_file "$dst"
+  fi
+  mkdir -p "$(dirname "$dst")"
   cp "$src" "$dst"
   info "Installed: $dst"
 }
@@ -151,9 +324,19 @@ copy_dir_if_ok() {
 # Copy a directory as one managed unit, preserving an existing installation.
 copy_tree_if_ok() {
   local src_dir="$1" dst_dir="$2" label="$3"
-  if [[ -d "$dst_dir" && "$FORCE" == false ]]; then
+  src_dir="${src_dir%/}"
+  if [[ -d "$dst_dir" && "$FORCE" == false && "$SYNC" == false ]]; then
     info "Skipping $label (exists): $dst_dir"
     return 1
+  fi
+  if [[ "$SYNC" == true ]]; then
+    local src rel
+    while IFS= read -r -d '' src; do
+      rel="${src#"$src_dir"/}"
+      copy_if_ok "$src" "$dst_dir/$rel"
+    done < <(find "$src_dir" -type f -print0)
+    info "$label synchronized: $dst_dir"
+    return 0
   fi
   if [[ -d "$dst_dir" && "$FORCE" == true ]]; then
     local backup="$dst_dir.bak-$(date +%s)"
@@ -163,6 +346,10 @@ copy_tree_if_ok() {
   fi
   mkdir -p "$dst_dir"
   cp -r "$src_dir/." "$dst_dir/"
+  local installed
+  while IFS= read -r -d '' installed; do
+    register_managed "$installed"
+  done < <(find "$dst_dir" -type f -print0)
   info "$label installed: $dst_dir"
 }
 
@@ -179,7 +366,7 @@ copy_config() {
       cp "$OPENCODE_DIR/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc.bak"
       info "Backed up opencode.jsonc to opencode.jsonc.bak"
     fi
-    cp "$repo_dir/config/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc"
+    copy_if_ok "$repo_dir/config/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc" false
     info "opencode.jsonc installed"
   fi
 
@@ -275,6 +462,8 @@ copy_config() {
 # Install memory adapter
 install_memory() {
   if [[ "$SKIP_MEMORY" == true ]]; then
+    preserve_manifest_prefix "opencode/mcp/memory-adapter/"
+    preserve_manifest_prefix "bin/memory-adapter"
     warn "Skipping memory adapter (--skip-memory)"
     return
   fi
@@ -348,9 +537,9 @@ verify_install() {
   fi
 
   local agent_count plugin_count skill_count
-  agent_count=$(find "$OPENCODE_DIR/agents" -name "*.md" 2>/dev/null | wc -l || echo 0)
-  plugin_count=$(find "$OPENCODE_DIR/plugins" -name "*.js" ! -name "*-helpers.js" 2>/dev/null | wc -l || echo 0)
-  skill_count=$(find "$HOME/opencode-custom/skills" -maxdepth 1 -type d 2>/dev/null | wc -l || echo 0)
+  agent_count=$(find "$OPENCODE_DIR/agents" -name "*.md" 2>/dev/null | wc -l) || agent_count=0
+  plugin_count=$(find "$OPENCODE_DIR/plugins" -name "*.js" ! -name "*-helpers.js" 2>/dev/null | wc -l) || plugin_count=0
+  skill_count=$(find "$HOME/opencode-custom/skills" -maxdepth 1 -type d 2>/dev/null | wc -l) || skill_count=0
   skill_count=$((skill_count > 0 ? skill_count - 1 : 0))
 
   echo ""
@@ -384,6 +573,8 @@ main() {
 
   check_deps
   create_dirs
+  CURRENT_MANIFEST="$(mktemp)"
+  trap 'rm -f "$CURRENT_MANIFEST"' EXIT
 
   REPO_DIR="$(clone_repo)"
   info "Using repo dir: $REPO_DIR"
@@ -391,6 +582,7 @@ main() {
   copy_config "$REPO_DIR"
   install_memory "$REPO_DIR"
   verify_install
+  finalize_manifest
 
   echo ""
   log "Done. Happy coding!"

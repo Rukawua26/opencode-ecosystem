@@ -11,7 +11,7 @@ Comparativa funcional y arquitectonica entre ambos enfoques.
 | **Orquestador** | Multi-IDE (Claude Code, Cursor, OpenCode, etc.) | OpenCode CLI (foco unico) |
 | **Package Manager** | Homebrew tap | curl-pipe (sin dependencias) |
 | **Memoria** | Engram (Go + SQLite, servidor) | Memory Adapter (Node + SQLite, MCP) |
-| **Skills** | Repos publicos, skills custom | Repos locales + 18 skills incluidas |
+| **Skills** | Repos publicos, skills custom | Repos locales + 21 skills incluidas |
 | **Multi-Modelo** | TUI picker (manual por fase) | JSON config (automatico por fase) |
 | **Personalidad** | Frases como Gentleman | SOUL.md + presets (helpful, technical, teacher, etc.) |
 | **Instalacion** | TUI interactiva con flags | Script bash + script PowerShell |
@@ -64,7 +64,7 @@ Comparativa funcional y arquitectonica entre ambos enfoques.
 - Carga basadas en contexto
 
 ### OpenCode
-- 18 skills preconfiguradas (SDD, debug, security, obsidian, tdd, etc.)
+- 21 skills preconfiguradas (SDD, debug, security, obsidian, tdd, etc.)
 - Skills cargadas por necesidad
 - Personalizables sin tocar OpenCode
 - Skills custom agregables en cualquier momento
@@ -106,7 +106,7 @@ Requiere:
 curl -sSL https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.sh | bash
 ```
 Requiere:
-- Node.js 18+
+- Node.js 22+
 - Git
 
 En Windows:
@@ -162,7 +162,7 @@ Mismo feature. Somos compatibles.
   - **personalities.js**: gestion de personalidad del agente
   - **validator.js**: validacion de API keys en startup
   - **session-metrics.js**: metricas de sesion (tools, delegaciones, compactions)
-- **auto-memory.js**: captura automatica de decisiones y bugs
+- **auto-memory.js** esta disponible, pero no se activa por defecto.
 
 **Ventaja nuestro:** Ya tenemos un ecosistema maduro de plugins custom.
 
@@ -179,26 +179,26 @@ Mismo feature. Somos compatibles.
 - **local-model-router**: routeo a modelos Ollama locales
 - **context7**: disponible (opt-in)
 - **diagram-generator**: disponible (opt-in)
-- **playwright**: browser automation (opt-in)
 
-5+ MCPs ya configurados vs los ~3 de Gentleman.
+Hay 2 MCP activos y 2 opt-in en la configuracion distribuida.
 
 ---
 
 ## Token Economy
 
 ### Gentleman
-- Subagentes en hoja en blanco: 50-70% ahorro
+- Subagentes en hoja en blanco
 - Skills cargadas por necesidad
 - Compaction
 
 ### OpenCode
 - Mismas estrategias (subagentes, skills, compaction)
-- Mas: multi-modelo por fase (ahorro adicional 20-40%)
+- Mas: multi-modelo por fase
 - Mas: memoria estructurada (no se carga chat bruto)
 - Mas: configuracion declarativa sin TUI overhead
 
-**Ventaja nuestro:** Mas capas de optimizacion, menos intervencion manual.
+**Ventaja nuestro:** Mas capas de optimizacion y medicion local. El ahorro real
+debe compararse con una linea base; no se publica un porcentaje sin evidencia.
 
 ---
 
@@ -255,10 +255,10 @@ No son competidores: se complementan. Puedes usar Gentleman para tener el TUI de
 | TUI interactiva | Si | No (script) | Gentleman |
 | Memory persistente | Engram (Go+) | Memory Adapter (Node) | Empate |
 | Fallback de modelos | Manual | Automatico | OpenCode |
-| Skills preconfiguradas | No | Si (18+) | OpenCode |
-| Plugins preconfigurados | No | Si (8) | OpenCode |
+| Skills preconfiguradas | No | Si (21) | OpenCode |
+| Plugins preconfigurados | No | Si (7 activos) | OpenCode |
 | Instalacion sin Homebrew | No | Si | OpenCode |
 | Soporte Windows nativo | Parcial | Si (PowerShell) | OpenCode |
 | CI/CD robusto | No claro | Si (Actions + npm) | OpenCode |
-| Ahorro de tokens | 50-70% | 75-85% | OpenCode |
+| Medicion de tokens | No documentada | Metricas locales y baseline manual | OpenCode |
 | Personalidad custom | Fija | SOUL.md editable | OpenCode |

@@ -87,7 +87,112 @@ for marker_file in \
 done
 echo "[OK] Reinstall preserved agents, skills, profiles, and tools"
 
+# A first sync updates managed files without pruning unknown files.
+rm -f "$HOME/.config/opencode/.ecosystem-managed-files"
+printf '%s\n' 'user-config-marker' > "$HOME/.config/opencode/opencode.jsonc"
+printf '%s\n' 'user-custom-plugin' > "$HOME/.config/opencode/plugins/user-custom.js"
+printf '%s\n' 'unknown-old-plugin' > "$HOME/.config/opencode/plugins/unknown-old.js"
+bash "$REPO_DIR/install.sh" --skip-memory --sync >/dev/null
+
+if [[ "$(<"$HOME/.config/opencode/opencode.jsonc")" != "user-config-marker" ]]; then
+  echo "[FAIL] Sync overwrote opencode.jsonc"
+  exit 1
+fi
+if [[ "$(<"$HOME/.config/opencode/plugins/user-custom.js")" != "user-custom-plugin" ]]; then
+  echo "[FAIL] Sync overwrote an unmanaged custom file"
+  exit 1
+fi
+if [[ ! -f "$HOME/.config/opencode/plugins/unknown-old.js" ]]; then
+  echo "[FAIL] First sync pruned a file without manifest evidence"
+  exit 1
+fi
+if [[ "$(<"$HOME/.config/opencode/agents/ai-matcher.md")" == "user-agent-marker" ]]; then
+  echo "[FAIL] Sync did not update a managed agent"
+  exit 1
+fi
+assert_exists "$HOME/.config/opencode/.ecosystem-managed-files"
+echo "[OK] First sync updated managed files and preserved unknown files"
+
+# A later sync prunes only paths recorded by the previous manifest.
+printf '%s\n' 'retired-managed-plugin' > "$HOME/.config/opencode/plugins/retired-managed.js"
+printf '%s\n' 'opencode/plugins/retired-managed.js' >> "$HOME/.config/opencode/.ecosystem-managed-files"
+printf '%s\n' 'do-not-delete' > "$HOME/escape"
+printf '%s\n' 'opencode/../../escape' >> "$HOME/.config/opencode/.ecosystem-managed-files"
+printf 'opencode/opencode.jsonc\r\n' >> "$HOME/.config/opencode/.ecosystem-managed-files"
+printf 'opencode/.ecosystem-managed-files\r\n' >> "$HOME/.config/opencode/.ecosystem-managed-files"
+printf '%s\n' 'sync-profile-marker' > "$HOME/.config/opencode/profiles/work/opencode.jsonc"
+for index in $(seq 1 12); do mkdir -p "$HOME/.local/share/opencode/install-backups/10000000$index-1"; done
+bash "$REPO_DIR/install.sh" --skip-memory --sync >/dev/null
+
+if [[ -e "$HOME/.config/opencode/plugins/retired-managed.js" ]]; then
+  echo "[FAIL] Sync did not prune a stale managed file"
+  exit 1
+fi
+if [[ ! -f "$HOME/.config/opencode/plugins/user-custom.js" || ! -f "$HOME/.config/opencode/plugins/unknown-old.js" ]]; then
+  echo "[FAIL] Sync pruned an unmanaged file"
+  exit 1
+fi
+if [[ "$(<"$HOME/escape")" != "do-not-delete" ]]; then
+  echo "[FAIL] Sync followed an unsafe manifest path"
+  exit 1
+fi
+if [[ "$(<"$HOME/.config/opencode/opencode.jsonc")" != "user-config-marker" ]]; then
+  echo "[FAIL] Sync pruned protected opencode.jsonc from a CRLF manifest entry"
+  exit 1
+fi
+BACKUP_DIR_COUNT=0
+for backup_dir in "$HOME/.local/share/opencode/install-backups"/*; do
+  [[ -d "$backup_dir" ]] && BACKUP_DIR_COUNT=$((BACKUP_DIR_COUNT + 1))
+done
+if [[ $BACKUP_DIR_COUNT -gt 10 ]]; then
+  echo "[FAIL] Sync retained more than 10 install backup directories"
+  exit 1
+fi
+if ! find "$HOME/.local/share/opencode/install-backups" -path '*/opencode/plugins/retired-managed.js' -type f | grep -q .; then
+  echo "[FAIL] Sync did not back up a stale managed file"
+  exit 1
+fi
+if ! find "$HOME/.local/share/opencode/install-backups" -path '*/opencode/profiles/work/opencode.jsonc' -type f | grep -q .; then
+  echo "[FAIL] Sync did not back up a replaced managed file"
+  exit 1
+fi
+echo "[OK] Sync backed up changes and pruned only known stale files"
+
+# Sync must refuse managed symlinks instead of following them outside the roots.
+printf '%s\n' 'symlink-target' > "$HOME/symlink-target"
+rm -f "$HOME/.config/opencode/plugins/guardrails.js"
+ln -s "$HOME/symlink-target" "$HOME/.config/opencode/plugins/guardrails.js"
+if bash "$REPO_DIR/install.sh" --skip-memory --sync >/dev/null 2>&1; then
+  echo "[FAIL] Sync followed a managed symbolic link"
+  exit 1
+fi
+if [[ "$(<"$HOME/symlink-target")" != "symlink-target" ]]; then
+  echo "[FAIL] Sync modified a symbolic-link target"
+  exit 1
+fi
+rm -f "$HOME/.config/opencode/plugins/guardrails.js"
+cp "$REPO_DIR/config/plugins/guardrails.js" "$HOME/.config/opencode/plugins/guardrails.js"
+echo "[OK] Sync refused managed symbolic links"
+
+printf '%s\n' 'nested-target' > "$HOME/nested-target"
+rm -rf "$HOME/opencode-custom/skills/defuddle"
+mkdir -p "$HOME/nested-victim"
+printf '%s\n' 'nested-target' > "$HOME/nested-victim/SKILL.md"
+ln -s "$HOME/nested-victim" "$HOME/opencode-custom/skills/defuddle"
+if bash "$REPO_DIR/install.sh" --skip-memory --sync >/dev/null 2>&1; then
+  echo "[FAIL] Sync followed a symbolic-link directory"
+  exit 1
+fi
+if [[ "$(<"$HOME/nested-victim/SKILL.md")" != "nested-target" ]]; then
+  echo "[FAIL] Sync modified a file through a symbolic-link directory"
+  exit 1
+fi
+rm -f "$HOME/opencode-custom/skills/defuddle"
+cp -r "$REPO_DIR/skills/defuddle" "$HOME/opencode-custom/skills/defuddle"
+echo "[OK] Sync refused symbolic-link directory components"
+
 # A forced reinstall must back up customizations before replacement.
+printf '%s\n' 'user-profile-marker' > "$HOME/.config/opencode/profiles/work/opencode.jsonc"
 bash "$REPO_DIR/install.sh" --skip-memory --force >/dev/null
 profile_backups=("$HOME/.config/opencode/profiles/work.bak-"*)
 profile_backup="${profile_backups[${#profile_backups[@]} - 1]}"

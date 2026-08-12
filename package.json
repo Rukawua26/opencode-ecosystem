@@ -24,6 +24,7 @@
     "test:install:windows": "pwsh -NoProfile -File tests/install.test.ps1",
     "test:hooks": "bash tests/hooks.test.sh",
     "test:router": "node --test config/mcp/local-model-router.test.js",
+    "eval:local-structure": "node tools/evals/local-model-structure.js",
     "check-docs": "node tools/scripts/check-docs.js",
     "lint": "eslint ."
   },

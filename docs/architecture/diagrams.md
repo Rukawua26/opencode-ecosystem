@@ -41,8 +41,7 @@ graph TD
     K -->|reads| D1
     K -->|uses| C1
     K -->|queries| D1a
-    K -->|verifies via| P[hypruse MCP tools]
-    R[ADR-004 analysis] -->|documents| P
+    K -->|verifies via| V[Tests and review receipts]
 
     L[npm registry] <-->|publish| D1
     M[GitHub Releases] <-->|tag v1.9.0| H3

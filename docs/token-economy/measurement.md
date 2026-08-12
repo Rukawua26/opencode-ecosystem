@@ -39,6 +39,9 @@ Compara:
 - `compactions / sessions`
 - costo por modelo
 - delegaciones por sesion
+- lecturas amplias por sesion
+- mensajes con loop detectado
+- mensajes marcados como verificados
 
 ## Decision
 

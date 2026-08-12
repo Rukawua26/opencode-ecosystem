@@ -4,10 +4,12 @@
 param(
     [switch]$Verbose,
     [switch]$Force,
+    [switch]$Sync,
     [switch]$SkipMemory
 )
 
 $ErrorActionPreference = "Stop"
+if ($Force -and $Sync) { throw "-Force and -Sync cannot be used together" }
 $RepoUrl = "https://github.com/Rukawua26/opencode-ecosystem.git"
 $InstallTag = if ($env:INSTALL_TAG) { $env:INSTALL_TAG } else { "v1.9.0" }
 
@@ -41,6 +43,12 @@ $OpenCodeDir = Join-Path $env:USERPROFILE ".config\opencode"
 $OpenCodeBinDir = Join-Path $env:USERPROFILE ".opencode\bin"
 $DataDir = Join-Path $env:LOCALAPPDATA "opencode\plugins-data"
 $ToolsDir = Join-Path $OpenCodeDir "tools"
+$SkillsDir = Join-Path $env:USERPROFILE "opencode-custom\skills"
+$ManifestFile = Join-Path $OpenCodeDir ".ecosystem-managed-files"
+$CurrentManifest = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+$PreviousManifest = if (Test-Path $ManifestFile) { @(Get-Content $ManifestFile | Where-Object { $_ }) } else { @() }
+$SyncBackupDir = $null
+$MaxInstallBackups = 10
 
 Write-Log "Creating directories..."
 $null = New-Item -ItemType Directory -Force -Path $OpenCodeDir, "$OpenCodeDir\plugins", "$OpenCodeDir\lib", "$OpenCodeDir\mcp", "$OpenCodeDir\agents", "$OpenCodeDir\profiles", $ToolsDir, $OpenCodeBinDir, $DataDir
@@ -60,12 +68,108 @@ if ((Test-Path (Join-Path $ScriptDir "config\opencode.jsonc")) -and (Test-Path (
     Write-Info "Repo cloned at tag $InstallTag"
 }
 
-# Copy file only if it does not exist or Force is set
-function Copy-IfOk { param($Src, $Dst)
-    if ((Test-Path $Dst) -and -not $Force) {
+function Get-ManagedPath { param($Path)
+    $FullPath = [System.IO.Path]::GetFullPath($Path)
+    $OpenCodePrefix = [System.IO.Path]::GetFullPath($OpenCodeDir) + [System.IO.Path]::DirectorySeparatorChar
+    $SkillsPrefix = [System.IO.Path]::GetFullPath($SkillsDir) + [System.IO.Path]::DirectorySeparatorChar
+    $BinPrefix = [System.IO.Path]::GetFullPath($OpenCodeBinDir) + [System.IO.Path]::DirectorySeparatorChar
+    if ($FullPath.StartsWith($OpenCodePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return "opencode/" + $FullPath.Substring($OpenCodePrefix.Length).Replace("\", "/")
+    }
+    if ($FullPath.StartsWith($SkillsPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return "skills/" + $FullPath.Substring($SkillsPrefix.Length).Replace("\", "/")
+    }
+    if ($FullPath.StartsWith($BinPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return "bin/" + $FullPath.Substring($BinPrefix.Length).Replace("\", "/")
+    }
+    return $null
+}
+
+function Get-ManagedDestination { param($Logical)
+    if ($Logical.StartsWith("opencode/")) { return Join-Path $OpenCodeDir $Logical.Substring(9) }
+    if ($Logical.StartsWith("skills/")) { return Join-Path $SkillsDir $Logical.Substring(7) }
+    if ($Logical.StartsWith("bin/")) { return Join-Path $OpenCodeBinDir $Logical.Substring(4) }
+    return $null
+}
+
+function Test-SafeManagedPath { param($Logical)
+    if ($Logical -notmatch '^(opencode|skills|bin)/') { return $false }
+    if ($Logical -match '[:\\]' -or $Logical.Contains('//')) { return $false }
+    return -not ($Logical.Split('/') -contains '..')
+}
+
+function Test-ProtectedManagedPath { param($Logical)
+    return $Logical -in @("opencode/opencode.jsonc", "opencode/.ecosystem-managed-files")
+}
+
+function Register-Managed { param($Path)
+    $Logical = Get-ManagedPath $Path
+    if ($Logical) { [void]$CurrentManifest.Add($Logical) }
+}
+
+function Assert-NoReparseComponents { param($Path, $Root)
+    $FullPath = [System.IO.Path]::GetFullPath($Path)
+    $FullRoot = [System.IO.Path]::GetFullPath($Root)
+    $Prefix = $FullRoot.TrimEnd('\') + '\'
+    if (-not $FullPath.StartsWith($Prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Managed path is outside its root: $Path"
+    }
+    $Current = $FullRoot
+    $Relative = $FullPath.Substring($Prefix.Length)
+    foreach ($Segment in $Relative.Split('\', [System.StringSplitOptions]::RemoveEmptyEntries)) {
+        $Current = Join-Path $Current $Segment
+        $Item = Get-Item -LiteralPath $Current -Force -ErrorAction SilentlyContinue
+        if ($Item -and ($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+            throw "Refusing managed path with symbolic-link component: $Current"
+        }
+    }
+}
+
+function Assert-ManagedPathSafe { param($Path)
+    $Logical = Get-ManagedPath $Path
+    if (-not $Logical) { throw "Managed path is outside allowed roots: $Path" }
+    if ($Logical.StartsWith("opencode/")) { Assert-NoReparseComponents $Path $OpenCodeDir; return }
+    if ($Logical.StartsWith("skills/")) { Assert-NoReparseComponents $Path $SkillsDir; return }
+    if ($Logical.StartsWith("bin/")) { Assert-NoReparseComponents $Path $OpenCodeBinDir; return }
+    throw "Managed path is outside allowed roots: $Path"
+}
+
+function Backup-SyncFile { param($Path)
+    if (-not $Sync -or -not (Test-Path -LiteralPath $Path -PathType Leaf)) { return }
+    Assert-ManagedPathSafe $Path
+    $Logical = Get-ManagedPath $Path
+    if (-not $Logical) { return }
+    if (-not $script:SyncBackupDir) {
+        $Stamp = "{0}-{1}" -f [DateTimeOffset]::UtcNow.ToUnixTimeSeconds(), $PID
+        $script:SyncBackupDir = Join-Path $env:USERPROFILE ".local\share\opencode\install-backups\$Stamp"
+        New-Item -ItemType Directory -Force -Path $script:SyncBackupDir | Out-Null
+        $BackupRoot = Split-Path $script:SyncBackupDir -Parent
+        $OldBackups = @(Get-ChildItem $BackupRoot -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -Skip $MaxInstallBackups)
+        foreach ($OldBackup in $OldBackups) { Remove-Item $OldBackup.FullName -Recurse -Force }
+    }
+    $Backup = Join-Path $script:SyncBackupDir $Logical
+    New-Item -ItemType Directory -Force -Path (Split-Path $Backup -Parent) | Out-Null
+    Copy-Item -LiteralPath $Path -Destination $Backup -Force
+}
+
+function Preserve-ManifestPrefix { param($Prefix)
+    foreach ($Logical in $PreviousManifest) {
+        if ($Logical.StartsWith($Prefix, [System.StringComparison]::Ordinal)) {
+            [void]$CurrentManifest.Add($Logical)
+        }
+    }
+}
+
+# Copy file only if it does not exist, Force is set, or Sync is active.
+function Copy-IfOk { param($Src, $Dst, [bool]$Managed = $true)
+    if ($Managed) { Register-Managed $Dst }
+    if ($Sync) { Assert-ManagedPathSafe $Dst }
+    if ((Test-Path $Dst) -and -not $Force -and -not $Sync) {
         Write-Info "Skipping (exists): $Dst"
         return
     }
+    if ($Sync) { Backup-SyncFile $Dst }
+    New-Item -ItemType Directory -Force -Path (Split-Path $Dst -Parent) | Out-Null
     Copy-Item $Src $Dst -Force
     Write-Info "Installed: $Dst"
 }
@@ -76,7 +180,7 @@ function Copy-DirIfOk { param($SrcDir, $DstDir, $Label)
     if ($Force -and $ExistingFiles.Count -gt 0) {
         $ts = [int][double]::Parse((Get-Date -UFormat %s))
         $BakDir = "$DstDir.bak-$ts"
-        Copy-Item $DstDir $BakDir -Recurse -Force -ErrorAction SilentlyContinue
+        Copy-Item $DstDir $BakDir -Recurse -Force
         Write-Info "$Label backed up to $(Split-Path $BakDir -Leaf)"
     }
     $Files = Get-ChildItem $SrcDir -ErrorAction SilentlyContinue
@@ -84,7 +188,7 @@ function Copy-DirIfOk { param($SrcDir, $DstDir, $Label)
 }
 
 function Copy-TreeIfOk { param($SrcDir, $DstDir, $Label)
-    if ((Test-Path $DstDir) -and -not $Force) {
+    if ((Test-Path $DstDir) -and -not $Force -and -not $Sync) {
         Write-Info "Skipping $Label (exists): $DstDir"
         return $false
     }
@@ -96,8 +200,11 @@ function Copy-TreeIfOk { param($SrcDir, $DstDir, $Label)
         Write-Info "$Label backed up to $(Split-Path $BakDir -Leaf)"
     }
     New-Item -ItemType Directory -Force -Path $DstDir | Out-Null
-    Copy-Item (Join-Path $SrcDir "*") $DstDir -Recurse -Force
-    Write-Info "$Label installed: $DstDir"
+    foreach ($File in Get-ChildItem $SrcDir -Recurse -File -ErrorAction SilentlyContinue) {
+        $Relative = [System.IO.Path]::GetRelativePath($SrcDir, $File.FullName)
+        Copy-IfOk $File.FullName (Join-Path $DstDir $Relative)
+    }
+    Write-Info "$Label $(if ($Sync) { 'synchronized' } else { 'installed' }): $DstDir"
     return $true
 }
 
@@ -113,7 +220,7 @@ if ((Test-Path $ConfigPath) -and -not $Force) {
         Copy-Item $ConfigPath "$ConfigPath.bak" -Force
         Write-Info "Backed up opencode.jsonc"
     }
-    Copy-Item (Join-Path $RepoDir "config\opencode.jsonc") $ConfigPath -Force
+    Copy-IfOk (Join-Path $RepoDir "config\opencode.jsonc") $ConfigPath $false
     Write-Info "opencode.jsonc installed"
 }
 
@@ -179,7 +286,6 @@ Write-Info "Profiles copied: $($ProfileDirs.Count)"
 
 # Skills
 Write-Log "Installing skills..."
-$SkillsDir = Join-Path $env:USERPROFILE "opencode-custom\skills"
 $SkillDirs = Get-ChildItem (Join-Path $RepoDir "skills") -Directory -ErrorAction SilentlyContinue
 foreach ($d in $SkillDirs) {
     $dest = Join-Path $SkillsDir $d.Name
@@ -198,7 +304,9 @@ $DoctorSource = Join-Path $RepoDir "tools\scripts\doctor.js"
 if (Test-Path $DoctorSource) {
     Copy-IfOk $DoctorSource (Join-Path $ToolsDir "doctor.js")
     $DoctorCommand = Join-Path $OpenCodeBinDir "opencode-doctor.cmd"
-    if ($Force -or -not (Test-Path $DoctorCommand)) {
+    Register-Managed $DoctorCommand
+    if ($Force -or $Sync -or -not (Test-Path $DoctorCommand)) {
+        if ($Sync) { Backup-SyncFile $DoctorCommand }
         '@node "%USERPROFILE%\.config\opencode\tools\doctor.js" %*' | Set-Content $DoctorCommand -Encoding Ascii
     }
     Write-Info "opencode-doctor installed at $OpenCodeBinDir\opencode-doctor.cmd"
@@ -207,7 +315,9 @@ $MetricsSource = Join-Path $RepoDir "tools\scripts\opencode-metrics.js"
 if (Test-Path $MetricsSource) {
     Copy-IfOk $MetricsSource (Join-Path $ToolsDir "opencode-metrics.js")
     $MetricsCommand = Join-Path $OpenCodeBinDir "opencode-metrics.cmd"
-    if ($Force -or -not (Test-Path $MetricsCommand)) {
+    Register-Managed $MetricsCommand
+    if ($Force -or $Sync -or -not (Test-Path $MetricsCommand)) {
+        if ($Sync) { Backup-SyncFile $MetricsCommand }
         '@node "%USERPROFILE%\.config\opencode\tools\opencode-metrics.js" %*' | Set-Content $MetricsCommand -Encoding Ascii
     }
     Write-Info "opencode-metrics installed at $OpenCodeBinDir\opencode-metrics.cmd"
@@ -223,11 +333,49 @@ if (-not $SkipMemory) {
         Write-Info "Memory adapter installed at $MemDir"
     }
     $MemoryCommand = Join-Path $OpenCodeBinDir "memory-adapter.cmd"
-    if ($Force -or -not (Test-Path $MemoryCommand)) {
+    Register-Managed $MemoryCommand
+    if ($Force -or $Sync -or -not (Test-Path $MemoryCommand)) {
+        if ($Sync) { Backup-SyncFile $MemoryCommand }
         '@node "%USERPROFILE%\.config\opencode\mcp\memory-adapter\src\cli.js" %*' | Set-Content $MemoryCommand -Encoding Ascii
     }
 } else {
+    Preserve-ManifestPrefix "opencode/mcp/memory-adapter/"
+    Preserve-ManifestPrefix "bin/memory-adapter"
     Write-Warn "Skipping memory adapter (--skip-memory)"
+}
+
+function Finalize-Manifest {
+    if ($Sync -and (Test-Path $ManifestFile)) {
+        foreach ($Logical in $PreviousManifest) {
+            if (-not (Test-SafeManagedPath $Logical)) {
+                Write-Warn "Ignoring unsafe managed path in manifest: $Logical"
+                continue
+            }
+            if (Test-ProtectedManagedPath $Logical) {
+                Write-Warn "Ignoring protected path in manifest: $Logical"
+                continue
+            }
+            if ($CurrentManifest.Contains($Logical)) { continue }
+            $Destination = Get-ManagedDestination $Logical
+            if ($Destination -and (Test-Path -LiteralPath $Destination -PathType Leaf)) {
+                Assert-ManagedPathSafe $Destination
+                Backup-SyncFile $Destination
+                Remove-Item -LiteralPath $Destination -Force
+                Write-Info "Removed stale managed file: $Logical"
+            }
+        }
+    }
+    if (-not $Sync -and -not $Force -and (Test-Path $ManifestFile)) {
+        foreach ($Logical in $PreviousManifest) {
+            if ((Test-SafeManagedPath $Logical) -and -not (Test-ProtectedManagedPath $Logical)) {
+                [void]$CurrentManifest.Add($Logical)
+            }
+        }
+    }
+    $NextManifest = "$ManifestFile.next"
+    @($CurrentManifest | Sort-Object) | Set-Content $NextManifest -Encoding utf8
+    Move-Item $NextManifest $ManifestFile -Force
+    Write-Info "Managed manifest updated: $ManifestFile"
 }
 
 # Verify installation
@@ -269,6 +417,8 @@ if ($passed -ne $checks) {
     Write-Err "Some checks failed. Review the warnings above."
     exit 1
 }
+
+Finalize-Manifest
 
 Write-Host ""
 Write-Log "Installation successful!"

@@ -8,12 +8,13 @@ Version documentada: **v1.9.0**.
 
 - **Memory Adapter** — SQLite + MCP server para memoria persistente entre sesiones
 - **Skills** — 21 skills exportables (SDD, debug, security, prompts, etc.)
-- **Agentes** — 16+ agentes especializados (trading, backend, frontend, design, android)
+- **Agentes** — 16 agentes especializados en producto, arquitectura, codigo, seguridad y revision
 - **Multi-modelo** — Routing automatico entre modelos cloud y locales (Ollama)
 - **Obsidian** — Catalogo determinista de proyectos e ingestión de fuentes con preview y escritura create-only
 - **SDD** — Spec-Driven Development con plantillas y workflows
 - **Organic RDD** — review Tier 0-3 con receipts ligados al hash del candidato
 - **Instalador seguro** — preserva customizaciones por defecto y crea rollback con `--force`
+- **Sync opt-in** — actualiza archivos gestionados, respalda reemplazos y poda solo rutas conocidas
 
 ## Instalacion
 
@@ -24,6 +25,10 @@ curl -sSL https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/in
 ```
 
 El instalador usa la release `v1.9.0` por defecto. Define `INSTALL_TAG` solo para instalar otra release explicitamente.
+
+Para sincronizar una instalacion existente con `main` sin reemplazar
+`opencode.jsonc`, ejecuta `install.sh --sync` o `install.ps1 -Sync`. La primera
+sincronizacion crea el manifiesto sin borrar archivos desconocidos.
 
 Paquetes individuales:
 
@@ -39,8 +44,6 @@ npm install @rukawua26/opencode-skills
 
 - `memory-adapter` — CLI para gestionar memoria
 - `opencode` — CLI para interactuar con el ecosistema
-- `python3 ~/docs/scripts/discover_projects.py --dry-run` — Previsualizar el catálogo del vault
-- `python3 ~/docs/scripts/discover_projects.py --apply` — Crear notas faltantes y regenerar el grafo
 
 ## Modelos locales
 
@@ -51,11 +54,12 @@ npm install @rukawua26/opencode-skills
 
 ## Verificacion
 
-- Vitest: 67 tests
+- Vitest: 72 tests
 - Router MCP: 23 tests
 - Memory adapter: 43 tests
 - Instaladores: Linux, macOS, Alpine y Windows
-- CI: lint, coverage, contratos, hooks y Organic RDD
+- CI: lint, coverage, contratos, hooks e instaladores multiplataforma
+- Eval local opt-in: `npm run eval:local-structure` (fuera de CI)
 
 ## Enlaces
 

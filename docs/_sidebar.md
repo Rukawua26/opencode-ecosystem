@@ -5,5 +5,4 @@
 - [Token Economy](token-economy/measurement.md)
   - [Estudio](token-economy/study.md)
 - [Comparativas](comparison.md)
-- [Pendientes v1.3](pending-v1.3.md)
 - [Guia SDD](guides/sdd-step-by-step.md)

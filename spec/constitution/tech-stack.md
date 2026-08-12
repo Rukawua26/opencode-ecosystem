@@ -2,7 +2,7 @@
 
 ## Core
 - **OpenCode CLI** — orquestador principal
-- **Node.js 18+** — runtime de plugins, skills y MCP servers
+- **Node.js 22+** — runtime de plugins, skills y MCP servers (`node:sqlite` nativo)
 - **SQLite** — almacenamiento del memory adapter (via `node:sqlite`)
 
 ## Modelo

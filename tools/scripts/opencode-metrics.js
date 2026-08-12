@@ -37,6 +37,9 @@ const summary = {
   tools: 0,
   delegations: 0,
   compactions: 0,
+  broad_reads: 0,
+  verified_messages: 0,
+  loop_detected_messages: 0,
   failures: 0,
   models: {},
 };
@@ -50,6 +53,9 @@ for (const item of records) {
   summary.tools += item.tools || 0;
   summary.delegations += item.delegations || 0;
   summary.compactions += item.compactions || 0;
+  summary.broad_reads += item.reads_broad || 0;
+  summary.verified_messages += item.verified ? 1 : 0;
+  summary.loop_detected_messages += item.loop_detected ? 1 : 0;
   summary.failures += item.failed ? 1 : 0;
   const key = `${item.provider}/${item.model}`;
   summary.models[key] ||= { messages: 0, cost: 0, input_tokens: 0, output_tokens: 0 };
