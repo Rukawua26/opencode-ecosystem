@@ -23,11 +23,9 @@ function createValidInstall() {
     ".config/opencode/mcp/profiles-placeholder",
     ".config/opencode/profiles",
     ".local/share/opencode/plugins-data",
+    "opencode/plugins-data",
     "opencode-custom/skills",
   ]) mkdirSync(join(home, directory), { recursive: true });
-  if (process.platform === "win32" && process.env.LOCALAPPDATA) {
-    mkdirSync(join(process.env.LOCALAPPDATA, "opencode", "plugins-data"), { recursive: true });
-  }
   for (const file of [
     ".config/opencode/opencode.jsonc",
     ".config/opencode/mcp/memory-adapter/package.json",
