@@ -42,7 +42,7 @@ function createValidInstall() {
 function runDoctor(args = []) {
   return spawnSync(process.execPath, [doctor, ...args], {
     encoding: "utf8",
-    env: { ...process.env, HOME: home, USERPROFILE: home, NODE_DISABLE_COMPILE_CACHE: "1", OPENAI_API_KEY: "", ANTHROPIC_API_KEY: "", GOOGLE_API_KEY: "", GEMINI_API_KEY: "" },
+    env: { ...process.env, HOME: home, USERPROFILE: home, LOCALAPPDATA: home, NODE_DISABLE_COMPILE_CACHE: "1", OPENAI_API_KEY: "", ANTHROPIC_API_KEY: "", GOOGLE_API_KEY: "", GEMINI_API_KEY: "" },
   });
 }
 
@@ -172,7 +172,7 @@ describe("opencode-doctor", () => {
     const before = snapshot(home);
     const result = spawnSync("bash", [doctorWrapper, "--json"], {
       encoding: "utf8",
-      env: { ...process.env, HOME: home, USERPROFILE: home, TMPDIR: temp },
+      env: { ...process.env, HOME: home, USERPROFILE: home, LOCALAPPDATA: home, TMPDIR: temp },
     });
     expect(result.status).toBe(0);
     expect(JSON.parse(result.stdout).ok).toBe(true);
