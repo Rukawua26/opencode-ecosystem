@@ -14,9 +14,11 @@ OPENCODE_BIN_DIR="$HOME/.opencode/bin"
 VERBOSE=false
 FORCE=false
 SYNC=false
+DRY_RUN=false
 SKIP_MEMORY=false
 MANIFEST_FILE="$OPENCODE_DIR/.ecosystem-managed-files"
 CURRENT_MANIFEST=""
+CURRENT_MANAGED=()
 SYNC_BACKUP_DIR=""
 MAX_INSTALL_BACKUPS=10
 
@@ -32,6 +34,7 @@ log() { echo -e "${GREEN}[opencode-ecosystem]${NC} $*" >&2; }
 warn() { echo -e "${YELLOW}[warn]${NC} $*" >&2; }
 error() { echo -e "${RED}[error]${NC} $*" >&2; }
 info() { { [[ "$VERBOSE" == true ]] && echo -e "${BLUE}[debug]${NC} $*" >&2; } || true; }
+plan() { echo "[dry-run] $*" >&2; }
 
 # Parse args
 while [[ $# -gt 0 ]]; do
@@ -39,14 +42,16 @@ while [[ $# -gt 0 ]]; do
     --verbose|-v) VERBOSE=true; shift ;;
     --force|-f) FORCE=true; shift ;;
     --sync) SYNC=true; shift ;;
+    --dry-run) DRY_RUN=true; shift ;;
     --skip-memory) SKIP_MEMORY=true; shift ;;
     --help|-h)
-      echo "Usage: install.sh [--verbose] [--force | --sync] [--skip-memory]"
+      echo "Usage: install.sh [--verbose] [--force | --sync] [--dry-run] [--skip-memory]"
       echo ""
       echo "Options:"
       echo "  --verbose, -v    Show detailed output"
       echo "  --force, -f      Overwrite existing config"
       echo "  --sync           Update managed files and prune known stale files"
+      echo "  --dry-run        Preview operations without changing the system"
       echo "  --skip-memory    Skip memory adapter installation"
       echo "  --help, -h       Show this help"
       exit 0
@@ -58,6 +63,12 @@ done
 if [[ "$FORCE" == true && "$SYNC" == true ]]; then
   error "--force and --sync cannot be used together"
   exit 1
+fi
+
+# Node 22+ may write a compile cache even for version probes. A preview must be
+# strictly read-only, including temporary directories.
+if [[ "$DRY_RUN" == true ]]; then
+  export NODE_DISABLE_COMPILE_CACHE=1
 fi
 
 # Detect OS
@@ -102,15 +113,20 @@ check_deps() {
 # Create directories
 create_dirs() {
   log "Creating directories..."
-  mkdir -p "$OPENCODE_DIR"
-  mkdir -p "$OPENCODE_DIR/plugins"
-  mkdir -p "$OPENCODE_DIR/lib"
-  mkdir -p "$OPENCODE_DIR/mcp"
-  mkdir -p "$OPENCODE_DIR/agents"
-  mkdir -p "$OPENCODE_DIR/profiles"
-  mkdir -p "$OPENCODE_DIR/tools"
-  mkdir -p "$OPENCODE_BIN_DIR"
-  mkdir -p "$HOME/.local/share/opencode/plugins-data"
+  local directories=(
+    "$OPENCODE_DIR" "$OPENCODE_DIR/plugins" "$OPENCODE_DIR/lib"
+    "$OPENCODE_DIR/mcp" "$OPENCODE_DIR/agents" "$OPENCODE_DIR/profiles"
+    "$OPENCODE_DIR/tools" "$OPENCODE_BIN_DIR"
+    "$HOME/.local/share/opencode/plugins-data"
+  )
+  local directory
+  for directory in "${directories[@]}"; do
+    if [[ "$DRY_RUN" == true ]]; then
+      [[ -d "$directory" ]] || plan "create directory: $directory"
+    else
+      mkdir -p "$directory"
+    fi
+  done
   info "Directories created at $OPENCODE_DIR"
 }
 
@@ -118,6 +134,11 @@ create_dirs() {
 clone_repo() {
   local clone_dir="$SCRIPT_DIR"
   if [[ ! -f "$SCRIPT_DIR/config/opencode.jsonc" || ! -d "$SCRIPT_DIR/skills" ]]; then
+    if [[ "$DRY_RUN" == true ]]; then
+      plan "clone $REPO_URL at tag $INSTALL_TAG"
+      printf '%s\n' "__DRY_RUN_REMOTE__"
+      return
+    fi
     clone_dir="$(mktemp -d)"
     log "Cloning repo (tag $INSTALL_TAG) to $clone_dir..."
     git clone --depth 1 --branch "$INSTALL_TAG" "$REPO_URL" "$clone_dir"
@@ -159,7 +180,23 @@ is_safe_managed_path() {
 register_managed() {
   local logical
   logical="$(managed_path_for "$1")" || return 0
-  printf '%s\n' "$logical" >> "$CURRENT_MANIFEST"
+  if [[ "$DRY_RUN" == true ]]; then
+    CURRENT_MANAGED+=("$logical")
+  else
+    printf '%s\n' "$logical" >> "$CURRENT_MANIFEST"
+  fi
+}
+
+current_manifest_contains() {
+  local logical="$1" current
+  if [[ "$DRY_RUN" == false ]]; then
+    grep -Fqx "$logical" "$CURRENT_MANIFEST"
+    return
+  fi
+  for current in "${CURRENT_MANAGED[@]}"; do
+    [[ "$current" == "$logical" ]] && return 0
+  done
+  return 1
 }
 
 preserve_manifest_prefix() {
@@ -168,7 +205,11 @@ preserve_manifest_prefix() {
   while IFS= read -r logical; do
     logical="${logical%$'\r'}"
     if [[ "$logical" == "$prefix"* ]]; then
-      printf '%s\n' "$logical" >> "$CURRENT_MANIFEST"
+      if [[ "$DRY_RUN" == true ]]; then
+        CURRENT_MANAGED+=("$logical")
+      else
+        printf '%s\n' "$logical" >> "$CURRENT_MANIFEST"
+      fi
     fi
   done < "$MANIFEST_FILE"
   return 0
@@ -225,6 +266,10 @@ backup_sync_file() {
   [[ "$SYNC" == true && -f "$path" ]] || return 0
   assert_managed_path_safe "$path"
   logical="$(managed_path_for "$path")" || return 0
+  if [[ "$DRY_RUN" == true ]]; then
+    plan "backup: $logical"
+    return 0
+  fi
   if [[ -z "$SYNC_BACKUP_DIR" ]]; then
     SYNC_BACKUP_DIR="$HOME/.local/share/opencode/install-backups/$(date +%s)-$$"
     mkdir -p "$SYNC_BACKUP_DIR"
@@ -249,21 +294,29 @@ prune_stale_managed() {
       warn "Ignoring protected path in manifest: $logical"
       continue
     fi
-    if grep -Fqx "$logical" "$CURRENT_MANIFEST"; then
+    if current_manifest_contains "$logical"; then
       continue
     fi
     destination="$(managed_destination_for "$logical")" || continue
     assert_managed_path_safe "$destination"
     if [[ -f "$destination" ]]; then
       backup_sync_file "$destination"
-      rm -f "$destination"
-      info "Removed stale managed file: $logical"
+      if [[ "$DRY_RUN" == true ]]; then
+        plan "remove: $logical"
+      else
+        rm -f "$destination"
+        info "Removed stale managed file: $logical"
+      fi
     fi
   done < "$MANIFEST_FILE"
 }
 
 finalize_manifest() {
   prune_stale_managed
+  if [[ "$DRY_RUN" == true ]]; then
+    plan "update manifest: $MANIFEST_FILE"
+    return 0
+  fi
   if [[ "$SYNC" == false && "$FORCE" == false && -f "$MANIFEST_FILE" ]]; then
     local previous
     while IFS= read -r previous; do
@@ -289,11 +342,15 @@ copy_if_ok() {
     assert_managed_path_safe "$dst"
   fi
   if [[ -f "$dst" && "$FORCE" == false && "$SYNC" == false ]]; then
-    info "Skipping (exists): $dst"
+    if [[ "$DRY_RUN" == true ]]; then plan "preserve: $dst"; else info "Skipping (exists): $dst"; fi
     return 0
   fi
   if [[ "$SYNC" == true ]]; then
     backup_sync_file "$dst"
+  fi
+  if [[ "$DRY_RUN" == true ]]; then
+    if [[ -e "$dst" || -L "$dst" ]]; then plan "update: $dst"; else plan "create: $dst"; fi
+    return 0
   fi
   mkdir -p "$(dirname "$dst")"
   cp "$src" "$dst"
@@ -308,9 +365,13 @@ copy_dir_if_ok() {
     if [[ -e "${existing_files[0]}" ]]; then
       local ts_backup
       ts_backup="$(date +%s)"
-      mkdir -p "$dst_dir.bak-$ts_backup"
-      cp -r "$dst_dir/"* "$dst_dir.bak-$ts_backup/"
-      info "$label backed up to $(basename "$dst_dir").bak-$ts_backup"
+      if [[ "$DRY_RUN" == true ]]; then
+        plan "backup: $label directory $dst_dir"
+      else
+        mkdir -p "$dst_dir.bak-$ts_backup"
+        cp -r "$dst_dir/"* "$dst_dir.bak-$ts_backup/"
+        info "$label backed up to $(basename "$dst_dir").bak-$ts_backup"
+      fi
     fi
   fi
   for src in $src_glob; do
@@ -326,7 +387,7 @@ copy_tree_if_ok() {
   local src_dir="$1" dst_dir="$2" label="$3"
   src_dir="${src_dir%/}"
   if [[ -d "$dst_dir" && "$FORCE" == false && "$SYNC" == false ]]; then
-    info "Skipping $label (exists): $dst_dir"
+    if [[ "$DRY_RUN" == true ]]; then plan "preserve: $label tree $dst_dir"; else info "Skipping $label (exists): $dst_dir"; fi
     return 1
   fi
   if [[ "$SYNC" == true ]]; then
@@ -340,9 +401,21 @@ copy_tree_if_ok() {
   fi
   if [[ -d "$dst_dir" && "$FORCE" == true ]]; then
     local backup="$dst_dir.bak-$(date +%s)"
-    cp -r "$dst_dir" "$backup"
-    rm -rf "$dst_dir"
-    info "$label backed up to $(basename "$backup")"
+    if [[ "$DRY_RUN" == true ]]; then
+      plan "backup: $label tree $dst_dir"
+    else
+      cp -r "$dst_dir" "$backup"
+      rm -rf "$dst_dir"
+      info "$label backed up to $(basename "$backup")"
+    fi
+  fi
+  if [[ "$DRY_RUN" == true ]]; then
+    local source relative
+    while IFS= read -r -d '' source; do
+      relative="${source#"$src_dir"/}"
+      copy_if_ok "$source" "$dst_dir/$relative"
+    done < <(find "$src_dir" -type f -print0)
+    return 0
   fi
   mkdir -p "$dst_dir"
   cp -r "$src_dir/." "$dst_dir/"
@@ -360,11 +433,14 @@ copy_config() {
 
   # opencode.jsonc
   if [[ -f "$OPENCODE_DIR/opencode.jsonc" && "$FORCE" == false ]]; then
+    if [[ "$DRY_RUN" == true ]]; then plan "preserve: $OPENCODE_DIR/opencode.jsonc"; fi
     warn "opencode.jsonc already exists; preserving it (use --force to replace)"
   else
     if [[ -f "$OPENCODE_DIR/opencode.jsonc" && "$FORCE" == true ]]; then
-      cp "$OPENCODE_DIR/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc.bak"
-      info "Backed up opencode.jsonc to opencode.jsonc.bak"
+      if [[ "$DRY_RUN" == true ]]; then plan "backup: opencode/opencode.jsonc"; else
+        cp "$OPENCODE_DIR/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc.bak"
+        info "Backed up opencode.jsonc to opencode.jsonc.bak"
+      fi
     fi
     copy_if_ok "$repo_dir/config/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc" false
     info "opencode.jsonc installed"
@@ -399,14 +475,18 @@ copy_config() {
     copy_if_ok "$repo_dir/config/mcp/package.json" "$OPENCODE_DIR/mcp/package.json"
     copy_if_ok "$repo_dir/config/mcp/package-lock.json" "$OPENCODE_DIR/mcp/package-lock.json"
     info "MCP servers copied"
-    if [[ -f "$OPENCODE_DIR/mcp/package.json" ]]; then
+    if [[ -f "$OPENCODE_DIR/mcp/package.json" || "$DRY_RUN" == true ]]; then
       log "Installing MCP router dependencies..."
-      (cd "$OPENCODE_DIR/mcp" && npm ci --omit=dev --ignore-scripts) || {
+      if [[ "$DRY_RUN" == true ]]; then
+        plan "install-dependencies: $OPENCODE_DIR/mcp"
+      else
+        (cd "$OPENCODE_DIR/mcp" && npm ci --omit=dev --ignore-scripts) || {
         error "Failed to install MCP router dependencies in $OPENCODE_DIR/mcp"
         error "Run 'npm ci --omit=dev --ignore-scripts' manually in $OPENCODE_DIR/mcp"
         exit 1
-      }
-      info "MCP router dependencies installed"
+        }
+        info "MCP router dependencies installed"
+      fi
     fi
   fi
 
@@ -419,8 +499,10 @@ copy_config() {
       profile_name="$(basename "$profile_dir")"
       if copy_tree_if_ok "$profile_dir" "$OPENCODE_DIR/profiles/$profile_name" "Profile $profile_name"; then
         local profile="$OPENCODE_DIR/profiles/$profile_name/opencode.jsonc"
-        if [[ -f "$profile" ]]; then
+        if [[ -f "$profile" && "$DRY_RUN" == false ]]; then
           node -e 'const fs=require("node:fs"); const file=process.argv[1]; fs.writeFileSync(file, fs.readFileSync(file,"utf8").replaceAll("__OPENCODE_DIR__", process.argv[2]));' "$profile" "$OPENCODE_DIR"
+        elif [[ "$DRY_RUN" == true && -f "$profile_dir/opencode.jsonc" ]]; then
+          plan "update template: $profile"
         fi
       fi
     done
@@ -430,7 +512,11 @@ copy_config() {
   # Skills
   log "Installing skills..."
   if [[ -d "$repo_dir/skills" ]]; then
-    mkdir -p "$HOME/opencode-custom/skills"
+    if [[ "$DRY_RUN" == true ]]; then
+      [[ -d "$HOME/opencode-custom/skills" ]] || plan "create directory: $HOME/opencode-custom/skills"
+    else
+      mkdir -p "$HOME/opencode-custom/skills"
+    fi
     for skill_dir in "$repo_dir/skills"/*/; do
       [[ -d "$skill_dir" ]] || continue
       skill_name="$(basename "$skill_dir")"
@@ -448,13 +534,13 @@ copy_config() {
   if [[ -f "$repo_dir/tools/scripts/doctor.js" && -f "$repo_dir/tools/scripts/opencode-doctor.sh" ]]; then
     copy_if_ok "$repo_dir/tools/scripts/doctor.js" "$OPENCODE_DIR/tools/doctor.js"
     copy_if_ok "$repo_dir/tools/scripts/opencode-doctor.sh" "$OPENCODE_BIN_DIR/opencode-doctor"
-    chmod +x "$OPENCODE_BIN_DIR/opencode-doctor"
+    if [[ "$DRY_RUN" == true ]]; then plan "update mode executable: $OPENCODE_BIN_DIR/opencode-doctor"; else chmod +x "$OPENCODE_BIN_DIR/opencode-doctor"; fi
     info "opencode-doctor installed globally at $OPENCODE_BIN_DIR/opencode-doctor"
   fi
   if [[ -f "$repo_dir/tools/scripts/opencode-metrics.js" && -f "$repo_dir/tools/scripts/opencode-metrics.sh" ]]; then
     copy_if_ok "$repo_dir/tools/scripts/opencode-metrics.js" "$OPENCODE_DIR/tools/opencode-metrics.js"
     copy_if_ok "$repo_dir/tools/scripts/opencode-metrics.sh" "$OPENCODE_BIN_DIR/opencode-metrics"
-    chmod +x "$OPENCODE_BIN_DIR/opencode-metrics"
+    if [[ "$DRY_RUN" == true ]]; then plan "update mode executable: $OPENCODE_BIN_DIR/opencode-metrics"; else chmod +x "$OPENCODE_BIN_DIR/opencode-metrics"; fi
     info "opencode-metrics installed globally at $OPENCODE_BIN_DIR/opencode-metrics"
   fi
 }
@@ -485,9 +571,9 @@ install_memory() {
   fi
 
   # Link global CLI through a wrapper so relative imports stay inside the package.
-  if [[ -f "$mem_dir/src/cli.js" && -f "$repo_dir/tools/scripts/memory-adapter.sh" ]]; then
+  if [[ ( -f "$mem_dir/src/cli.js" || "$DRY_RUN" == true ) && -f "$repo_dir/tools/scripts/memory-adapter.sh" ]]; then
     copy_if_ok "$repo_dir/tools/scripts/memory-adapter.sh" "$OPENCODE_BIN_DIR/memory-adapter"
-    chmod +x "$OPENCODE_BIN_DIR/memory-adapter"
+    if [[ "$DRY_RUN" == true ]]; then plan "update mode executable: $OPENCODE_BIN_DIR/memory-adapter"; else chmod +x "$OPENCODE_BIN_DIR/memory-adapter"; fi
     info "memory-adapter CLI installed globally at $OPENCODE_BIN_DIR/memory-adapter"
   fi
 
@@ -573,19 +659,27 @@ main() {
 
   check_deps
   create_dirs
-  CURRENT_MANIFEST="$(mktemp)"
-  trap 'rm -f "$CURRENT_MANIFEST"' EXIT
+  if [[ "$DRY_RUN" == false ]]; then
+    CURRENT_MANIFEST="$(mktemp)"
+    trap 'rm -f "$CURRENT_MANIFEST"' EXIT
+  fi
 
   REPO_DIR="$(clone_repo)"
+  if [[ "$REPO_DIR" == "__DRY_RUN_REMOTE__" ]]; then
+    plan "defer-verification: detailed plan requires distribution contents"
+    echo ""
+    log "Dry run complete; no changes made."
+    return 0
+  fi
   info "Using repo dir: $REPO_DIR"
 
   copy_config "$REPO_DIR"
   install_memory "$REPO_DIR"
-  verify_install
+  if [[ "$DRY_RUN" == true ]]; then plan "defer-verification: runtime installation checks"; else verify_install; fi
   finalize_manifest
 
   echo ""
-  log "Done. Happy coding!"
+  if [[ "$DRY_RUN" == true ]]; then log "Dry run complete; no changes made."; else log "Done. Happy coding!"; fi
 }
 
 main

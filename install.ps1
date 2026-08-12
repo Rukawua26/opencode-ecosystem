@@ -5,6 +5,7 @@ param(
     [switch]$Verbose,
     [switch]$Force,
     [switch]$Sync,
+    [switch]$DryRun,
     [switch]$SkipMemory
 )
 
@@ -17,16 +18,28 @@ function Write-Log { param($Message) Write-Host "[opencode-ecosystem] $Message" 
 function Write-Warn { param($Message) Write-Host "[warn] $Message" -ForegroundColor Yellow }
 function Write-Info { param($Message) if ($Verbose) { Write-Host "[debug] $Message" -ForegroundColor Blue } }
 function Write-Err { param($Message) Write-Host "[error] $Message" -ForegroundColor Red }
+function Write-Plan { param($Action, $Target) Write-Host "[dry-run] ${Action}: $Target" }
 
 function Test-Command { param($Cmd) return [bool](Get-Command $Cmd -ErrorAction SilentlyContinue) }
 
 # Check dependencies
 Write-Log "Checking dependencies..."
+$PreviousNodeDisableCompileCache = $env:NODE_DISABLE_COMPILE_CACHE
+if ($DryRun) { $env:NODE_DISABLE_COMPILE_CACHE = "1" }
+function Restore-NodeCompileCacheEnvironment {
+    if ($null -eq $PreviousNodeDisableCompileCache) {
+        Remove-Item Env:NODE_DISABLE_COMPILE_CACHE -ErrorAction SilentlyContinue
+    } else {
+        $env:NODE_DISABLE_COMPILE_CACHE = $PreviousNodeDisableCompileCache
+    }
+}
 $missing = @()
 if (-not (Test-Command "node")) { $missing += "nodejs" }
+if (-not (Test-Command "npm")) { $missing += "npm" }
 if (-not (Test-Command "git")) { $missing += "git" }
 
 if ($missing.Count -gt 0) {
+    Restore-NodeCompileCacheEnvironment
     Write-Err "Missing dependencies: $($missing -join ', ')"
     Write-Err "Install with: winget install $($missing -join ' ') or choco install $($missing -join ' ')"
     exit 1
@@ -37,6 +50,7 @@ if ($NodeMajor -lt 22) {
     exit 1
 }
 Write-Info "Dependencies OK: node=$(node --version), git=$(git --version)"
+Restore-NodeCompileCacheEnvironment
 
 # Set paths
 $OpenCodeDir = Join-Path $env:USERPROFILE ".config\opencode"
@@ -51,7 +65,24 @@ $SyncBackupDir = $null
 $MaxInstallBackups = 10
 
 Write-Log "Creating directories..."
-$null = New-Item -ItemType Directory -Force -Path $OpenCodeDir, "$OpenCodeDir\plugins", "$OpenCodeDir\lib", "$OpenCodeDir\mcp", "$OpenCodeDir\agents", "$OpenCodeDir\profiles", $ToolsDir, $OpenCodeBinDir, $DataDir
+$InstallDirectories = @(
+    $OpenCodeDir,
+    (Join-Path $OpenCodeDir "plugins"),
+    (Join-Path $OpenCodeDir "lib"),
+    (Join-Path $OpenCodeDir "mcp"),
+    (Join-Path $OpenCodeDir "agents"),
+    (Join-Path $OpenCodeDir "profiles"),
+    $ToolsDir,
+    $OpenCodeBinDir,
+    $DataDir
+)
+foreach ($Directory in $InstallDirectories) {
+    if ($DryRun) {
+        if (-not (Test-Path -LiteralPath $Directory -PathType Container)) { Write-Plan "create directory" $Directory }
+    } else {
+        $null = New-Item -ItemType Directory -Force -Path $Directory
+    }
+}
 Write-Info "Directories created at $OpenCodeDir"
 
 # Determine script location
@@ -60,6 +91,13 @@ if ((Test-Path (Join-Path $ScriptDir "config\opencode.jsonc")) -and (Test-Path (
     $RepoDir = $ScriptDir
     Write-Info "Using local distribution files"
 } else {
+    if ($DryRun) {
+        Write-Plan "clone $RepoUrl at tag $InstallTag" "distribution sources"
+        Write-Plan "defer-verification" "detailed plan requires distribution contents"
+        Write-Host ""
+        Write-Log "Dry run complete; no changes made."
+        return
+    }
     $TempDir = [System.IO.Path]::GetTempFileName() | ForEach-Object { [System.IO.Path]::ChangeExtension($_, '') }
     New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
     Write-Log "Cloning repo (tag $InstallTag) to $TempDir..."
@@ -110,13 +148,14 @@ function Register-Managed { param($Path)
 function Assert-NoReparseComponents { param($Path, $Root)
     $FullPath = [System.IO.Path]::GetFullPath($Path)
     $FullRoot = [System.IO.Path]::GetFullPath($Root)
-    $Prefix = $FullRoot.TrimEnd('\') + '\'
+    $Separator = [System.IO.Path]::DirectorySeparatorChar
+    $Prefix = $FullRoot.TrimEnd([char[]]@('\', '/')) + $Separator
     if (-not $FullPath.StartsWith($Prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "Managed path is outside its root: $Path"
     }
     $Current = $FullRoot
     $Relative = $FullPath.Substring($Prefix.Length)
-    foreach ($Segment in $Relative.Split('\', [System.StringSplitOptions]::RemoveEmptyEntries)) {
+    foreach ($Segment in $Relative.Split($Separator, [System.StringSplitOptions]::RemoveEmptyEntries)) {
         $Current = Join-Path $Current $Segment
         $Item = Get-Item -LiteralPath $Current -Force -ErrorAction SilentlyContinue
         if ($Item -and ($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
@@ -139,6 +178,7 @@ function Backup-SyncFile { param($Path)
     Assert-ManagedPathSafe $Path
     $Logical = Get-ManagedPath $Path
     if (-not $Logical) { return }
+    if ($DryRun) { Write-Plan "backup" $Logical; return }
     if (-not $script:SyncBackupDir) {
         $Stamp = "{0}-{1}" -f [DateTimeOffset]::UtcNow.ToUnixTimeSeconds(), $PID
         $script:SyncBackupDir = Join-Path $env:USERPROFILE ".local\share\opencode\install-backups\$Stamp"
@@ -165,10 +205,18 @@ function Copy-IfOk { param($Src, $Dst, [bool]$Managed = $true)
     if ($Managed) { Register-Managed $Dst }
     if ($Sync) { Assert-ManagedPathSafe $Dst }
     if ((Test-Path $Dst) -and -not $Force -and -not $Sync) {
-        Write-Info "Skipping (exists): $Dst"
+        if ($DryRun) { Write-Plan "preserve" $Dst } else { Write-Info "Skipping (exists): $Dst" }
         return
     }
     if ($Sync) { Backup-SyncFile $Dst }
+    if ($DryRun) {
+        if ((Test-Path -LiteralPath $Dst) -or (Get-Item -LiteralPath $Dst -Force -ErrorAction SilentlyContinue)) {
+            Write-Plan "update" $Dst
+        } else {
+            Write-Plan "create" $Dst
+        }
+        return
+    }
     New-Item -ItemType Directory -Force -Path (Split-Path $Dst -Parent) | Out-Null
     Copy-Item $Src $Dst -Force
     Write-Info "Installed: $Dst"
@@ -178,10 +226,14 @@ function Copy-IfOk { param($Src, $Dst, [bool]$Managed = $true)
 function Copy-DirIfOk { param($SrcDir, $DstDir, $Label)
     $ExistingFiles = @(Get-ChildItem $DstDir -ErrorAction SilentlyContinue)
     if ($Force -and $ExistingFiles.Count -gt 0) {
-        $ts = [int][double]::Parse((Get-Date -UFormat %s))
-        $BakDir = "$DstDir.bak-$ts"
-        Copy-Item $DstDir $BakDir -Recurse -Force
-        Write-Info "$Label backed up to $(Split-Path $BakDir -Leaf)"
+        if ($DryRun) {
+            Write-Plan "backup" "$Label directory $DstDir"
+        } else {
+            $ts = [int][double]::Parse((Get-Date -UFormat %s))
+            $BakDir = "$DstDir.bak-$ts"
+            Copy-Item $DstDir $BakDir -Recurse -Force
+            Write-Info "$Label backed up to $(Split-Path $BakDir -Leaf)"
+        }
     }
     $Files = Get-ChildItem $SrcDir -ErrorAction SilentlyContinue
     foreach ($f in $Files) { Copy-IfOk $f.FullName (Join-Path $DstDir $f.Name) }
@@ -189,15 +241,26 @@ function Copy-DirIfOk { param($SrcDir, $DstDir, $Label)
 
 function Copy-TreeIfOk { param($SrcDir, $DstDir, $Label)
     if ((Test-Path $DstDir) -and -not $Force -and -not $Sync) {
-        Write-Info "Skipping $Label (exists): $DstDir"
+        if ($DryRun) { Write-Plan "preserve" "$Label tree $DstDir" } else { Write-Info "Skipping $Label (exists): $DstDir" }
         return $false
     }
     if ((Test-Path $DstDir) -and $Force) {
-        $ts = [int][double]::Parse((Get-Date -UFormat %s))
-        $BakDir = "$DstDir.bak-$ts"
-        Copy-Item $DstDir $BakDir -Recurse -Force
-        Remove-Item $DstDir -Recurse -Force
-        Write-Info "$Label backed up to $(Split-Path $BakDir -Leaf)"
+        if ($DryRun) {
+            Write-Plan "backup" "$Label tree $DstDir"
+        } else {
+            $ts = [int][double]::Parse((Get-Date -UFormat %s))
+            $BakDir = "$DstDir.bak-$ts"
+            Copy-Item $DstDir $BakDir -Recurse -Force
+            Remove-Item $DstDir -Recurse -Force
+            Write-Info "$Label backed up to $(Split-Path $BakDir -Leaf)"
+        }
+    }
+    if ($DryRun) {
+        foreach ($File in Get-ChildItem $SrcDir -Recurse -File -ErrorAction SilentlyContinue) {
+            $Relative = [System.IO.Path]::GetRelativePath($SrcDir, $File.FullName)
+            Copy-IfOk $File.FullName (Join-Path $DstDir $Relative)
+        }
+        return $true
     }
     New-Item -ItemType Directory -Force -Path $DstDir | Out-Null
     foreach ($File in Get-ChildItem $SrcDir -Recurse -File -ErrorAction SilentlyContinue) {
@@ -214,11 +277,14 @@ Write-Log "Installing config..."
 # opencode.jsonc
 $ConfigPath = Join-Path $OpenCodeDir "opencode.jsonc"
 if ((Test-Path $ConfigPath) -and -not $Force) {
+    if ($DryRun) { Write-Plan "preserve" $ConfigPath }
     Write-Warn "opencode.jsonc already exists; preserving it (use -Force to replace)"
 } else {
     if ((Test-Path $ConfigPath) -and $Force) {
-        Copy-Item $ConfigPath "$ConfigPath.bak" -Force
-        Write-Info "Backed up opencode.jsonc"
+        if ($DryRun) { Write-Plan "backup" "opencode/opencode.jsonc" } else {
+            Copy-Item $ConfigPath "$ConfigPath.bak" -Force
+            Write-Info "Backed up opencode.jsonc"
+        }
     }
     Copy-IfOk (Join-Path $RepoDir "config\opencode.jsonc") $ConfigPath $false
     Write-Info "opencode.jsonc installed"
@@ -258,16 +324,20 @@ if (Test-Path $McpPkg) {
     Copy-IfOk $McpPkg (Join-Path $OpenCodeDir "mcp\package.json")
     if (Test-Path $McpLock) { Copy-IfOk $McpLock (Join-Path $OpenCodeDir "mcp\package-lock.json") }
     Write-Info "Installing MCP router dependencies..."
-    Push-Location (Join-Path $OpenCodeDir "mcp")
-    npm ci --omit=dev --ignore-scripts
-    if ($LASTEXITCODE -ne 0) {
+    if ($DryRun) {
+        Write-Plan "install-dependencies" (Join-Path $OpenCodeDir "mcp")
+    } else {
+        Push-Location (Join-Path $OpenCodeDir "mcp")
+        npm ci --omit=dev --ignore-scripts
+        if ($LASTEXITCODE -ne 0) {
+            Pop-Location
+            Write-Err "Failed to install MCP router dependencies"
+            Write-Err "Run 'npm ci --omit=dev --ignore-scripts' manually in $(Join-Path $OpenCodeDir 'mcp')"
+            exit 1
+        }
         Pop-Location
-        Write-Err "Failed to install MCP router dependencies"
-        Write-Err "Run 'npm ci --omit=dev --ignore-scripts' manually in $(Join-Path $OpenCodeDir 'mcp')"
-        exit 1
+        Write-Info "MCP router dependencies installed"
     }
-    Pop-Location
-    Write-Info "MCP router dependencies installed"
 }
 
 # Profiles
@@ -277,8 +347,10 @@ foreach ($d in $ProfileDirs) {
     $dest = Join-Path $OpenCodeDir "profiles" $d.Name
     if (Copy-TreeIfOk $d.FullName $dest "Profile $($d.Name)") {
         $ProfileConfig = Join-Path $dest "opencode.jsonc"
-        if (Test-Path $ProfileConfig) {
+        if ((Test-Path $ProfileConfig) -and -not $DryRun) {
             (Get-Content $ProfileConfig -Raw).Replace("__OPENCODE_DIR__", $OpenCodeDir.Replace("\", "/")) | Set-Content $ProfileConfig -Encoding UTF8
+        } elseif ($DryRun -and (Test-Path (Join-Path $d.FullName "opencode.jsonc"))) {
+            Write-Plan "update template" $ProfileConfig
         }
     }
 }
@@ -307,7 +379,12 @@ if (Test-Path $DoctorSource) {
     Register-Managed $DoctorCommand
     if ($Force -or $Sync -or -not (Test-Path $DoctorCommand)) {
         if ($Sync) { Backup-SyncFile $DoctorCommand }
-        '@node "%USERPROFILE%\.config\opencode\tools\doctor.js" %*' | Set-Content $DoctorCommand -Encoding Ascii
+        if ($DryRun) { Write-Plan $(if (Test-Path $DoctorCommand) { "update" } else { "create" }) $DoctorCommand } else {
+            @(
+                '@set "NODE_DISABLE_COMPILE_CACHE=1"'
+                '@node "%USERPROFILE%\.config\opencode\tools\doctor.js" %*'
+            ) | Set-Content $DoctorCommand -Encoding Ascii
+        }
     }
     Write-Info "opencode-doctor installed at $OpenCodeBinDir\opencode-doctor.cmd"
 }
@@ -318,7 +395,9 @@ if (Test-Path $MetricsSource) {
     Register-Managed $MetricsCommand
     if ($Force -or $Sync -or -not (Test-Path $MetricsCommand)) {
         if ($Sync) { Backup-SyncFile $MetricsCommand }
-        '@node "%USERPROFILE%\.config\opencode\tools\opencode-metrics.js" %*' | Set-Content $MetricsCommand -Encoding Ascii
+        if ($DryRun) { Write-Plan $(if (Test-Path $MetricsCommand) { "update" } else { "create" }) $MetricsCommand } else {
+            '@node "%USERPROFILE%\.config\opencode\tools\opencode-metrics.js" %*' | Set-Content $MetricsCommand -Encoding Ascii
+        }
     }
     Write-Info "opencode-metrics installed at $OpenCodeBinDir\opencode-metrics.cmd"
 }
@@ -336,7 +415,9 @@ if (-not $SkipMemory) {
     Register-Managed $MemoryCommand
     if ($Force -or $Sync -or -not (Test-Path $MemoryCommand)) {
         if ($Sync) { Backup-SyncFile $MemoryCommand }
-        '@node "%USERPROFILE%\.config\opencode\mcp\memory-adapter\src\cli.js" %*' | Set-Content $MemoryCommand -Encoding Ascii
+        if ($DryRun) { Write-Plan $(if (Test-Path $MemoryCommand) { "update" } else { "create" }) $MemoryCommand } else {
+            '@node "%USERPROFILE%\.config\opencode\mcp\memory-adapter\src\cli.js" %*' | Set-Content $MemoryCommand -Encoding Ascii
+        }
     }
 } else {
     Preserve-ManifestPrefix "opencode/mcp/memory-adapter/"
@@ -360,8 +441,10 @@ function Finalize-Manifest {
             if ($Destination -and (Test-Path -LiteralPath $Destination -PathType Leaf)) {
                 Assert-ManagedPathSafe $Destination
                 Backup-SyncFile $Destination
-                Remove-Item -LiteralPath $Destination -Force
-                Write-Info "Removed stale managed file: $Logical"
+                if ($DryRun) { Write-Plan "remove" $Logical } else {
+                    Remove-Item -LiteralPath $Destination -Force
+                    Write-Info "Removed stale managed file: $Logical"
+                }
             }
         }
     }
@@ -372,6 +455,7 @@ function Finalize-Manifest {
             }
         }
     }
+    if ($DryRun) { Write-Plan "update manifest" $ManifestFile; return }
     $NextManifest = "$ManifestFile.next"
     @($CurrentManifest | Sort-Object) | Set-Content $NextManifest -Encoding utf8
     Move-Item $NextManifest $ManifestFile -Force
@@ -379,6 +463,14 @@ function Finalize-Manifest {
 }
 
 # Verify installation
+if ($DryRun) {
+    Write-Plan "defer-verification" "runtime installation checks"
+    Finalize-Manifest
+    Write-Host ""
+    Write-Log "Dry run complete; no changes made."
+    return
+}
+
 Write-Log "Verifying installation..."
 
 $checks = 0; $passed = 0

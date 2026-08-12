@@ -1,9 +1,11 @@
 $ErrorActionPreference = "Stop"
 
 $RepoDir = Split-Path $PSScriptRoot -Parent
-$TestHome = Join-Path ($env:RUNNER_TEMP ?? $env:TEMP) "opencode-install-home"
+$TempRoot = $env:RUNNER_TEMP ?? $env:TEMP ?? [System.IO.Path]::GetTempPath()
+$TestHome = Join-Path $TempRoot "opencode-install-home"
 $OriginalUserProfile = $env:USERPROFILE
 $OriginalLocalAppData = $env:LOCALAPPDATA
+$OriginalTemp = $env:TEMP
 
 function Assert-Path { param($Path)
     if (-not (Test-Path $Path)) { throw "Expected path: $Path" }
@@ -14,6 +16,29 @@ try {
     New-Item -ItemType Directory -Force -Path $TestHome | Out-Null
     $env:USERPROFILE = $TestHome
     $env:LOCALAPPDATA = Join-Path $TestHome "AppData\Local"
+
+    # A clean dry-run must leave the requested HOME absent.
+    Remove-Item $TestHome -Recurse -Force -ErrorAction SilentlyContinue
+    $DryRunOutput = (& (Join-Path $RepoDir "install.ps1") -DryRun -Verbose *>&1 | Out-String)
+    if (Test-Path $TestHome) { throw "Clean DryRun modified USERPROFILE" }
+    foreach ($Expected in @("create directory:", "install-dependencies:", "defer-verification:", "Dry run complete; no changes made")) {
+        if (-not $DryRunOutput.Contains($Expected)) { throw "DryRun output missing: $Expected" }
+    }
+
+    $DetachedDir = Join-Path $TempRoot "opencode-detached-dry-run"
+    Remove-Item $DetachedDir -Recurse -Force -ErrorAction SilentlyContinue
+    New-Item -ItemType Directory -Force -Path (Join-Path $DetachedDir "tmp") | Out-Null
+    Copy-Item (Join-Path $RepoDir "install.ps1") (Join-Path $DetachedDir "install.ps1")
+    $env:TEMP = Join-Path $DetachedDir "tmp"
+    $DetachedOutput = (& (Join-Path $DetachedDir "install.ps1") -DryRun *>&1 | Out-String)
+    $env:TEMP = $OriginalTemp
+    if (Test-Path $TestHome) { throw "Detached DryRun modified USERPROFILE" }
+    if (@(Get-ChildItem (Join-Path $DetachedDir "tmp") -Force).Count -ne 0) { throw "Detached DryRun created temporary files" }
+    if (-not $DetachedOutput.Contains("clone https://github.com/Rukawua26/opencode-ecosystem.git at tag v1.9.0")) {
+        throw "Detached DryRun did not report remote clone"
+    }
+    Remove-Item $DetachedDir -Recurse -Force
+    New-Item -ItemType Directory -Force -Path $TestHome | Out-Null
 
     & (Join-Path $RepoDir "install.ps1") -Verbose -SkipMemory -Force
     if ($LASTEXITCODE -ne 0) { throw "Initial install failed" }
@@ -27,6 +52,21 @@ try {
     Set-Content (Join-Path $SkillsDir "defuddle\SKILL.md") "user-skill-marker"
     Set-Content (Join-Path $OpenCodeDir "profiles\work\opencode.jsonc") "user-profile-marker"
     Set-Content (Join-Path $OpenCodeDir "tools\doctor.js") "user-tool-marker"
+
+    $PopulatedBefore = @(Get-ChildItem $TestHome -Recurse -Force | ForEach-Object {
+        $Hash = if (-not $_.PSIsContainer -and -not ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { (Get-FileHash $_.FullName -Algorithm SHA256).Hash } else { "" }
+        "$($_.FullName.Substring($TestHome.Length))|$($_.Attributes)|$($_.Length)|$Hash"
+    } | Sort-Object)
+    $NormalDryRun = (& (Join-Path $RepoDir "install.ps1") -SkipMemory -DryRun *>&1 | Out-String)
+    $ForceDryRun = (& (Join-Path $RepoDir "install.ps1") -SkipMemory -Force -DryRun *>&1 | Out-String)
+    $PopulatedAfter = @(Get-ChildItem $TestHome -Recurse -Force | ForEach-Object {
+        $Hash = if (-not $_.PSIsContainer -and -not ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { (Get-FileHash $_.FullName -Algorithm SHA256).Hash } else { "" }
+        "$($_.FullName.Substring($TestHome.Length))|$($_.Attributes)|$($_.Length)|$Hash"
+    } | Sort-Object)
+    if (Compare-Object $PopulatedBefore $PopulatedAfter) { throw "Normal or Force DryRun changed populated state" }
+    if (-not $NormalDryRun.Contains("preserve:") -or -not $ForceDryRun.Contains("backup:")) {
+        throw "Normal/Force DryRun did not reflect mode decisions"
+    }
 
     & (Join-Path $RepoDir "install.ps1") -SkipMemory
     if ($LASTEXITCODE -ne 0) { throw "Preserving reinstall failed" }
@@ -73,6 +113,20 @@ try {
     $BackupRoot = Join-Path $TestHome ".local\share\opencode\install-backups"
     foreach ($Index in 1..12) { New-Item -ItemType Directory -Force -Path (Join-Path $BackupRoot "10000000$Index-1") | Out-Null }
 
+    $BeforeDryRun = @(Get-ChildItem $TestHome -Recurse -Force | ForEach-Object {
+        $Hash = if (-not $_.PSIsContainer -and -not ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { (Get-FileHash $_.FullName -Algorithm SHA256).Hash } else { "" }
+        "$($_.FullName.Substring($TestHome.Length))|$($_.Attributes)|$($_.Length)|$Hash"
+    } | Sort-Object)
+    $SyncDryRunOutput = (& (Join-Path $RepoDir "install.ps1") -SkipMemory -Sync -DryRun *>&1 | Out-String)
+    $AfterDryRun = @(Get-ChildItem $TestHome -Recurse -Force | ForEach-Object {
+        $Hash = if (-not $_.PSIsContainer -and -not ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) { (Get-FileHash $_.FullName -Algorithm SHA256).Hash } else { "" }
+        "$($_.FullName.Substring($TestHome.Length))|$($_.Attributes)|$($_.Length)|$Hash"
+    } | Sort-Object)
+    if (Compare-Object $BeforeDryRun $AfterDryRun) { throw "Sync DryRun changed the installation" }
+    if (-not $SyncDryRunOutput.Contains("backup: opencode/plugins/retired-managed.js") -or -not $SyncDryRunOutput.Contains("remove: opencode/plugins/retired-managed.js")) {
+        throw "Sync DryRun did not project stale backup and removal"
+    }
+
     & (Join-Path $RepoDir "install.ps1") -SkipMemory -Sync
     if ($LASTEXITCODE -ne 0) { throw "Managed pruning sync failed" }
     if (Test-Path (Join-Path $OpenCodeDir "plugins\retired-managed.js")) {
@@ -91,10 +145,10 @@ try {
     if (@(Get-ChildItem $BackupRoot -Directory).Count -gt 10) {
         throw "Sync retained more than 10 install backup directories"
     }
-    if (-not ($Backups | Where-Object { $_.FullName -like "*\opencode\plugins\retired-managed.js" })) {
+    if (-not ($Backups | Where-Object { $_.FullName.Replace('\', '/') -like "*/opencode/plugins/retired-managed.js" })) {
         throw "Sync did not back up a stale managed file"
     }
-    if (-not ($Backups | Where-Object { $_.FullName -like "*\opencode\profiles\work\opencode.jsonc" })) {
+    if (-not ($Backups | Where-Object { $_.FullName.Replace('\', '/') -like "*/opencode/profiles/work/opencode.jsonc" })) {
         throw "Sync did not back up a replaced managed file"
     }
 
@@ -103,6 +157,13 @@ try {
     Set-Content $SymlinkTarget "symlink-target"
     Remove-Item $GuardrailsPath -Force
     New-Item -ItemType SymbolicLink -Path $GuardrailsPath -Target $SymlinkTarget | Out-Null
+    $RejectedDryRunSymlink = $false
+    try {
+        & (Join-Path $RepoDir "install.ps1") -SkipMemory -Sync -DryRun
+    } catch {
+        $RejectedDryRunSymlink = $_.Exception.Message -like "*symbolic-link component*"
+    }
+    if (-not $RejectedDryRunSymlink) { throw "Sync DryRun did not reject a managed symbolic link" }
     $RejectedSymlink = $false
     try {
         & (Join-Path $RepoDir "install.ps1") -SkipMemory -Sync
@@ -122,6 +183,13 @@ try {
     New-Item -ItemType Directory -Force -Path $NestedVictim | Out-Null
     Set-Content (Join-Path $NestedVictim "SKILL.md") "nested-target"
     New-Item -ItemType SymbolicLink -Path $DefuddlePath -Target $NestedVictim | Out-Null
+    $RejectedNestedDryRunSymlink = $false
+    try {
+        & (Join-Path $RepoDir "install.ps1") -SkipMemory -Sync -DryRun
+    } catch {
+        $RejectedNestedDryRunSymlink = $_.Exception.Message -like "*symbolic-link component*"
+    }
+    if (-not $RejectedNestedDryRunSymlink) { throw "Sync DryRun did not reject a symbolic-link directory" }
     $RejectedNestedSymlink = $false
     try {
         & (Join-Path $RepoDir "install.ps1") -SkipMemory -Sync
@@ -153,5 +221,6 @@ try {
 } finally {
     $env:USERPROFILE = $OriginalUserProfile
     $env:LOCALAPPDATA = $OriginalLocalAppData
+    $env:TEMP = $OriginalTemp
     Remove-Item $TestHome -Recurse -Force -ErrorAction SilentlyContinue
 }

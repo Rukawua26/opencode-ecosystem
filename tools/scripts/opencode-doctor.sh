@@ -7,4 +7,5 @@ if [[ ! -f "$DOCTOR_JS" ]]; then
   echo "[error] doctor.js no esta instalado en $DOCTOR_JS" >&2
   exit 1
 fi
+export NODE_DISABLE_COMPILE_CACHE=1
 exec node "$DOCTOR_JS" "$@"
