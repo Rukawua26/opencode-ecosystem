@@ -25,6 +25,9 @@ function createValidInstall() {
     ".local/share/opencode/plugins-data",
     "opencode-custom/skills",
   ]) mkdirSync(join(home, directory), { recursive: true });
+  if (process.platform === "win32" && process.env.LOCALAPPDATA) {
+    mkdirSync(join(process.env.LOCALAPPDATA, "opencode", "plugins-data"), { recursive: true });
+  }
   for (const file of [
     ".config/opencode/opencode.jsonc",
     ".config/opencode/mcp/memory-adapter/package.json",
@@ -70,7 +73,6 @@ describe("opencode-doctor", () => {
   it("emits one stable JSON document for a valid installation", () => {
     const before = snapshot(home);
     const result = runDoctor(["--json"]);
-    if (result.status !== 0) console.error("DEBUG stderr:", result.stderr, "DEBUG stdout:", result.stdout);
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
     const report = JSON.parse(result.stdout);
