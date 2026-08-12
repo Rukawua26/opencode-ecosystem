@@ -51,7 +51,16 @@ ruta relativa (`opencode/`, `skills/` o `bin/`). El manifiesto solo se reemplaza
 despues de una verificacion completa, por lo que un fallo conserva el ownership
 anterior para reintentar.
 
-## Novedades v1.9.0
+## Estado Actual
+
+`main` mantiene la base de `v1.9.0` y agrega:
+
+- sincronizacion gestionada opt-in con manifiesto, backups y pruning seguro;
+- preservacion de `opencode.jsonc` y rutas personalizadas;
+- scaffolders aislados en tests, nombres kebab-case seguros y destinos symlink rechazados;
+- tests de regresion para traversal, symlinks, retencion y entradas ejecutables.
+
+La release `v1.9.0` introdujo:
 
 - Instaladores Bash y PowerShell verificados en Linux, macOS, Alpine y Windows.
 - Router MCP reproducible con SDK y lockfile propios.
@@ -133,15 +142,19 @@ Un receipt congela los hashes del candidato y registra lentes, verificacion y ga
 
 ## Verificacion
 
-La release v1.9.0 fue validada con:
+El estado actual del repositorio se valida con:
 
-- 72 tests Vitest;
+- 84 tests Vitest;
 - 23 tests del router MCP;
 - 43 tests del memory adapter;
 - lint, coverage V8, contratos documentales y hooks;
 - instaladores reales en Linux, macOS, Alpine y Windows;
 - `npm audit` sin vulnerabilidades en la release;
 - CodeQL y pipeline de publicacion bloqueante.
+
+Los scaffolders Bash se prueban en Linux y macOS dentro de un directorio
+temporal unico por caso. Windows ejecuta la suite nativa del instalador
+PowerShell y omite esos tests POSIX.
 
 Son checks deterministas de software, no Agent Evals. El eval local de estructura JSON es manual y no forma parte del CI:
 

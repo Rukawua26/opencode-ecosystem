@@ -37,6 +37,7 @@ checkFile("README.md", [
   { name: "should mention local-model-router", pattern: /local-model-router/, shouldNotExist: false },
   { name: "should mention obsidian-ingest", pattern: /obsidian-ingest/, shouldNotExist: false },
   { name: "should document opt-in installer sync", pattern: /--sync/, shouldNotExist: false },
+  { name: "should document safe scaffolder names", pattern: /scaffolders[\s\S]*kebab-case/i, shouldNotExist: false },
   { name: "should distinguish deterministic checks from agent evals", pattern: /checks deterministas de software, no Agent Evals/i, shouldNotExist: false },
   { name: "should describe provider keys as optional", pattern: /API keys son opcionales/i, shouldNotExist: false },
 ]);

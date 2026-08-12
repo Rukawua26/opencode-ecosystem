@@ -1,34 +1,66 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { execSync } from "node:child_process";
-import { existsSync, readFileSync, rmSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
+const describePosix = process.platform === "win32" ? describe.skip : describe;
+const executionOptions = { timeout: 5_000, stdio: "pipe" };
+let testRoot;
 
-function cleanupTestArtifacts() {
-  const skillDir = join(repoRoot, "skills", "zz-test-scaffold-skill");
-  const pluginFile = join(repoRoot, "config", "plugins", "zz-test-scaffold-plugin.js");
-  if (existsSync(skillDir)) rmSync(skillDir, { recursive: true, force: true });
-  if (existsSync(pluginFile)) rmSync(pluginFile, { force: true });
+function scaffoldScript(name) {
+  return join(testRoot, "tools", "scripts", name);
 }
 
-describe("create-skill.sh scaffolder", () => {
-  const skillName = "zz-test-scaffold-skill";
-  const skillDir = join(repoRoot, "skills", skillName);
+function runScaffolder(script, ...args) {
+  return execFileSync("bash", [scaffoldScript(script), ...args], {
+    cwd: testRoot,
+    ...executionOptions,
+  });
+}
 
-  beforeEach(cleanupTestArtifacts);
-  afterEach(cleanupTestArtifacts);
+function expectExitOne(callback) {
+  let executionError;
+  try {
+    callback();
+  } catch (error) {
+    executionError = error;
+  }
+  expect(executionError).toBeDefined();
+  expect(executionError.status).toBe(1);
+  return executionError;
+}
+
+beforeEach(() => {
+  testRoot = undefined;
+  testRoot = mkdtempSync(join(tmpdir(), "opencode-scaffolders-"));
+  mkdirSync(join(testRoot, "tools", "scripts"), { recursive: true });
+  mkdirSync(join(testRoot, "config", "plugins"), { recursive: true });
+  for (const script of ["create-skill.sh", "create-plugin.sh"]) {
+    copyFileSync(join(repoRoot, "tools", "scripts", script), scaffoldScript(script));
+  }
+});
+
+afterEach(() => {
+  if (testRoot) rmSync(testRoot, { recursive: true, force: true });
+});
+
+describePosix("create-skill.sh scaffolder", () => {
+  const skillName = "zz-test-scaffold-skill";
 
   it("should create a skill directory with SKILL.md", () => {
-    execSync(`bash ${join(repoRoot, "tools", "scripts", "create-skill.sh")} ${skillName}`, { cwd: repoRoot });
+    const skillDir = join(testRoot, "skills", skillName);
+    runScaffolder("create-skill.sh", skillName);
     expect(existsSync(skillDir)).toBe(true);
     expect(existsSync(join(skillDir, "SKILL.md"))).toBe(true);
   });
 
   it("SKILL.md should have valid frontmatter with name and description", () => {
-    execSync(`bash ${join(repoRoot, "tools", "scripts", "create-skill.sh")} ${skillName}`, { cwd: repoRoot });
+    const skillDir = join(testRoot, "skills", skillName);
+    runScaffolder("create-skill.sh", skillName);
     const content = readFileSync(join(skillDir, "SKILL.md"), "utf8");
     expect(content).toContain("---");
     expect(content).toContain(`name: ${skillName}`);
@@ -36,33 +68,35 @@ describe("create-skill.sh scaffolder", () => {
   });
 
   it("should fail if skill already exists", () => {
-    execSync(`bash ${join(repoRoot, "tools", "scripts", "create-skill.sh")} ${skillName}`, { cwd: repoRoot });
-    expect(() => {
-      execSync(`bash ${join(repoRoot, "tools", "scripts", "create-skill.sh")} ${skillName}`, { cwd: repoRoot, stdio: "pipe" });
-    }).toThrow();
+    runScaffolder("create-skill.sh", skillName);
+    const error = expectExitOne(() => runScaffolder("create-skill.sh", skillName));
+    expect(error.stdout.toString()).toContain("already exists");
   });
 
   it("should fail without skill name argument", () => {
-    expect(() => {
-      execSync(`bash ${join(repoRoot, "tools", "scripts", "create-skill.sh")}`, { cwd: repoRoot, stdio: "pipe" });
-    }).toThrow();
+    const error = expectExitOne(() => runScaffolder("create-skill.sh"));
+    expect(error.stdout.toString()).toContain("Usage:");
+  });
+
+  it.each(["../escape", "Invalid Name", "name_with_underscore", "skill-2"])("should reject unsafe skill name %s", (invalidName) => {
+    const error = expectExitOne(() => runScaffolder("create-skill.sh", invalidName));
+    expect(error.stdout.toString()).toContain("lowercase kebab-case");
+    expect(existsSync(join(testRoot, "skills"))).toBe(false);
   });
 });
 
-describe("create-plugin.sh scaffolder", () => {
+describePosix("create-plugin.sh scaffolder", () => {
   const pluginName = "zz-test-scaffold-plugin";
-  const pluginFile = join(repoRoot, "config", "plugins", `${pluginName}.js`);
-
-  beforeEach(cleanupTestArtifacts);
-  afterEach(cleanupTestArtifacts);
 
   it("should create a plugin .js file", () => {
-    execSync(`bash ${join(repoRoot, "tools", "scripts", "create-plugin.sh")} ${pluginName}`, { cwd: repoRoot });
+    const pluginFile = join(testRoot, "config", "plugins", `${pluginName}.js`);
+    runScaffolder("create-plugin.sh", pluginName);
     expect(existsSync(pluginFile)).toBe(true);
   });
 
   it("generated plugin should use valid JS identifiers (camelCase)", () => {
-    execSync(`bash ${join(repoRoot, "tools", "scripts", "create-plugin.sh")} ${pluginName}`, { cwd: repoRoot });
+    const pluginFile = join(testRoot, "config", "plugins", `${pluginName}.js`);
+    runScaffolder("create-plugin.sh", pluginName);
     const content = readFileSync(pluginFile, "utf8");
     expect(content).toContain("import { tool }");
     expect(content).toMatch(/export const zzTestScaffoldPlugin/);
@@ -70,15 +104,36 @@ describe("create-plugin.sh scaffolder", () => {
   });
 
   it("should fail if plugin already exists", () => {
-    execSync(`bash ${join(repoRoot, "tools", "scripts", "create-plugin.sh")} ${pluginName}`, { cwd: repoRoot });
-    expect(() => {
-      execSync(`bash ${join(repoRoot, "tools", "scripts", "create-plugin.sh")} ${pluginName}`, { cwd: repoRoot, stdio: "pipe" });
-    }).toThrow();
+    runScaffolder("create-plugin.sh", pluginName);
+    const error = expectExitOne(() => runScaffolder("create-plugin.sh", pluginName));
+    expect(error.stdout.toString()).toContain("already exists");
   });
 
   it("should fail without plugin name argument", () => {
-    expect(() => {
-      execSync(`bash ${join(repoRoot, "tools", "scripts", "create-plugin.sh")}`, { cwd: repoRoot, stdio: "pipe" });
-    }).toThrow();
+    const error = expectExitOne(() => runScaffolder("create-plugin.sh"));
+    expect(error.stdout.toString()).toContain("Usage:");
+  });
+
+  it.each(["../escape", "Invalid Name", "plugin-2", "x';process.exit(0);//"])("should reject unsafe plugin name %s", (invalidName) => {
+    const error = expectExitOne(() => runScaffolder("create-plugin.sh", invalidName));
+    expect(error.stdout.toString()).toContain("lowercase kebab-case");
+    expect(existsSync(join(testRoot, "config", "escape.js"))).toBe(false);
+    expect(readdirSync(join(testRoot, "config", "plugins"))).toHaveLength(0);
+  });
+
+  it.each(["class", "arguments", "interface"])("should reject reserved JavaScript word %s", (reservedWord) => {
+    const error = expectExitOne(() => runScaffolder("create-plugin.sh", reservedWord));
+    expect(error.stdout.toString()).toContain("reserved JavaScript word");
+    expect(readdirSync(join(testRoot, "config", "plugins"))).toHaveLength(0);
+  });
+
+  it("should reject dangling symbolic links at the destination", () => {
+    const pluginFile = join(testRoot, "config", "plugins", `${pluginName}.js`);
+    const escapedFile = join(testRoot, "escaped-plugin.js");
+    symlinkSync(escapedFile, pluginFile);
+
+    const error = expectExitOne(() => runScaffolder("create-plugin.sh", pluginName));
+    expect(error.stdout.toString()).toContain("already exists");
+    expect(existsSync(escapedFile)).toBe(false);
   });
 });

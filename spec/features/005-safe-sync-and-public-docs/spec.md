@@ -16,6 +16,8 @@ modelos locales.
 - Preservar archivos no incluidos en el manifiesto y la configuracion principal.
 - Crear backups antes de reemplazar o retirar archivos gestionados.
 - Anadir un eval local opt-in de formato JSON, fuera del CI bloqueante.
+- Aislar los tests de scaffolders y rechazar nombres que puedan escapar de sus
+  rutas o alterar el codigo generado.
 
 ## Fuera de Alcance
 
@@ -72,6 +74,14 @@ Las mejoras instaladas de guardrails y metricas MUST incorporarse al repositorio
 con tests de comportamiento antes de ejecutar sync, para evitar una regresion del
 runtime local.
 
+### R9 - Scaffolders seguros y deterministas
+
+Los scaffolders Bash MUST aceptar solo nombres kebab-case seguros. Sus tests MUST
+ejecutarse fuera del checkout, MUST limitar el tiempo de cada proceso y MUST NOT
+crear artefactos que otros tests puedan enumerar. Al ser herramientas POSIX, sus
+tests MUST ejecutarse solo en plataformas compatibles. El scaffolder de plugins
+MUST rechazar palabras reservadas JavaScript y destinos que sean symlinks.
+
 ## Escenarios de Aceptacion
 
 ### Escenario A - Actualizacion gestionada
@@ -105,3 +115,16 @@ distinta de v1.9.0.
 Given Ollama y los modelos fijados disponibles
 When se ejecuta el eval manual
 Then produce JSON con total, validos, fallos y tasa de exito por modelo.
+
+### Escenario F - Nombre de scaffold invalido
+
+Given un nombre con traversal, espacios o sintaxis ejecutable
+When se invoca un scaffolder
+Then termina con error antes de crear archivos o ejecutar contenido del nombre.
+
+### Escenario G - Suite paralela
+
+Given Vitest ejecuta coverage y enumera los plugins del checkout
+When corren los tests de scaffolders
+Then sus artefactos existen solo en un directorio temporal unico y no interfieren
+con ningun otro archivo de test.

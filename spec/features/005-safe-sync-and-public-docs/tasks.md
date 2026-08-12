@@ -12,5 +12,9 @@
 - [x] 10. Documentar flujo de sincronizacion
 - [x] 10a. Integrar mejoras locales de guardrails y metricas con tests
 - [x] 11. Ejecutar verificaciones completas
-- [ ] 12. Completar Organic RDD
-- [ ] 13. Aplicar sync al runtime local y confirmar v1.9.0
+- [x] 12. Completar Organic RDD del candidato de sync
+- [x] 13. Aplicar sync al runtime local y confirmar v1.9.0
+- [x] 14. Aislar los tests de scaffolders fuera del checkout
+- [x] 15. Endurecer nombres y ejecucion de scaffolders
+- [x] 16. Actualizar README y evidencia de verificacion
+- [ ] 17. Completar Organic RDD del fix y confirmar CI remota

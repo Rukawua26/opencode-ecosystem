@@ -14,6 +14,11 @@ if [ -z "$SKILL_NAME" ]; then
   exit 1
 fi
 
+if [[ ! "$SKILL_NAME" =~ ^[a-z][a-z0-9]*(-[a-z][a-z0-9]*)*$ ]]; then
+  echo "Error: Skill name must use lowercase kebab-case (for example, my-new-skill)"
+  exit 1
+fi
+
 SKILL_DIR="$SKILLS_DIR/$SKILL_NAME"
 
 if [ -d "$SKILL_DIR" ]; then

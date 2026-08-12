@@ -18,6 +18,12 @@
    comportamiento para no degradarlas durante sync.
 9. Ejecutar sync local tras pasar tests para llevar el runtime de 1.8.0 a 1.9.0
    sin tocar la configuracion principal personalizada.
+10. Ejecutar copias reales de los scaffolders en un directorio temporal por test,
+    con cleanup defensivo, timeout y aserciones del codigo de salida.
+11. Validar nombres kebab-case antes de construir rutas o codigo y pasar el nombre
+    a Node como argumento, nunca como fuente JavaScript interpolada.
+12. Rechazar palabras reservadas y destinos existentes o symlinks antes de generar
+    un plugin.
 
 ## Decisiones
 
@@ -28,6 +34,8 @@
   una instalacion a un HOME concreto.
 - `opencode.jsonc` queda fuera del manifiesto sincronizable.
 - El eval mide estructura, no calidad semantica ni proveedores comerciales.
+- Los scaffolders son Bash; Windows valida el instalador PowerShell y omite estos
+  tests POSIX en lugar de depender de la traduccion de rutas de Git Bash.
 
 ## Archivos
 
@@ -42,6 +50,10 @@
 | `tools/evals/local-model-structure.js` | Eval manual JSON/esquema |
 | `package.json` | Script opt-in del eval |
 | `docs/architecture/installer-sync.mmd` | Flujo de sync documentado |
+| `tools/scripts/create-skill.sh` | Validacion de nombres seguros |
+| `tools/scripts/create-plugin.sh` | Validacion y conversion sin interpolar codigo |
+| `tests/scaffolders.test.js` | Sandbox temporal y regresiones de seguridad |
+| `vitest.config.js` | `allowOnly: false` impide publicar accidentalmente un test `.only` |
 
 ## Riesgos y Mitigaciones
 
@@ -53,6 +65,9 @@
 - Fallo parcial: escribir el manifiesto solo despues de copiar, instalar y
   verificar correctamente.
 - Costo local: eval manual, dataset pequeno y sin ejecucion automatica.
+- Carrera entre archivos Vitest: no escribir nunca dentro del checkout durante
+  los tests de scaffolders.
+- Nombre hostil: validar antes de construir destinos y usar argumentos separados.
 
 ## Verificacion
 
