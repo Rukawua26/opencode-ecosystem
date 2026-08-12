@@ -70,6 +70,7 @@ describe("opencode-doctor", () => {
   it("emits one stable JSON document for a valid installation", () => {
     const before = snapshot(home);
     const result = runDoctor(["--json"]);
+    if (result.status !== 0) console.error("DEBUG stderr:", result.stderr, "DEBUG stdout:", result.stdout);
     expect(result.status).toBe(0);
     expect(result.stderr).toBe("");
     const report = JSON.parse(result.stdout);
