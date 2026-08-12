@@ -9,6 +9,57 @@ mkdir -p "$HOME"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+snapshot_home() {
+  local root="$1" current="$1"
+  local entry path rel stats target
+  while IFS= read -r -d '' entry; do
+    path="${entry}"
+    rel="${path#"$root"/}"
+    stats=''
+    if [[ -L "$path" ]]; then
+      target="$(readlink "$path")"
+      printf '%s|link|%s\n' "$rel" "$target"
+    elif [[ -d "$path" ]]; then
+      printf '%s|dir|%s\n' "$rel" "$(ls -1 "$path" | wc -l | tr -d ' ')"
+    else
+      printf '%s|file|%s\n' "$rel" "$(wc -c < "$path" | tr -d ' ')"
+    fi
+  done < <(find "$root" -mindepth 1 -print0 2>/dev/null) | sort
+}
+
+# A clean dry-run must describe the plan without creating HOME or running apply-only work.
+DRY_RUN_HOME="/tmp/test-install-dry-run-home"
+rm -rf "$DRY_RUN_HOME"
+DRY_RUN_OUTPUT="$(HOME="$DRY_RUN_HOME" bash "$REPO_DIR/install.sh" --dry-run --verbose 2>&1)"
+if [[ -e "$DRY_RUN_HOME" ]]; then
+  echo "[FAIL] Clean dry-run modified HOME"
+  exit 1
+fi
+for expected in "create directory:" "install-dependencies:" "defer-verification:" "Dry run complete; no changes made"; do
+  if [[ "$DRY_RUN_OUTPUT" != *"$expected"* ]]; then
+    echo "[FAIL] Dry-run output missing: $expected"
+    exit 1
+  fi
+done
+echo "[OK] Clean dry-run produced a complete read-only plan"
+
+# A detached dry-run reports the remote source without cloning or creating temp files.
+DETACHED_DIR="$(mktemp -d)"
+DETACHED_TMP="$DETACHED_DIR/tmp"
+mkdir -p "$DETACHED_TMP"
+cp "$REPO_DIR/install.sh" "$DETACHED_DIR/install.sh"
+DETACHED_OUTPUT="$(HOME="$DRY_RUN_HOME" TMPDIR="$DETACHED_TMP" bash "$DETACHED_DIR/install.sh" --dry-run 2>&1)"
+if [[ -e "$DRY_RUN_HOME" || -n "$(find "$DETACHED_TMP" -mindepth 1 -print -quit)" ]]; then
+  echo "[FAIL] Detached dry-run created HOME or temporary files"
+  exit 1
+fi
+if [[ "$DETACHED_OUTPUT" != *"clone https://github.com/Rukawua26/opencode-ecosystem.git at tag v1.9.0"* || "$DETACHED_OUTPUT" != *"detailed plan requires distribution contents"* ]]; then
+  echo "[FAIL] Detached dry-run did not report deferred remote planning"
+  exit 1
+fi
+rm -rf "$DETACHED_DIR"
+echo "[OK] Detached dry-run did not clone or create temporary files"
+
 # Run install without the optional memory adapter.
 bash "$REPO_DIR/install.sh" --verbose --skip-memory --force
 
@@ -71,6 +122,19 @@ printf '%s\n' 'user-agent-marker' > "$HOME/.config/opencode/agents/ai-matcher.md
 printf '%s\n' 'user-skill-marker' > "$HOME/opencode-custom/skills/defuddle/SKILL.md"
 printf '%s\n' 'user-profile-marker' > "$HOME/.config/opencode/profiles/work/opencode.jsonc"
 printf '%s\n' 'user-tool-marker' > "$HOME/.config/opencode/tools/doctor.js"
+POPULATED_BEFORE="$(snapshot_home "$HOME")"
+NORMAL_DRY_RUN_OUTPUT="$(bash "$REPO_DIR/install.sh" --skip-memory --dry-run 2>&1)"
+FORCE_DRY_RUN_OUTPUT="$(bash "$REPO_DIR/install.sh" --skip-memory --force --dry-run 2>&1)"
+POPULATED_AFTER="$(snapshot_home "$HOME")"
+if [[ "$POPULATED_BEFORE" != "$POPULATED_AFTER" ]]; then
+  echo "[FAIL] Normal or force dry-run changed a populated installation"
+  exit 1
+fi
+if [[ "$NORMAL_DRY_RUN_OUTPUT" != *"preserve:"* || "$FORCE_DRY_RUN_OUTPUT" != *"backup:"* ]]; then
+  echo "[FAIL] Normal/force dry-run did not reflect mode decisions"
+  exit 1
+fi
+echo "[OK] Normal and force dry-run preserved populated state"
 bash "$REPO_DIR/install.sh" --skip-memory >/dev/null
 
 for marker_file in \
@@ -122,6 +186,21 @@ printf 'opencode/opencode.jsonc\r\n' >> "$HOME/.config/opencode/.ecosystem-manag
 printf 'opencode/.ecosystem-managed-files\r\n' >> "$HOME/.config/opencode/.ecosystem-managed-files"
 printf '%s\n' 'sync-profile-marker' > "$HOME/.config/opencode/profiles/work/opencode.jsonc"
 for index in $(seq 1 12); do mkdir -p "$HOME/.local/share/opencode/install-backups/10000000$index-1"; done
+
+# Sync dry-run must project backup/pruning while preserving every byte and path.
+DRY_RUN_BEFORE="$(snapshot_home "$HOME")"
+DRY_RUN_SYNC_OUTPUT="$(bash "$REPO_DIR/install.sh" --skip-memory --sync --dry-run 2>&1)"
+DRY_RUN_AFTER="$(snapshot_home "$HOME")"
+if [[ "$DRY_RUN_BEFORE" != "$DRY_RUN_AFTER" ]]; then
+  echo "[FAIL] Sync dry-run changed the installation"
+  exit 1
+fi
+if [[ "$DRY_RUN_SYNC_OUTPUT" != *"backup: opencode/plugins/retired-managed.js"* || "$DRY_RUN_SYNC_OUTPUT" != *"remove: opencode/plugins/retired-managed.js"* ]]; then
+  echo "[FAIL] Sync dry-run did not project stale backup and removal"
+  exit 1
+fi
+echo "[OK] Sync dry-run projected stale pruning without changes"
+
 bash "$REPO_DIR/install.sh" --skip-memory --sync >/dev/null
 
 if [[ -e "$HOME/.config/opencode/plugins/retired-managed.js" ]]; then
@@ -162,6 +241,10 @@ echo "[OK] Sync backed up changes and pruned only known stale files"
 printf '%s\n' 'symlink-target' > "$HOME/symlink-target"
 rm -f "$HOME/.config/opencode/plugins/guardrails.js"
 ln -s "$HOME/symlink-target" "$HOME/.config/opencode/plugins/guardrails.js"
+if bash "$REPO_DIR/install.sh" --skip-memory --sync --dry-run >/dev/null 2>&1; then
+  echo "[FAIL] Sync dry-run accepted a managed symbolic link"
+  exit 1
+fi
 if bash "$REPO_DIR/install.sh" --skip-memory --sync >/dev/null 2>&1; then
   echo "[FAIL] Sync followed a managed symbolic link"
   exit 1
@@ -179,6 +262,10 @@ rm -rf "$HOME/opencode-custom/skills/defuddle"
 mkdir -p "$HOME/nested-victim"
 printf '%s\n' 'nested-target' > "$HOME/nested-victim/SKILL.md"
 ln -s "$HOME/nested-victim" "$HOME/opencode-custom/skills/defuddle"
+if bash "$REPO_DIR/install.sh" --skip-memory --sync --dry-run >/dev/null 2>&1; then
+  echo "[FAIL] Sync dry-run accepted a symbolic-link directory"
+  exit 1
+fi
 if bash "$REPO_DIR/install.sh" --skip-memory --sync >/dev/null 2>&1; then
   echo "[FAIL] Sync followed a symbolic-link directory"
   exit 1

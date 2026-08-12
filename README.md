@@ -45,6 +45,22 @@ Set-Location opencode-ecosystem
 
 `--sync` / `-Sync` respalda antes de reemplazar, conserva rutas no gestionadas y solo retira archivos obsoletos registrados por un manifiesto anterior. Los ultimos 10 backups se guardan en `~/.local/share/opencode/install-backups/`. La primera sincronizacion crea el manifiesto sin podar archivos desconocidos. `--force` / `-Force` reemplaza la distribucion gestionada completa y debe usarse solo cuando se desea ese comportamiento.
 
+Antes de aplicar cualquier modo local, usa `--dry-run` / `-DryRun` para ver
+`create`, `update`, `preserve`, `backup` y `remove` sin escribir archivos, crear
+temporales, clonar ni instalar dependencias:
+
+```bash
+bash install.sh --sync --dry-run
+```
+
+```powershell
+.\install.ps1 -Sync -DryRun
+```
+
+Si se ejecuta un script aislado sin las fuentes del repositorio, el preview solo
+reporta el tag que clonaria y difiere el plan detallado; nunca infiere pruning
+sin conocer la distribucion deseada.
+
 Si una sincronizacion falla despues de reemplazar un archivo, cierra OpenCode,
 localiza el backup mas reciente y copia su contenido de vuelta conservando la
 ruta relativa (`opencode/`, `skills/` o `bin/`). El manifiesto solo se reemplaza
@@ -59,6 +75,7 @@ anterior para reintentar.
 - preservacion de `opencode.jsonc` y rutas personalizadas;
 - scaffolders aislados en tests, nombres kebab-case seguros y destinos symlink rechazados;
 - tests de regresion para traversal, symlinks, retencion y entradas ejecutables.
+- preview read-only para install, force y sync; doctor con salida JSON versionada.
 
 La release `v1.9.0` introdujo:
 
@@ -144,7 +161,7 @@ Un receipt congela los hashes del candidato y registra lentes, verificacion y ga
 
 El estado actual del repositorio se valida con:
 
-- 84 tests Vitest;
+- 93 tests Vitest;
 - 23 tests del router MCP;
 - 43 tests del memory adapter;
 - lint, coverage V8, contratos documentales y hooks;
@@ -170,6 +187,9 @@ El comando reporta respuestas validas, fallos y tasa por modelo. No compara prov
 # Salud de la instalacion; Ollama y API keys son opcionales
 opencode-doctor
 
+# Informe estructurado read-only para CI y diagnostico
+opencode-doctor --json
+
 # Metricas de los ultimos siete dias
 opencode-metrics 7
 
@@ -179,6 +199,10 @@ npm run test:router
 npm run test:coverage
 npm run test:install
 ```
+
+El doctor valida el manifiesto, entradas faltantes y rutas/symlinks inseguros.
+El manifiesto actual no contiene hashes, por lo que el JSON reporta
+`modified.status: "unknown"` en vez de afirmar que un archivo fue modificado.
 
 `opencode-metrics` registra tokens, coste, modelos, herramientas, delegaciones, lecturas amplias, compactaciones, loops y errores. Las cifras de ahorro se consideran hipotesis hasta compararlas con una linea base real; consulta [`docs/token-economy/measurement.md`](docs/token-economy/measurement.md).
 
