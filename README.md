@@ -132,12 +132,11 @@ La release `v1.9.0` introdujo:
 ## Componentes
 
 | Componente | Estado actual |
-|---|---|
+| --- | --- |
 | **16 agentes** | Definiciones especializadas para arquitectura, backend, frontend, seguridad, revision y producto |
 | **21 skills** | SDD, prompts, debug, seguridad, TDD y `obsidian-ingest`; cargadas bajo demanda |
-| **7 plugins activos por defecto** | guardrails, checkpoints, sandbox, validator, metrics, kanban y personalities |
-| **auto-memory** | Plugin disponible pero no activado por defecto; encola candidatos y exige persistencia explicita |
-| **2 MCP locales activos** | memory-adapter y local-model-router |
+| **5 plugins activos por defecto** | guardrails, checkpoints, validator, session-metrics, organic-rdd |
+| **4 MCP locales activos** | local-model-router, memory-adapter, context7 y diagram-generator |
 | **2 MCP opt-in** | Context7 y diagram-generator, deshabilitados por defecto |
 | **3 perfiles** | work, personal y light |
 
@@ -203,7 +202,7 @@ Un receipt congela los hashes del candidato y registra lentes, verificacion y ga
 
 El estado actual del repositorio se valida con:
 
-- 93 tests Vitest;
+- 105 tests Vitest;
 - 23 tests del router MCP;
 - 43 tests del memory adapter;
 - lint, coverage V8, contratos documentales y hooks;
@@ -232,6 +231,20 @@ opencode-doctor
 # Informe estructurado read-only para CI y diagnostico
 opencode-doctor --json
 
+# Ver perfil efectivo, modelos, plugins y MCP sin iniciar OpenCode
+opencode-profile --status
+opencode-profile --json
+
+# Iniciar perfiles reproducibles
+opencode-work
+opencode-personal
+opencode-light
+
+# Crear y consultar el indice local de metadata de skills
+opencode-skills --refresh
+opencode-skills --status
+opencode-skills --search security
+
 # Metricas de los ultimos siete dias
 opencode-metrics 7
 
@@ -242,9 +255,13 @@ npm run test:coverage
 npm run test:install
 ```
 
-El doctor valida el manifiesto, entradas faltantes y rutas/symlinks inseguros.
+El doctor valida el manifiesto, JSONC principal, perfiles activos, entradas
+faltantes y rutas/symlinks inseguros. Nunca muestra valores de credenciales.
 El manifiesto actual no contiene hashes, por lo que el JSON reporta
 `modified.status: "unknown"` en vez de afirmar que un archivo fue modificado.
+
+El registry indexa solo nombre, descripcion y rutas de `SKILL.md`; no carga los
+cuerpos de todas las skills ni usa watchers. Solo `--refresh` escribe el indice.
 
 `opencode-metrics` registra tokens, coste, modelos, herramientas, delegaciones, lecturas amplias, compactaciones, loops y errores. Las cifras de ahorro se consideran hipotesis hasta compararlas con una linea base real; consulta [`docs/token-economy/measurement.md`](docs/token-economy/measurement.md).
 
