@@ -129,6 +129,30 @@ La release `v1.9.0` introdujo:
 - Queries vacias no arrancan Ollama; filas sin embedding usan fallback textual.
 - Pipeline unico y bloqueante antes del tag, GitHub Release y publicacion npm.
 
+## Optimizacion De Contexto
+
+Presupuesto de contexto para maquinas modestas (i5/8GB), local-first y sin
+depender de codigo externo inestable:
+
+- **Piso fijo recortado**: triggers de nube ajustados ("arquitectura" suelta ya
+  no fuerza modelo cloud); `playwright` MCP inactivo por defecto; plugins no
+  esenciales (`kanban`, `personalities`, `sandbox`) movidos a `plugins.disabled/`.
+- **Memoria anti-inflacion**: prevencion anti-efimera en `auto-memory`, rotacion
+  de logs, poda diaria por cron (`memory_prune.js`) y bordes que reinyectan
+  decisiones al inicio/fin del contexto (`memory-edges`).
+- **Visibilidad en vivo**: plugin `context-stats` (`/context_stats`) reporta
+  tools, delegaciones, lecturas amplias, compactaciones y loops desde
+  `session-metrics.jsonl`, como proxy de presupuesto sin conteo de tokens crudos.
+- **Dedupe SDD**: `sdd-phase-common.md` compartido por las 4 fases
+  (specify/plan/tasks/implement); ~63% menos tokens por ciclo SDD conservando
+  el flujo unico de cada fase.
+- **DCP opcional**: Dynamic Context Pruning no se instala automaticamente (no
+  esta en npm; PR upstream inmaduro). Se documenta como paso opt-in
+  "enable-after-verify" con fallback a un hook propio minimo (dedup/purge).
+
+Filosofia: reutilizar > adoptar > construir; medir antes de podar; no cargar
+codigo de terceros no empaquetado.
+
 ## Componentes
 
 | Componente | Estado actual |
