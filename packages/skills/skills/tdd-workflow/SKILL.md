@@ -1,3 +1,8 @@
+---
+name: tdd-workflow
+description: Use only when the user explicitly requests TDD or test-first development for a scoped change.
+---
+
 # TDD Workflow
 
 Workflow de desarrollo guiado por tests para features nuevas.

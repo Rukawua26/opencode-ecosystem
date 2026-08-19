@@ -1,3 +1,8 @@
+---
+name: loop-engineering
+description: Use when iterating against bounded tests, builds, or checks until a verifiable result is reached.
+---
+
 # Loop Engineering
 
 Disena y ejecuta bucles controlados donde la IA itera hasta cumplir un objetivo verificable sin perder control humano.

@@ -1,3 +1,8 @@
+---
+name: accessibility-audit
+description: Use when reviewing frontend diffs for static accessibility issues in React, HTML, CSS, or themes.
+---
+
 # Accessibility Audit
 
 Auditoria estatica de accesibilidad para cambios frontend. Solo chequeos que se pueden verificar sin browser ni screen reader.

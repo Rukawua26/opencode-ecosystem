@@ -1,3 +1,8 @@
+---
+name: multiagent-orchestrator
+description: Use when a change crosses three or more layers or needs isolated implementation and independent verification.
+---
+
 # Multiagent Orchestrator
 
 Orquesta subagentes especializados solo cuando el aislamiento de contexto reduce riesgo o carga cognitiva.

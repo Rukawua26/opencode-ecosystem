@@ -1,3 +1,8 @@
+---
+name: code-reviewer-v2
+description: Use when reviewing significant or sensitive changes for bugs, regressions, security, performance, and missing tests.
+---
+
 # Code Reviewer V2
 
 Revision estructurada enfocada en bugs, regresiones, seguridad, performance y cobertura, no preferencias de estilo.
