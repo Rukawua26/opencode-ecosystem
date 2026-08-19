@@ -15,6 +15,8 @@ Version documentada: **v1.9.0**.
 - **Organic RDD** — review Tier 0-3 con receipts ligados al hash del candidato
 - **Instalador seguro** — preserva customizaciones por defecto y crea rollback con `--force`
 - **Sync opt-in** — actualiza archivos gestionados, respalda reemplazos y poda solo rutas conocidas
+- **Perfiles reproducibles** — `work`, `personal`, `light` y reporte read-only
+- **Skill registry** — indice local de metadata, sin cargar cuerpos ni watchers
 
 ## Instalacion
 
@@ -44,6 +46,10 @@ npm install @rukawua26/opencode-skills
 
 - `memory-adapter` — CLI para gestionar memoria
 - `opencode` — CLI para interactuar con el ecosistema
+- `opencode-doctor --json` — diagnostico estructurado de config, perfiles y manifest
+- `opencode-profile --status` — perfil, modelo, plugins y MCP efectivos
+- `opencode-skills --refresh` — refresca el indice minimo de skills
+- `opencode-skills --search <texto>` — busca solo en metadata indexada
 
 ## Modelos locales
 
@@ -54,7 +60,7 @@ npm install @rukawua26/opencode-skills
 
 ## Verificacion
 
-- Vitest: 72 tests
+- Vitest: suite determinista de plugins, tools, perfiles y skills
 - Router MCP: 23 tests
 - Memory adapter: 43 tests
 - Instaladores: Linux, macOS, Alpine y Windows

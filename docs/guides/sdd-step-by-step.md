@@ -168,19 +168,21 @@ Usar la API existente en /api/auth/login.
 
 ---
 
-## Multi-Modelo Automatico
+## Perfiles Y Routing Real
 
-Detras de escena, cada fase usa el modelo optimo segun `sdd_multi_model` en tu `opencode.jsonc`:
+OpenCode usa el modelo del perfil activo. El ecosistema instala `work`,
+`personal` y `light`; puedes inspeccionarlos sin iniciar una sesion:
 
-| Fase | Modelo | Razon |
-|---|---|---|
-| `spec` | Gemini Flash | Alto razonamiento |
-| `plan` | Gemini Flash | Diseno tecnico |
-| `tasks` | GPT-5.4-mini | Descomposicion |
-| `implement` | GPT-5.4 | Codigo robusto |
-| `verify` | GPT-5.4 | Deteccion de bugs |
+```bash
+opencode-profile --status
+opencode-profile --json
+```
 
-Si tu modelo primario falla, usa el fallback configurado automaticamente.
+El `local-model-router` recomienda o ejecuta modelos Ollama para subtareas
+acotadas. Las fases SDD no usan una clave privada `sdd_multi_model`: si una fase
+necesita un modelo especifico, se declara en el agente o comando compatible con
+el esquema oficial de OpenCode. No se afirma fallback automatico si el runtime no
+lo proporciona.
 
 ---
 

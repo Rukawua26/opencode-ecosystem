@@ -20,7 +20,48 @@ function Write-Info { param($Message) if ($Verbose) { Write-Host "[debug] $Messa
 function Write-Err { param($Message) Write-Host "[error] $Message" -ForegroundColor Red }
 function Write-Plan { param($Action, $Target) Write-Host "[dry-run] ${Action}: $Target" }
 
-function Test-Command { param($Cmd) return [bool](Get-Command $Cmd -ErrorAction SilentlyContinue) }
+function Resolve-TrustedCommand { param($Command)
+    $CurrentDirectory = [System.IO.Path]::GetFullPath((Get-Location).Path)
+    $IsWindowsPlatform = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
+    $Extensions = if ($IsWindowsPlatform -and -not [System.IO.Path]::HasExtension($Command)) {
+        if ($env:PATHEXT) { @($env:PATHEXT -split ';' | Where-Object { $_ }) } else { @('.COM', '.EXE', '.BAT', '.CMD') }
+    } else { @('') }
+    foreach ($Entry in ($env:PATH -split [System.IO.Path]::PathSeparator)) {
+        $Directory = $Entry.Trim('"')
+        if (-not $Directory) { continue }
+        try { $FullDirectory = [System.IO.Path]::GetFullPath($Directory) } catch { continue }
+        if ($FullDirectory -eq $CurrentDirectory) { continue }
+        foreach ($Extension in $Extensions) {
+            $Candidate = Join-Path $FullDirectory ($Command + $Extension.ToLowerInvariant())
+            $Item = Get-Item -LiteralPath $Candidate -Force -ErrorAction SilentlyContinue
+            $SafeItem = $Item -and -not $Item.PSIsContainer -and (-not $IsWindowsPlatform -or -not ($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint))
+            if ($SafeItem) {
+                if ($Item.FullName -match '[%\r\n]') { throw "Unsafe command path: $($Item.FullName)" }
+                return $Item.FullName
+            }
+        }
+    }
+    return $null
+}
+
+function Assert-NoReparseBelowHome { param($Path)
+    $FullPath = [System.IO.Path]::GetFullPath($Path)
+    $FullRoot = [System.IO.Path]::GetFullPath($env:USERPROFILE)
+    $Separator = [System.IO.Path]::DirectorySeparatorChar
+    $Prefix = $FullRoot.TrimEnd([char[]]@('\', '/')) + $Separator
+    if (-not $FullPath.StartsWith($Prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Managed path is outside USERPROFILE: $Path"
+    }
+    $Current = $FullRoot
+    $Relative = $FullPath.Substring($Prefix.Length)
+    foreach ($Segment in $Relative.Split($Separator, [System.StringSplitOptions]::RemoveEmptyEntries)) {
+        $Current = Join-Path $Current $Segment
+        $Item = Get-Item -LiteralPath $Current -Force -ErrorAction SilentlyContinue
+        if ($Item -and ($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
+            throw "Refusing managed path with symbolic-link component: $Current"
+        }
+    }
+}
 
 # Check dependencies
 Write-Log "Checking dependencies..."
@@ -34,9 +75,12 @@ function Restore-NodeCompileCacheEnvironment {
     }
 }
 $missing = @()
-if (-not (Test-Command "node")) { $missing += "nodejs" }
-if (-not (Test-Command "npm")) { $missing += "npm" }
-if (-not (Test-Command "git")) { $missing += "git" }
+$NodeCommand = Resolve-TrustedCommand "node"
+$NpmCommand = Resolve-TrustedCommand "npm"
+$GitCommand = Resolve-TrustedCommand "git"
+if (-not $NodeCommand) { $missing += "nodejs" }
+if (-not $NpmCommand) { $missing += "npm" }
+if (-not $GitCommand) { $missing += "git" }
 
 if ($missing.Count -gt 0) {
     Restore-NodeCompileCacheEnvironment
@@ -44,12 +88,12 @@ if ($missing.Count -gt 0) {
     Write-Err "Install with: winget install $($missing -join ' ') or choco install $($missing -join ' ')"
     exit 1
 }
-$NodeMajor = [int]((node --version).TrimStart('v').Split('.')[0])
+$NodeMajor = [int]((& $NodeCommand --version).TrimStart('v').Split('.')[0])
 if ($NodeMajor -lt 22) {
     Write-Err "Node.js 22 or newer is required for the native node:sqlite module"
     exit 1
 }
-Write-Info "Dependencies OK: node=$(node --version), git=$(git --version)"
+Write-Info "Dependencies OK: node=$(& $NodeCommand --version), git=$(& $GitCommand --version)"
 Restore-NodeCompileCacheEnvironment
 
 # Set paths
@@ -77,6 +121,11 @@ $InstallDirectories = @(
     $DataDir
 )
 foreach ($Directory in $InstallDirectories) {
+    $FullDirectory = [System.IO.Path]::GetFullPath($Directory)
+    $HomePrefix = [System.IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd([char[]]@('\', '/')) + [System.IO.Path]::DirectorySeparatorChar
+    if ($FullDirectory.StartsWith($HomePrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Assert-NoReparseBelowHome $Directory
+    }
     if ($DryRun) {
         if (-not (Test-Path -LiteralPath $Directory -PathType Container)) { Write-Plan "create directory" $Directory }
     } else {
@@ -101,7 +150,7 @@ if ((Test-Path (Join-Path $ScriptDir "config\opencode.jsonc")) -and (Test-Path (
     $TempDir = [System.IO.Path]::GetTempFileName() | ForEach-Object { [System.IO.Path]::ChangeExtension($_, '') }
     New-Item -ItemType Directory -Force -Path $TempDir | Out-Null
     Write-Log "Cloning repo (tag $InstallTag) to $TempDir..."
-    git clone --depth 1 --branch $InstallTag $RepoUrl $TempDir
+    & $GitCommand clone --depth 1 --branch $InstallTag $RepoUrl $TempDir
     $RepoDir = $TempDir
     Write-Info "Repo cloned at tag $InstallTag"
 }
@@ -145,31 +194,13 @@ function Register-Managed { param($Path)
     if ($Logical) { [void]$CurrentManifest.Add($Logical) }
 }
 
-function Assert-NoReparseComponents { param($Path, $Root)
-    $FullPath = [System.IO.Path]::GetFullPath($Path)
-    $FullRoot = [System.IO.Path]::GetFullPath($Root)
-    $Separator = [System.IO.Path]::DirectorySeparatorChar
-    $Prefix = $FullRoot.TrimEnd([char[]]@('\', '/')) + $Separator
-    if (-not $FullPath.StartsWith($Prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
-        throw "Managed path is outside its root: $Path"
-    }
-    $Current = $FullRoot
-    $Relative = $FullPath.Substring($Prefix.Length)
-    foreach ($Segment in $Relative.Split($Separator, [System.StringSplitOptions]::RemoveEmptyEntries)) {
-        $Current = Join-Path $Current $Segment
-        $Item = Get-Item -LiteralPath $Current -Force -ErrorAction SilentlyContinue
-        if ($Item -and ($Item.Attributes -band [System.IO.FileAttributes]::ReparsePoint)) {
-            throw "Refusing managed path with symbolic-link component: $Current"
-        }
-    }
-}
-
 function Assert-ManagedPathSafe { param($Path)
     $Logical = Get-ManagedPath $Path
     if (-not $Logical) { throw "Managed path is outside allowed roots: $Path" }
-    if ($Logical.StartsWith("opencode/")) { Assert-NoReparseComponents $Path $OpenCodeDir; return }
-    if ($Logical.StartsWith("skills/")) { Assert-NoReparseComponents $Path $SkillsDir; return }
-    if ($Logical.StartsWith("bin/")) { Assert-NoReparseComponents $Path $OpenCodeBinDir; return }
+    if ($Logical.StartsWith("opencode/") -or $Logical.StartsWith("skills/") -or $Logical.StartsWith("bin/")) {
+        Assert-NoReparseBelowHome $Path
+        return
+    }
     throw "Managed path is outside allowed roots: $Path"
 }
 
@@ -203,7 +234,7 @@ function Preserve-ManifestPrefix { param($Prefix)
 # Copy file only if it does not exist, Force is set, or Sync is active.
 function Copy-IfOk { param($Src, $Dst, [bool]$Managed = $true)
     if ($Managed) { Register-Managed $Dst }
-    if ($Sync) { Assert-ManagedPathSafe $Dst }
+    if ($Force -or $Sync -or -not (Test-Path -LiteralPath $Dst -PathType Leaf)) { Assert-ManagedPathSafe $Dst }
     if ((Test-Path $Dst) -and -not $Force -and -not $Sync) {
         if ($DryRun) { Write-Plan "preserve" $Dst } else { Write-Info "Skipping (exists): $Dst" }
         return
@@ -226,6 +257,7 @@ function Copy-IfOk { param($Src, $Dst, [bool]$Managed = $true)
 function Copy-DirIfOk { param($SrcDir, $DstDir, $Label)
     $ExistingFiles = @(Get-ChildItem $DstDir -ErrorAction SilentlyContinue)
     if ($Force -and $ExistingFiles.Count -gt 0) {
+        Assert-ManagedPathSafe $DstDir
         if ($DryRun) {
             Write-Plan "backup" "$Label directory $DstDir"
         } else {
@@ -245,6 +277,7 @@ function Copy-TreeIfOk { param($SrcDir, $DstDir, $Label)
         return $false
     }
     if ((Test-Path $DstDir) -and $Force) {
+        Assert-ManagedPathSafe $DstDir
         if ($DryRun) {
             Write-Plan "backup" "$Label tree $DstDir"
         } else {
@@ -281,6 +314,7 @@ if ((Test-Path $ConfigPath) -and -not $Force) {
     Write-Warn "opencode.jsonc already exists; preserving it (use -Force to replace)"
 } else {
     if ((Test-Path $ConfigPath) -and $Force) {
+        Assert-ManagedPathSafe $ConfigPath
         if ($DryRun) { Write-Plan "backup" "opencode/opencode.jsonc" } else {
             Copy-Item $ConfigPath "$ConfigPath.bak" -Force
             Write-Info "Backed up opencode.jsonc"
@@ -328,7 +362,7 @@ if (Test-Path $McpPkg) {
         Write-Plan "install-dependencies" (Join-Path $OpenCodeDir "mcp")
     } else {
         Push-Location (Join-Path $OpenCodeDir "mcp")
-        npm ci --omit=dev --ignore-scripts
+        & $NpmCommand ci --omit=dev --ignore-scripts
         if ($LASTEXITCODE -ne 0) {
             Pop-Location
             Write-Err "Failed to install MCP router dependencies"
@@ -371,6 +405,12 @@ if (Test-Path (Join-Path $RepoDir ".env.example")) {
     Write-Info ".env.example copied (configure your API keys manually)"
 }
 
+# Shared config inspector
+$ConfigInspectorSource = Join-Path $RepoDir "tools\scripts\config-inspect.js"
+if (Test-Path $ConfigInspectorSource) {
+    Copy-IfOk $ConfigInspectorSource (Join-Path $ToolsDir "config-inspect.js")
+}
+
 # Global doctor command
 $DoctorSource = Join-Path $RepoDir "tools\scripts\doctor.js"
 if (Test-Path $DoctorSource) {
@@ -382,7 +422,7 @@ if (Test-Path $DoctorSource) {
         if ($DryRun) { Write-Plan $(if (Test-Path $DoctorCommand) { "update" } else { "create" }) $DoctorCommand } else {
             @(
                 '@set "NODE_DISABLE_COMPILE_CACHE=1"'
-                '@node "%USERPROFILE%\.config\opencode\tools\doctor.js" %*'
+                "@`"$NodeCommand`" `"%USERPROFILE%\.config\opencode\tools\doctor.js`" %*"
             ) | Set-Content $DoctorCommand -Encoding Ascii
         }
     }
@@ -396,10 +436,55 @@ if (Test-Path $MetricsSource) {
     if ($Force -or $Sync -or -not (Test-Path $MetricsCommand)) {
         if ($Sync) { Backup-SyncFile $MetricsCommand }
         if ($DryRun) { Write-Plan $(if (Test-Path $MetricsCommand) { "update" } else { "create" }) $MetricsCommand } else {
-            '@node "%USERPROFILE%\.config\opencode\tools\opencode-metrics.js" %*' | Set-Content $MetricsCommand -Encoding Ascii
+            "@`"$NodeCommand`" `"%USERPROFILE%\.config\opencode\tools\opencode-metrics.js`" %*" | Set-Content $MetricsCommand -Encoding Ascii
         }
     }
     Write-Info "opencode-metrics installed at $OpenCodeBinDir\opencode-metrics.cmd"
+}
+
+# OpenCode profile launchers
+$ProfileSource = Join-Path $RepoDir "tools\scripts\profile.js"
+$ProfilePowerShellSource = Join-Path $RepoDir "tools\scripts\opencode-profile.ps1"
+if ((Test-Path $ProfileSource) -and (Test-Path $ProfilePowerShellSource)) {
+    Copy-IfOk $ProfileSource (Join-Path $ToolsDir "profile.js")
+    Copy-IfOk $ProfilePowerShellSource (Join-Path $ToolsDir "opencode-profile.ps1")
+    $PowerShellCommand = (Get-Process -Id $PID).Path
+    if (-not $PowerShellCommand -or $PowerShellCommand -match '[%\r\n]') { throw "Cannot resolve a safe PowerShell path" }
+    $ProfileCommands = @{
+        "opencode-profile.cmd" = @('@set "OPENCODE_NODE=' + $NodeCommand + '"', "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" %*")
+        "opencode-work.cmd" = @('@set "OPENCODE_NODE=' + $NodeCommand + '"', "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" work %*")
+        "opencode-personal.cmd" = @('@set "OPENCODE_NODE=' + $NodeCommand + '"', "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" personal %*")
+        "opencode-light.cmd" = @('@set "OPENCODE_NODE=' + $NodeCommand + '"', "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" light %*")
+    }
+    foreach ($Name in $ProfileCommands.Keys) {
+        $Command = Join-Path $OpenCodeBinDir $Name
+        Register-Managed $Command
+        if ($Force -or $Sync -or -not (Test-Path $Command)) {
+            if ($Sync) { Backup-SyncFile $Command }
+            if ($DryRun) { Write-Plan $(if (Test-Path $Command) { "update" } else { "create" }) $Command } else {
+                $ProfileCommands[$Name] | Set-Content $Command -Encoding Ascii
+            }
+        }
+    }
+    Write-Info "OpenCode profile launchers installed at $OpenCodeBinDir"
+}
+
+# Skill registry
+$SkillsSource = Join-Path $RepoDir "tools\scripts\skills.js"
+if (Test-Path $SkillsSource) {
+    Copy-IfOk $SkillsSource (Join-Path $ToolsDir "skills.js")
+    $SkillsCommand = Join-Path $OpenCodeBinDir "opencode-skills.cmd"
+    Register-Managed $SkillsCommand
+    if ($Force -or $Sync -or -not (Test-Path $SkillsCommand)) {
+        if ($Sync) { Backup-SyncFile $SkillsCommand }
+        if ($DryRun) { Write-Plan $(if (Test-Path $SkillsCommand) { "update" } else { "create" }) $SkillsCommand } else {
+            @(
+                '@set "NODE_DISABLE_COMPILE_CACHE=1"'
+                "@`"$NodeCommand`" `"%USERPROFILE%\.config\opencode\tools\skills.js`" %*"
+            ) | Set-Content $SkillsCommand -Encoding Ascii
+        }
+    }
+    Write-Info "opencode-skills installed at $OpenCodeBinDir\opencode-skills.cmd"
 }
 
 # Memory adapter
@@ -416,7 +501,7 @@ if (-not $SkipMemory) {
     if ($Force -or $Sync -or -not (Test-Path $MemoryCommand)) {
         if ($Sync) { Backup-SyncFile $MemoryCommand }
         if ($DryRun) { Write-Plan $(if (Test-Path $MemoryCommand) { "update" } else { "create" }) $MemoryCommand } else {
-            '@node "%USERPROFILE%\.config\opencode\mcp\memory-adapter\src\cli.js" %*' | Set-Content $MemoryCommand -Encoding Ascii
+            "@`"$NodeCommand`" `"%USERPROFILE%\.config\opencode\mcp\memory-adapter\src\cli.js`" %*" | Set-Content $MemoryCommand -Encoding Ascii
         }
     }
 } else {
@@ -491,6 +576,11 @@ Assert-Path (Join-Path $ToolsDir "doctor.js") "doctor.js"
 Assert-Path (Join-Path $OpenCodeBinDir "opencode-doctor.cmd") "opencode-doctor command"
 Assert-Path (Join-Path $OpenCodeDir "lib\session-metrics.js") "session-metrics library"
 Assert-Path (Join-Path $OpenCodeBinDir "opencode-metrics.cmd") "opencode-metrics command"
+Assert-Path (Join-Path $ToolsDir "profile.js") "profile inspector"
+Assert-Path (Join-Path $OpenCodeBinDir "opencode-profile.cmd") "opencode-profile command"
+Assert-Path (Join-Path $OpenCodeBinDir "opencode-light.cmd") "opencode-light command"
+Assert-Path (Join-Path $ToolsDir "skills.js") "skill registry"
+Assert-Path (Join-Path $OpenCodeBinDir "opencode-skills.cmd") "opencode-skills command"
 if (-not $SkipMemory) { Assert-Path (Join-Path $OpenCodeBinDir "memory-adapter.cmd") "memory-adapter command" }
 
 $agentCount = (Get-ChildItem (Join-Path $OpenCodeDir "agents") -Filter "*.md" -ErrorAction SilentlyContinue).Count

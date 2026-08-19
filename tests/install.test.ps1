@@ -47,6 +47,11 @@ try {
     $SkillsDir = Join-Path $TestHome "opencode-custom\skills"
     Assert-Path (Join-Path $OpenCodeDir "opencode.jsonc")
     Assert-Path (Join-Path $OpenCodeDir "mcp\node_modules\@modelcontextprotocol\sdk\package.json")
+    Assert-Path (Join-Path $OpenCodeDir "tools\profile.js")
+    Assert-Path (Join-Path $TestHome ".opencode\bin\opencode-profile.cmd")
+    Assert-Path (Join-Path $TestHome ".opencode\bin\opencode-light.cmd")
+    Assert-Path (Join-Path $OpenCodeDir "tools\skills.js")
+    Assert-Path (Join-Path $TestHome ".opencode\bin\opencode-skills.cmd")
 
     Set-Content (Join-Path $OpenCodeDir "agents\ai-matcher.md") "user-agent-marker"
     Set-Content (Join-Path $SkillsDir "defuddle\SKILL.md") "user-skill-marker"
@@ -173,6 +178,24 @@ try {
     if (-not $RejectedSymlink) { throw "Sync did not reject a managed symbolic link" }
     if ((Get-Content $SymlinkTarget -Raw).Trim() -ne "symlink-target") {
         throw "Sync modified a symbolic-link target"
+    }
+
+    $RejectedForceDryRunSymlink = $false
+    try {
+        & (Join-Path $RepoDir "install.ps1") -SkipMemory -Force -DryRun
+    } catch {
+        $RejectedForceDryRunSymlink = $_.Exception.Message -like "*symbolic-link component*"
+    }
+    if (-not $RejectedForceDryRunSymlink) { throw "Force DryRun did not reject a managed symbolic link" }
+    $RejectedForceSymlink = $false
+    try {
+        & (Join-Path $RepoDir "install.ps1") -SkipMemory -Force
+    } catch {
+        $RejectedForceSymlink = $_.Exception.Message -like "*symbolic-link component*"
+    }
+    if (-not $RejectedForceSymlink) { throw "Force did not reject a managed symbolic link" }
+    if ((Get-Content $SymlinkTarget -Raw).Trim() -ne "symlink-target") {
+        throw "Force modified a symbolic-link target"
     }
     Remove-Item $GuardrailsPath -Force
     Copy-Item (Join-Path $RepoDir "config\plugins\guardrails.js") $GuardrailsPath

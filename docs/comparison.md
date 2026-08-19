@@ -1,264 +1,94 @@
-# Gentleman AI Stack vs OpenCode Ecosystem
+# Gentle AI vs OpenCode Ecosystem
 
-Comparativa funcional y arquitectonica entre ambos enfoques.
+Comparacion tecnica para decidir que adoptar sin copiar una plataforma completa.
 
----
+## Baseline
 
-## Vision General
-
-| Aspecto | Gentleman AI Stack | OpenCode Ecosystem |
+| Proyecto | Version analizada | Fecha |
 |---|---|---|
-| **Orquestador** | Multi-IDE (Claude Code, Cursor, OpenCode, etc.) | OpenCode CLI (foco unico) |
-| **Package Manager** | Homebrew tap | curl-pipe (sin dependencias) |
-| **Memoria** | Engram (Go + SQLite, servidor) | Memory Adapter (Node + SQLite, MCP) |
-| **Skills** | Repos publicos, skills custom | Repos locales + 21 skills incluidas |
-| **Multi-Modelo** | TUI picker (manual por fase) | JSON config (automatico por fase) |
-| **Personalidad** | Frases como Gentleman | SOUL.md + presets (helpful, technical, teacher, etc.) |
-| **Instalacion** | TUI interactiva con flags | Script bash + script PowerShell |
-| **Filosofia** | Amplio alcance, multi-IDE | Profundidad, ahorrro de tokens, local-first |
+| Gentle AI | `main` `b002e0e7dfd30d7dbf5c3b43cf8be4e0fa7162da`; estable `v2.3.0` | 2026-08-14 |
+| OpenCode Ecosystem | `main` desde `70ad924`; release `v1.9.0` | 2026-08-14 |
 
----
+Filtro de decision: i5-1235U, 8 GB RAM, Ollama local, YAGNI, memoria acotada y
+ahorro de tokens medido, no supuesto.
 
-## Filosofia y Principios
+## Enfoque
 
-### Gentleman AI Stack
-- "Un comando, cualquier agente, cualquier OS"
-- Maximizar compatibilidad horizontal (soporta 6+ IDEs)
-- TUI rica con menus interactivos
-- Multi-agentes async como super-poder central
+| Area | Gentle AI | OpenCode Ecosystem |
+|---|---|---|
+| Alcance | Configurador para multiples agentes e IDE | Distribucion especializada para OpenCode |
+| Runtime | Binario Go, TUI y componentes gestionados | Node.js 22+, scripts, plugins y MCP |
+| Memoria | Engram, CLI/TUI, sync Git y MCP | Memory Adapter, SQLite nativo, MCP read-only y escritura CLI |
+| Perfiles | Orquestadores y modelos por fase | `work`, `personal`, `light` y `default` |
+| Skills | 22 skills y registry | 21 skills, agentes especializados y registry index-first |
+| Routing | Directo, delegado u SDD opcional | Directo, maximo 3 subagentes, SDD opcional y router Ollama |
+| Review | RDD nativo y delivery gates | Organic RDD con receipts ligados al candidato |
+| Instalacion | TUI, Go install, Homebrew y binarios | Bash/PowerShell, manifest, dry-run y sync opt-in |
+| Releases | Checksums firmados y updater binario | Checkout fijado a commit y CI multiplataforma |
 
-### OpenCode Ecosystem (nuestro enfoque)
-- **Profundidad > Amplitud**: Optimizar OpenCode especificamente en lugar de soportar todos
-- **Ahorro de tokens como religion**: cada decision tecnica se evalua por su impacto en tokens
-- **Local-first, no cloud**: Funciona offline, sync opcional via Git
-- **Sin dependencias externas**: nada de Homebrew, npm install opcional
-- **Modularidad pura**: skills, plugins, MCPs totalmente independientes
+## Fortalezas De Gentle AI
 
----
+- Experiencia guiada de instalacion y diagnostico.
+- Soporte amplio para clientes distintos de OpenCode.
+- Perfiles OpenCode generados por fase y gestionados desde TUI.
+- Registry de skills para descubrir metadata sin cargar todos los cuerpos.
+- Engram ofrece consolidacion de proyectos y export/import para equipos.
+- Releases macOS/Linux autenticadas con Minisign.
+- Backups comprimidos, deduplicados y podados.
 
-## Memoria Persistente
+## Fortalezas Nuestras
 
-### Gentleman (Engram)
-- Go + SQLite con servidor local
-- Búsqueda por "layers" (project info, actions, observations, full details)
-- Sync entre companeros via Git (export/import)
-- Engram Cloud (futuro): sync en tiempo real
+- Menos procesos y dependencias para una maquina de 8 GB.
+- Integracion profunda con OpenCode en vez de adaptadores horizontales.
+- Ollama local limitado y apagado automatico tras inactividad.
+- Memoria estructurada; no se carga ni guarda el chat completo.
+- Plugins pequenos para guardrails, checkpoints, metricas y revision.
+- Instalador read-only en dry-run y pruning limitado al manifest previo.
+- Limites explicitos de subagentes y lecturas para controlar contexto.
+- Configuracion legible y compatible con el esquema oficial de OpenCode.
 
-### OpenCode (Memory Adapter)
-- Node.js + SQLite via MCP server (universal)
-- Tools: save_decision, save_bug_fix, search_memory, get_context
-- Búsqueda semántica opcional con Ollama embeddings
-- Export a Markdown para Obsidian vault
-- Sync via Git, archivo JSON, o notas Markdown
-- **Solo guarda informacion estructurada** (no chat completo)
+## Lo Que Adoptamos
 
-**Ventaja nuestro:** No requiere Go, servidor, ni configuracion adicional. Funciona out-of-the-box con cualquier agente MCP-compatible.
+1. Doctor de configuracion efectiva y perfiles.
+2. Launchers reproducibles `work`, `personal` y `light`.
+3. Skill registry index-first sin watchers ni TUI.
+4. Routing organico: directo para trabajo acotado, delegacion focalizada y SDD opcional.
+5. Backups y ownership verificables antes de retirar archivos.
+6. E2E determinista con runtime real y proveedor simulado en una feature posterior.
+7. Firmas de release solo si en el futuro distribuimos binarios propios.
 
----
+## Lo Que No Adoptamos
 
-## Skills
+1. Soporte multi-IDE: aumenta superficie sin beneficiar el uso principal.
+2. TUI Bubbletea: scripts y JSON cubren la necesidad actual con menos memoria.
+3. Engram como segundo sistema de memoria: duplicaria autoridad y persistencia.
+4. Perfiles generados con once agentes por perfil: multiplican config y contexto.
+5. Subagentes background no durables y sin aislamiento de filesystem.
+6. Judgment Day o revisores duplicados para cambios ordinarios.
+7. Updater binario y Minisign mientras no exista un binario propio.
+8. La rama `main` externa como dependencia operativa.
 
-### Gentleman
-- Skills publicas en repositorio
-- Skills como subagentes (cada skill = agente especializado)
-- Carga basadas en contexto
+## Actualizaciones
 
-### OpenCode
-- 21 skills preconfiguradas (SDD, debug, security, obsidian, tdd, etc.)
-- Skills cargadas por necesidad
-- Personalizables sin tocar OpenCode
-- Skills custom agregables en cualquier momento
+La referencia adecuada es la release estable `v2.3.0`, no `main` ni la
+prerelease. No se recomienda instalar Gentle AI sobre la configuracion activa:
+ambos sistemas administrarian `~/.config/opencode` y podrian disputarse perfiles,
+prompts y permisos.
 
-**Ventaja nuestro:** Skills listas para usar, sin descubrir ninguna o escribirlas desde cero.
+Para reevaluar:
 
----
-
-## Multi-Modelo
-
-### Gentleman
-- TUI interactiva permite elegir modelo por fase
-- Cambio manual entre proveedores
-- Sin fallbacks automaticos
-
-### OpenCode
-- Configuracion declarativa en `opencode.jsonc`
-- Routeo automatico segun fase de trabajo
-- **Fallbacks automaticos**: si el modelo primario falla, usa el secundario
-- Diferentes modelos por tipo de tarea (razonamiento vs implementacion)
-
-**Ventaja nuestro:** Mas robusto y eficiente en tokens. Sin intervencion manual del usuario.
-
----
-
-## Instalacion
-
-### Gentleman
 ```bash
-brew install Gentleman-programming/tap/gentleman-ai
-```
-Requiere:
-- Homebrew (solo macOS)
-- Go (para Engram)
-- Configuracion de TUI
-
-### OpenCode
-```bash
-curl -sSL https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.sh | bash
-```
-Requiere:
-- Node.js 22+
-- Git
-
-En Windows:
-```powershell
-iwr -useb https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.ps1 | iex
+git ls-remote https://github.com/Gentleman-Programming/gentle-ai.git refs/heads/main
 ```
 
-**Ventaja nuestro:** Sin Homebrew, sin Go, funciona identico en Linux/macOS/Windows.
+Si cambia el SHA, se revisan solo `docs/opencode-profiles.md`, `docs/engram.md`,
+`internal/skillregistry/`, `internal/backup/`, `internal/doctor/` y contratos RDD
+que puedan reducir complejidad. El detalle de baseline y decisiones se conserva
+en `~/docs/sources/gentle-ai-analysis.md`.
 
----
+## Veredicto
 
-## Personalidad del Agente
-
-### Gentleman
-- "Habla como yo" (Gentleman Programming, tono argentino)
-- Personalidad fija
-
-### OpenCode
-- SOUL.md editable por el usuario
-- 6 presets built-in (helpful, concise, technical, teacher, pirate, custom)
-- Personalidad por sesion via comando `@set_personality`
-
-**Ventaja nuestro:** Mas flexible, configuracion sin re-instalar nada.
-
----
-
-## Subagentes Async
-
-### Gentleman
-- Strength principal: subagentes async via Task tool
-- Background execution mientras trabajas
-
-### OpenCode
-- Misma capacidad via OpenCode Task tool
-- Configurable en `opencode.jsonc`
-- Safety guards: max 3 subagentes por feature
-
-Mismo feature. Somos compatibles.
-
----
-
-## Plugins
-
-### Gentleman
-- CLI installer automatico
-
-### OpenCode
-- 7 plugins preconfigurados:
-  - **kanban.js**: tablero de tareas persistente
-  - **guardrails.js**: anti-loop y deteccion de errores
-  - **checkpoints.js**: snapshots automaticos antes de edits
-  - **sandbox.js**: ejecucion aislada en Docker
-  - **personalities.js**: gestion de personalidad del agente
-  - **validator.js**: validacion de API keys en startup
-  - **session-metrics.js**: metricas de sesion (tools, delegaciones, compactions)
-- **auto-memory.js** esta disponible, pero no se activa por defecto.
-
-**Ventaja nuestro:** Ya tenemos un ecosistema maduro de plugins custom.
-
----
-
-## MCP Servers
-
-### Gentleman
-- Context7 (recomendado, opt-in)
-- Notion, Jira, etc.
-
-### OpenCode
-- **memory-adapter**: nuestro core innovation
-- **local-model-router**: routeo a modelos Ollama locales
-- **context7**: disponible (opt-in)
-- **diagram-generator**: disponible (opt-in)
-
-Hay 2 MCP activos y 2 opt-in en la configuracion distribuida.
-
----
-
-## Token Economy
-
-### Gentleman
-- Subagentes en hoja en blanco
-- Skills cargadas por necesidad
-- Compaction
-
-### OpenCode
-- Mismas estrategias (subagentes, skills, compaction)
-- Mas: multi-modelo por fase
-- Mas: memoria estructurada (no se carga chat bruto)
-- Mas: configuracion declarativa sin TUI overhead
-
-**Ventaja nuestro:** Mas capas de optimizacion y medicion local. El ahorro real
-debe compararse con una linea base; no se publica un porcentaje sin evidencia.
-
----
-
-## Testing y CI/CD
-
-### Gentleman
-- Documentacion publica, sin CI claro
-
-### OpenCode
-- GitHub Actions:
-  - Tests automaticos (Vitest + node:test)
-  - Validacion de `install.sh` en Ubuntu/macOS/Alpine
-  - Release automatico a npm al crear tag
-- Dependabot para updates
-- Tests de estructura de skills/agents/plugins
-
-**Ventaja nuestro:** Validacion robusta de cada cambio.
-
----
-
-## Casos de Uso Ideales
-
-### Cuando elegir Gentleman AI Stack
-- Si necesitas soportar multiples IDEs/Clientes (Claude Code, Cursor, etc.)
-- Si prefieres TUI interactiva con menus
-- Si quieres una "comunidad" grande alrededor de un proyecto estrella
-
-### Cuando elegir OpenCode Ecosystem
-- Si ya usas OpenCode y quieres profundizarlo al maximo
-- Si valoras **ahorro de tokens** sobre amplitud de soporte
-- Si prefieres **local-first sin dependencias externas** (Homebrew, Go)
-- Si quieres **fallbacks automaticos** de modelos sin intervencion manual
-- Si trabajas en **multiples SOs** con la misma fluidez
-
----
-
-## Conclusion
-
-Ambos enfoques son validos:
-- **Gentleman** apuesta por amplitud (multi-IDE, TUI rica)
-- **OpenCode Ecosystem** apuesta por profundidad y eficiencia (ahorro tokens, local-first)
-
-Nuestro enfoque es especialmente util para developers que ya usan OpenCode como su agente principal y quieren extraer el maximo provecho sin overhead.
-
-No son competidores: se complementan. Puedes usar Gentleman para tener el TUI de instalacion en macOS y luego aprovechar Memory Adapter y multi-modelo automatico de OpenCode Ecosystem.
-
----
-
-## Tabla Resumen Rapida
-
-| Feature | Gentleman AI | OpenCode Ecosystem | Ganador |
-|---|---|---|---|
-| Multi-IDE | Si (6+) | No (OpenCode only) | Gentleman |
-| TUI interactiva | Si | No (script) | Gentleman |
-| Memory persistente | Engram (Go+) | Memory Adapter (Node) | Empate |
-| Fallback de modelos | Manual | Automatico | OpenCode |
-| Skills preconfiguradas | No | Si (21) | OpenCode |
-| Plugins preconfigurados | No | Si (7 activos) | OpenCode |
-| Instalacion sin Homebrew | No | Si | OpenCode |
-| Soporte Windows nativo | Parcial | Si (PowerShell) | OpenCode |
-| CI/CD robusto | No claro | Si (Actions + npm) | OpenCode |
-| Medicion de tokens | No documentada | Metricas locales y baseline manual | OpenCode |
-| Personalidad custom | Fija | SOUL.md editable | OpenCode |
+Nuestro ecosistema debe seguir siendo el nucleo. Gentle AI es una referencia
+valiosa para UX operativa, registry, backups y contratos, pero no un reemplazo.
+Toda adopcion debe demostrar menos tokens, menos fallos o mejor recuperacion sin
+aumentar de forma relevante memoria y mantenimiento.

@@ -85,6 +85,13 @@ assert_exists "$HOME/.config/opencode/tools/doctor.js"
 assert_exists "$HOME/.opencode/bin/opencode-doctor"
 assert_exists "$HOME/.config/opencode/lib/session-metrics.js"
 assert_exists "$HOME/.opencode/bin/opencode-metrics"
+assert_exists "$HOME/.config/opencode/tools/profile.js"
+assert_exists "$HOME/.opencode/bin/opencode-profile"
+assert_exists "$HOME/.opencode/bin/opencode-work"
+assert_exists "$HOME/.opencode/bin/opencode-personal"
+assert_exists "$HOME/.opencode/bin/opencode-light"
+assert_exists "$HOME/.config/opencode/tools/skills.js"
+assert_exists "$HOME/.opencode/bin/opencode-skills"
 
 # Verify MCP router SDK
 assert_exists "$HOME/.config/opencode/mcp/package.json"
@@ -256,6 +263,24 @@ fi
 rm -f "$HOME/.config/opencode/plugins/guardrails.js"
 cp "$REPO_DIR/config/plugins/guardrails.js" "$HOME/.config/opencode/plugins/guardrails.js"
 echo "[OK] Sync refused managed symbolic links"
+
+rm -f "$HOME/.config/opencode/plugins/guardrails.js"
+ln -s "$HOME/symlink-target" "$HOME/.config/opencode/plugins/guardrails.js"
+if bash "$REPO_DIR/install.sh" --skip-memory --force --dry-run >/dev/null 2>&1; then
+  echo "[FAIL] Force dry-run accepted a managed symbolic link"
+  exit 1
+fi
+if bash "$REPO_DIR/install.sh" --skip-memory --force >/dev/null 2>&1; then
+  echo "[FAIL] Force followed a managed symbolic link"
+  exit 1
+fi
+if [[ "$(<"$HOME/symlink-target")" != "symlink-target" ]]; then
+  echo "[FAIL] Force modified a symbolic-link target"
+  exit 1
+fi
+rm -f "$HOME/.config/opencode/plugins/guardrails.js"
+cp "$REPO_DIR/config/plugins/guardrails.js" "$HOME/.config/opencode/plugins/guardrails.js"
+echo "[OK] Force refused managed symbolic links"
 
 printf '%s\n' 'nested-target' > "$HOME/nested-target"
 rm -rf "$HOME/opencode-custom/skills/defuddle"

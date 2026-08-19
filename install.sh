@@ -121,6 +121,9 @@ create_dirs() {
   )
   local directory
   for directory in "${directories[@]}"; do
+    case "$directory" in
+      "$OPENCODE_DIR"|"$OPENCODE_DIR"/*|"$OPENCODE_BIN_DIR"|"$OPENCODE_BIN_DIR"/*) assert_no_symlink_components "$directory" "$HOME" ;;
+    esac
     if [[ "$DRY_RUN" == true ]]; then
       [[ -d "$directory" ]] || plan "create directory: $directory"
     else
@@ -254,11 +257,19 @@ assert_no_symlink_components() {
 assert_managed_path_safe() {
   local path="$1"
   case "$path" in
-    "$OPENCODE_DIR"/*) assert_no_symlink_components "$path" "$OPENCODE_DIR" ;;
-    "$HOME/opencode-custom/skills"/*) assert_no_symlink_components "$path" "$HOME/opencode-custom/skills" ;;
-    "$OPENCODE_BIN_DIR"/*) assert_no_symlink_components "$path" "$OPENCODE_BIN_DIR" ;;
+    "$OPENCODE_DIR"/*|"$HOME/opencode-custom/skills"/*|"$OPENCODE_BIN_DIR"/*) assert_no_symlink_components "$path" "$HOME" ;;
     *) error "Managed path is outside allowed roots: $path"; exit 1 ;;
   esac
+}
+
+make_executable() {
+  local path="$1"
+  if [[ "$DRY_RUN" == true ]]; then
+    plan "update mode executable: $path"
+  else
+    assert_managed_path_safe "$path"
+    chmod +x "$path"
+  fi
 }
 
 backup_sync_file() {
@@ -338,7 +349,7 @@ copy_if_ok() {
   if [[ "$managed" == true ]]; then
     register_managed "$dst"
   fi
-  if [[ "$SYNC" == true ]]; then
+  if [[ "$FORCE" == true || "$SYNC" == true || ! -f "$dst" ]]; then
     assert_managed_path_safe "$dst"
   fi
   if [[ -f "$dst" && "$FORCE" == false && "$SYNC" == false ]]; then
@@ -361,6 +372,7 @@ copy_if_ok() {
 copy_dir_if_ok() {
   local src_glob="$1" dst_dir="$2" label="$3"
   if [[ "$FORCE" == true && -d "$dst_dir" ]]; then
+    assert_managed_path_safe "$dst_dir"
     local existing_files=("$dst_dir"/*)
     if [[ -e "${existing_files[0]}" ]]; then
       local ts_backup
@@ -400,6 +412,7 @@ copy_tree_if_ok() {
     return 0
   fi
   if [[ -d "$dst_dir" && "$FORCE" == true ]]; then
+    assert_managed_path_safe "$dst_dir"
     local backup="$dst_dir.bak-$(date +%s)"
     if [[ "$DRY_RUN" == true ]]; then
       plan "backup: $label tree $dst_dir"
@@ -437,6 +450,7 @@ copy_config() {
     warn "opencode.jsonc already exists; preserving it (use --force to replace)"
   else
     if [[ -f "$OPENCODE_DIR/opencode.jsonc" && "$FORCE" == true ]]; then
+      assert_managed_path_safe "$OPENCODE_DIR/opencode.jsonc"
       if [[ "$DRY_RUN" == true ]]; then plan "backup: opencode/opencode.jsonc"; else
         cp "$OPENCODE_DIR/opencode.jsonc" "$OPENCODE_DIR/opencode.jsonc.bak"
         info "Backed up opencode.jsonc to opencode.jsonc.bak"
@@ -512,6 +526,7 @@ copy_config() {
   # Skills
   log "Installing skills..."
   if [[ -d "$repo_dir/skills" ]]; then
+    assert_no_symlink_components "$HOME/opencode-custom/skills" "$HOME"
     if [[ "$DRY_RUN" == true ]]; then
       [[ -d "$HOME/opencode-custom/skills" ]] || plan "create directory: $HOME/opencode-custom/skills"
     else
@@ -530,18 +545,40 @@ copy_config() {
     info ".env.example copied (configure your API keys manually)"
   fi
 
+  # Shared config inspector
+  if [[ -f "$repo_dir/tools/scripts/config-inspect.js" ]]; then
+    copy_if_ok "$repo_dir/tools/scripts/config-inspect.js" "$OPENCODE_DIR/tools/config-inspect.js"
+  fi
+
   # Global doctor command
   if [[ -f "$repo_dir/tools/scripts/doctor.js" && -f "$repo_dir/tools/scripts/opencode-doctor.sh" ]]; then
     copy_if_ok "$repo_dir/tools/scripts/doctor.js" "$OPENCODE_DIR/tools/doctor.js"
     copy_if_ok "$repo_dir/tools/scripts/opencode-doctor.sh" "$OPENCODE_BIN_DIR/opencode-doctor"
-    if [[ "$DRY_RUN" == true ]]; then plan "update mode executable: $OPENCODE_BIN_DIR/opencode-doctor"; else chmod +x "$OPENCODE_BIN_DIR/opencode-doctor"; fi
+    make_executable "$OPENCODE_BIN_DIR/opencode-doctor"
     info "opencode-doctor installed globally at $OPENCODE_BIN_DIR/opencode-doctor"
   fi
   if [[ -f "$repo_dir/tools/scripts/opencode-metrics.js" && -f "$repo_dir/tools/scripts/opencode-metrics.sh" ]]; then
     copy_if_ok "$repo_dir/tools/scripts/opencode-metrics.js" "$OPENCODE_DIR/tools/opencode-metrics.js"
     copy_if_ok "$repo_dir/tools/scripts/opencode-metrics.sh" "$OPENCODE_BIN_DIR/opencode-metrics"
-    if [[ "$DRY_RUN" == true ]]; then plan "update mode executable: $OPENCODE_BIN_DIR/opencode-metrics"; else chmod +x "$OPENCODE_BIN_DIR/opencode-metrics"; fi
+    make_executable "$OPENCODE_BIN_DIR/opencode-metrics"
     info "opencode-metrics installed globally at $OPENCODE_BIN_DIR/opencode-metrics"
+  fi
+  if [[ -f "$repo_dir/tools/scripts/profile.js" && -f "$repo_dir/tools/scripts/opencode-profile.sh" ]]; then
+    copy_if_ok "$repo_dir/tools/scripts/profile.js" "$OPENCODE_DIR/tools/profile.js"
+    local profile_command source
+    for profile_command in opencode-profile opencode-work opencode-personal opencode-light; do
+      source="$repo_dir/tools/scripts/$profile_command.sh"
+      [[ -f "$source" ]] || continue
+      copy_if_ok "$source" "$OPENCODE_BIN_DIR/$profile_command"
+      make_executable "$OPENCODE_BIN_DIR/$profile_command"
+    done
+    info "OpenCode profile launchers installed globally"
+  fi
+  if [[ -f "$repo_dir/tools/scripts/skills.js" && -f "$repo_dir/tools/scripts/opencode-skills.sh" ]]; then
+    copy_if_ok "$repo_dir/tools/scripts/skills.js" "$OPENCODE_DIR/tools/skills.js"
+    copy_if_ok "$repo_dir/tools/scripts/opencode-skills.sh" "$OPENCODE_BIN_DIR/opencode-skills"
+    make_executable "$OPENCODE_BIN_DIR/opencode-skills"
+    info "opencode-skills installed globally at $OPENCODE_BIN_DIR/opencode-skills"
   fi
 }
 
@@ -573,7 +610,7 @@ install_memory() {
   # Link global CLI through a wrapper so relative imports stay inside the package.
   if [[ ( -f "$mem_dir/src/cli.js" || "$DRY_RUN" == true ) && -f "$repo_dir/tools/scripts/memory-adapter.sh" ]]; then
     copy_if_ok "$repo_dir/tools/scripts/memory-adapter.sh" "$OPENCODE_BIN_DIR/memory-adapter"
-    if [[ "$DRY_RUN" == true ]]; then plan "update mode executable: $OPENCODE_BIN_DIR/memory-adapter"; else chmod +x "$OPENCODE_BIN_DIR/memory-adapter"; fi
+    make_executable "$OPENCODE_BIN_DIR/memory-adapter"
     info "memory-adapter CLI installed globally at $OPENCODE_BIN_DIR/memory-adapter"
   fi
 
@@ -596,6 +633,11 @@ verify_install() {
   check "$OPENCODE_BIN_DIR/opencode-doctor"
   check "$OPENCODE_DIR/lib/session-metrics.js"
   check "$OPENCODE_BIN_DIR/opencode-metrics"
+  check "$OPENCODE_DIR/tools/profile.js"
+  check "$OPENCODE_BIN_DIR/opencode-profile"
+  check "$OPENCODE_BIN_DIR/opencode-light"
+  check "$OPENCODE_DIR/tools/skills.js"
+  check "$OPENCODE_BIN_DIR/opencode-skills"
   [[ -d "$OPENCODE_DIR/agents" ]] && { checks=$((checks+1)); passed=$((passed+1)); } || warn "Missing agents dir"
   [[ -d "$OPENCODE_DIR/plugins" ]] && { checks=$((checks+1)); passed=$((passed+1)); } || warn "Missing plugins dir"
   [[ -d "$OPENCODE_DIR/mcp" ]] && { checks=$((checks+1)); passed=$((passed+1)); } || warn "Missing mcp dir"

@@ -88,6 +88,9 @@ checkFile("README.md", [
   { name: "should document opt-in installer sync", pattern: /--sync/, shouldNotExist: false },
   { name: "should document read-only installer preview", pattern: /--dry-run/, shouldNotExist: false },
   { name: "should document structured doctor output", pattern: /opencode-doctor --json/, shouldNotExist: false },
+  { name: "should document profile status", pattern: /opencode-profile --status/, shouldNotExist: false },
+  { name: "should document direct light profile", pattern: /opencode-light/, shouldNotExist: false },
+  { name: "should document index-first skill registry", pattern: /opencode-skills --refresh/, shouldNotExist: false },
   { name: "should use the representative toolkit illustration", pattern: /assets\/toolkit\.svg/, shouldNotExist: false },
   { name: "should bind local illustrations to the current revision", pattern: /raw\.githubusercontent\.com\/Rukawua26\/opencode-ecosystem\/main\/assets\//, shouldNotExist: true },
   { name: "should verify the Bash checkout against the release commit", pattern: /EXPECTED_COMMIT="36f41541536747c74d467856ca7cfede8f28c028"[\s\S]*test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_COMMIT"[\s\S]*bash install\.sh/, shouldNotExist: false },
@@ -174,6 +177,16 @@ checkFile("config/plugins/checkpoints.js", [
 
 checkFile("tools/scripts/doctor.js", [
   { name: "should check router SDK", pattern: /@modelcontextprotocol\/sdk/, shouldNotExist: false },
+  { name: "should inspect effective configuration", pattern: /inspectConfiguration/, shouldNotExist: false },
+]);
+
+checkFile("config/opencode.jsonc", [
+  { name: "should not use unsupported private SDD config keys", pattern: /sdd_multi_model/, shouldNotExist: true },
+]);
+
+checkFile("tools/scripts/skills.js", [
+  { name: "should expose explicit refresh", pattern: /--refresh/, shouldNotExist: false },
+  { name: "should only index SKILL.md files", pattern: /SKILL\.md/, shouldNotExist: false },
 ]);
 
 checkFile("install.sh", [
