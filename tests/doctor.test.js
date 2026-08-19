@@ -26,8 +26,9 @@ function createValidInstall() {
     "opencode/plugins-data",
     "opencode-custom/skills",
   ]) mkdirSync(join(home, directory), { recursive: true });
+  write(".config/opencode/opencode.jsonc", "{\n  // test config\n  \"small_model\": \"openai/test-mini\",\n  \"sdd_multi_model\": {},\n}\n");
+  write(".config/opencode/profiles/light/opencode.jsonc", "{ \"model\": \"openai/test-light\" }");
   for (const file of [
-    ".config/opencode/opencode.jsonc",
     ".config/opencode/mcp/memory-adapter/package.json",
     ".config/opencode/mcp/memory-adapter/src/adapter.js",
     ".config/opencode/mcp/memory-adapter/src/mcp-server.js",
@@ -79,7 +80,25 @@ describe("opencode-doctor", () => {
     expect(report.manifest).toMatchObject({ status: "valid", entries: 1, present: 1, missing: [] });
     expect(report.manifest.modified).toEqual({ status: "unknown", reason: "manifest_has_no_content_hashes" });
     expect(report.checks.map((check) => check.id)).toContain("manifest.integrity");
+    expect(report.config.main).toMatchObject({ valid: true, smallModel: "openai/test-mini", sddMultiModelPresent: true });
+    expect(report.config.profiles).toEqual(expect.arrayContaining([
+      expect.objectContaining({ name: "light", valid: true, model: "openai/test-light" }),
+    ]));
+    expect(report.config.notes).toEqual(expect.arrayContaining([expect.stringContaining("sdd_multi_model")]));
     expect(snapshot(home)).toEqual(before);
+  });
+
+  it("reports invalid config without changing legacy required-check exits", () => {
+    write(".config/opencode/opencode.jsonc", "not-jsonc");
+    const result = runDoctor(["--json"]);
+    const report = JSON.parse(result.stdout);
+    expect(result.status).toBe(0);
+    expect(report.ok).toBe(true);
+    expect(report.config.main).toMatchObject({ valid: false, error: "config_unparseable" });
+    expect(report.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "config.main-valid", status: "skip" }),
+      expect.objectContaining({ id: "config.active-valid", status: "skip" }),
+    ]));
   });
 
   it("reports missing managed files without inventing modification status", () => {
@@ -170,6 +189,7 @@ describe("opencode-doctor", () => {
   it("keeps HOME and TMP read-only through the public wrapper", () => {
     const temp = mkdtempSync(join(tmpdir(), "opencode-doctor-tmp-"));
     write(".config/opencode/tools/doctor.js", readFileSync(doctor, "utf8"));
+    write(".config/opencode/tools/config-inspect.js", readFileSync(join(repoRoot, "tools", "scripts", "config-inspect.js"), "utf8"));
     const before = snapshot(home);
     const result = spawnSync("bash", [doctorWrapper, "--json"], {
       encoding: "utf8",

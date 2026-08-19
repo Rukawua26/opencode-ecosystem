@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
-import { join, relative, resolve, sep } from "node:path";
+import { delimiter, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
+import { inspectConfiguration } from "./config-inspect.js";
 
 const args = process.argv.slice(2);
 const unknown = args.filter((arg) => arg !== "--json" && arg !== "--help" && arg !== "-h");
@@ -24,6 +25,8 @@ const DATA_DIR = process.platform === "win32" && process.env.LOCALAPPDATA
   ? join(process.env.LOCALAPPDATA, "opencode", "plugins-data")
   : join(HOME, ".local", "share", "opencode", "plugins-data");
 const MANIFEST_FILE = join(OPENCODE_DIR, ".ecosystem-managed-files");
+const SKILL_INDEX_FILE = join(OPENCODE_DIR, ".skills-index.json");
+const config = inspectConfiguration({ home: HOME, opencodeDir: OPENCODE_DIR });
 
 const checks = [];
 
@@ -39,8 +42,31 @@ function addCheck(id, section, name, required, test) {
   checks.push({ id, section, name, status, required, ...(detail ? { detail } : {}) });
 }
 
+function resolveCommand(command) {
+  const extensions = process.platform === "win32"
+    ? (process.env.PATHEXT || ".COM;.EXE;.BAT;.CMD").split(";")
+    : [""];
+  const current = resolve(process.cwd());
+  for (const rawDirectory of (process.env.PATH || "").split(delimiter)) {
+    const directory = rawDirectory.replace(/^"|"$/g, "");
+    if (!directory || resolve(directory) === current) continue;
+    for (const extension of extensions) {
+      const candidate = join(directory, process.platform === "win32" ? `${command}${extension.toLowerCase()}` : command);
+      try {
+        if (statSync(candidate).isFile()) return candidate;
+      } catch (error) {
+        if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
+      }
+    }
+  }
+  return null;
+}
+
 function commandWorks(command, commandArgs = ["--version"]) {
-  return spawnSync(command, commandArgs, { stdio: "ignore", timeout: 5000, shell: process.platform === "win32" }).status === 0;
+  const executable = resolveCommand(command);
+  if (!executable) return false;
+  const shell = process.platform === "win32" && /\.(?:cmd|bat)$/i.test(executable);
+  return spawnSync(executable, commandArgs, { stdio: "ignore", timeout: 5000, shell }).status === 0;
 }
 
 function parseEnv(filePath) {
@@ -194,6 +220,9 @@ for (const directory of ["agents", "plugins", "mcp", "profiles"]) {
 }
 addCheck("opencode.skills", "opencode", "skills directory", true, () => existsSync(SKILLS_DIR) && statSync(SKILLS_DIR).isDirectory());
 addCheck("opencode.plugins-data", "opencode", "plugins-data directory", true, () => existsSync(DATA_DIR) && statSync(DATA_DIR).isDirectory());
+addCheck("config.main-valid", "config", "main config parses", false, () => config.main.valid);
+addCheck("config.profiles-valid", "config", "installed profile configs parse", false, () => config.profiles.every((profile) => profile.valid));
+addCheck("config.active-valid", "config", "active profile config parses", false, () => config.activeConfig.valid);
 
 const memoryDir = join(OPENCODE_DIR, "mcp", "memory-adapter");
 for (const [id, file] of [
@@ -218,6 +247,7 @@ addCheck("optional.doctor-command", "optional", "opencode-doctor installed", fal
   const suffix = process.platform === "win32" ? ".cmd" : "";
   return existsSync(join(BIN_DIR, `opencode-doctor${suffix}`));
 });
+addCheck("optional.skill-index", "skills", "skill registry index", false, () => existsSync(SKILL_INDEX_FILE));
 const environment = parseEnv(join(OPENCODE_DIR, ".env"));
 const providers = ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"];
 addCheck("optional.provider", "providers", "at least one provider key configured", false, () => providers.some((key) => Boolean(environment[key] || process.env[key])));
@@ -233,14 +263,16 @@ const summary = {
 const ok = requiredChecks.every((check) => check.status === "pass");
 
 if (jsonMode) {
-  console.log(JSON.stringify({ schemaVersion: 1, ok, checks, summary, manifest }, null, 2));
+  console.log(JSON.stringify({ schemaVersion: 1, ok, checks, summary, manifest, config }, null, 2));
 } else {
   const sections = [
     ["runtime", "Runtime"],
     ["opencode", "OpenCode"],
+    ["config", "Configuration and profiles"],
     ["memory", "Memory adapter"],
     ["router", "Local model router"],
     ["manifest", "Managed manifest"],
+    ["skills", "Skill registry"],
     ["optional", "Optional services"],
     ["providers", "Providers"],
   ];
