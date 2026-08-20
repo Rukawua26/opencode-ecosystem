@@ -15,7 +15,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-      security-events: write
 
     strategy:
       fail-fast: false
@@ -35,6 +34,26 @@ jobs:
         uses: github/codeql-action/autobuild@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
 
       - name: Perform CodeQL Analysis
+        id: codeql
         uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4
         with:
-          category: "/language:${{ matrix.language }}"
+          upload: never
+          upload-database: false
+
+      - name: Preserve CodeQL results
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: codeql-${{ matrix.language }}-${{ github.run_attempt }}
+          path: ${{ steps.codeql.outputs.sarif-output }}
+          retention-days: 14
+
+      - name: Reject high-severity CodeQL findings
+        env:
+          SARIF_DIR: ${{ steps.codeql.outputs.sarif-output }}
+        run: |
+          jq -s -e '
+            [.[] | .runs[] | . as $run | $run.results[]? | . as $result
+              | ($run.tool.driver.rules[$result.ruleIndex].properties["security-severity"] // "0" | tonumber) as $severity
+              | select(($result.level // "warning") == "error" or $severity >= 7)]
+            | length == 0
+          ' "$SARIF_DIR"/*.sarif

@@ -67,7 +67,7 @@ describe("opencode-skills", () => {
       expect.objectContaining({ code: "frontmatter_invalid" }),
     ]));
     expect(Object.keys(index.skills[0]).sort()).toEqual(["description", "name", "path", "root"]);
-    expect(lstatSync(indexPath).mode & 0o077).toBe(0);
+    if (process.platform !== "win32") expect(lstatSync(indexPath).mode & 0o077).toBe(0);
   });
 
   it("keeps status, JSON and search read-only", () => {

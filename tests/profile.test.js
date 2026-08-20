@@ -71,7 +71,7 @@ describe("profile inspector and launchers", () => {
     expect(runProfile(["--validate", "light"]).status).toBe(1);
   });
 
-  it("launches OpenCode with the selected profile and effort", () => {
+  it.skipIf(process.platform === "win32")("launches OpenCode with the selected profile and effort", () => {
     const tools = join(home, ".config", "opencode", "tools");
     mkdirSync(tools, { recursive: true });
     cpSync(profileScript, join(tools, "profile.js"));

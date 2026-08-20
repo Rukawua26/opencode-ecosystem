@@ -54,6 +54,23 @@ try {
     Assert-Path (Join-Path $OpenCodeDir "tools\skills.js")
     Assert-Path (Join-Path $TestHome ".opencode\bin\opencode-skills.cmd")
 
+    if ($IsWindows) {
+        $LaunchOutput = Join-Path $TestHome "profile-launch.txt"
+        $env:PROFILE_TEST_OUTPUT = $LaunchOutput
+        Set-Content -LiteralPath (Join-Path $TestHome ".opencode\bin\opencode.cmd") -Encoding ascii -Value @'
+@echo off
+> "%PROFILE_TEST_OUTPUT%" <nul set /p "=%OPENCODE_CONFIG%|%OPENCODE_EFFORT_MODE%|%*"
+exit /b 0
+'@
+        & (Join-Path $TestHome ".opencode\bin\opencode-light.cmd") --test-arg
+        if ($LASTEXITCODE -ne 0) { throw "Light profile launcher failed" }
+        $ExpectedLaunch = "$(Join-Path $OpenCodeDir 'profiles\light\opencode.jsonc')|low|--test-arg"
+        if ((Get-Content $LaunchOutput -Raw) -ne $ExpectedLaunch) {
+            throw "Light profile launcher did not forward config, effort, and arguments"
+        }
+        Remove-Item Env:PROFILE_TEST_OUTPUT
+    }
+
     Set-Content (Join-Path $OpenCodeDir "agents\ai-matcher.md") "user-agent-marker"
     Set-Content (Join-Path $SkillsDir "defuddle\SKILL.md") "user-skill-marker"
     Set-Content (Join-Path $OpenCodeDir "profiles\work\opencode.jsonc") "user-profile-marker"
