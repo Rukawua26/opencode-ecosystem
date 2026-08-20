@@ -46,7 +46,7 @@ function checkPassiveSvg(relPath) {
   }
 }
 
-function checkPinnedInstallerBlocks() {
+function checkTaggedInstallerBlocks() {
   const content = readFileSync(join(repoRoot, "README.md"), "utf-8");
   const blocks = [...content.matchAll(/```(bash|powershell)\n([\s\S]*?)```/g)];
   for (const [, language, block] of blocks) {
@@ -56,22 +56,22 @@ function checkPinnedInstallerBlocks() {
 
     const executionIndex = block.search(/(?:bash install\.sh|\.\\install\.ps1)/);
     const beforeExecution = block.slice(0, executionIndex);
-    let verifiesCommit = false;
+    let verifiesTag = false;
     if (language === "bash") {
-      const declaration = beforeExecution.match(/^([A-Z_]+)="([0-9a-f]{40})"$/m);
+      const declaration = beforeExecution.match(/^([A-Z_]+)="(v\d+\.\d+\.\d+)"$/m);
       if (declaration) {
         const variable = declaration[1];
-        verifiesCommit = beforeExecution.includes(`test "$(git rev-parse HEAD)" = "$${variable}"`);
+        verifiesTag = beforeExecution.includes(`test "$(git describe --tags --exact-match)" = "$${variable}"`);
       }
     } else {
-      const declaration = beforeExecution.match(/^\$([A-Za-z][A-Za-z0-9]*) = "([0-9a-f]{40})"$/m);
+      const declaration = beforeExecution.match(/^\$([A-Za-z][A-Za-z0-9]*) = "(v\d+\.\d+\.\d+)"$/m);
       if (declaration) {
         const variable = declaration[1];
-        verifiesCommit = beforeExecution.includes(`if ((git rev-parse HEAD) -ne $${variable})`);
+        verifiesTag = beforeExecution.includes(`if ((git describe --tags --exact-match) -ne $${variable})`);
       }
     }
-    if (!verifiesCommit) {
-      console.error("[FAIL] README.md: every downloaded installer checkout must verify its commit");
+    if (!verifiesTag) {
+      console.error("[FAIL] README.md: every downloaded installer checkout must verify its exact tag");
       errors++;
     }
   }
@@ -82,7 +82,9 @@ checkFile("README.md", [
   { name: "should not include local hypruse session history", pattern: /hypruse|ADR-004/i, shouldNotExist: true },
   { name: "should not claim an unmeasured 61 percent saving", pattern: /61%/, shouldNotExist: true },
   { name: "should not present deterministic checks as 137 agent checks", pattern: /137 checks locales/i, shouldNotExist: true },
-  { name: "should document v1.9.0", pattern: /v1\.9\.0/, shouldNotExist: false },
+  { name: "should document v1.10.0", pattern: /v1\.10\.0/, shouldNotExist: false },
+  { name: "should not install the previous memory-adapter release", pattern: /opencode-memory-adapter@1\.9\.0/, shouldNotExist: true },
+  { name: "should document the current memory-adapter test count", pattern: /45 tests del memory adapter/, shouldNotExist: false },
   { name: "should mention local-model-router", pattern: /local-model-router/, shouldNotExist: false },
   { name: "should mention obsidian-ingest", pattern: /obsidian-ingest/, shouldNotExist: false },
   { name: "should document opt-in installer sync", pattern: /--sync/, shouldNotExist: false },
@@ -93,10 +95,8 @@ checkFile("README.md", [
   { name: "should document index-first skill registry", pattern: /opencode-skills --refresh/, shouldNotExist: false },
   { name: "should use the representative toolkit illustration", pattern: /assets\/toolkit\.svg/, shouldNotExist: false },
   { name: "should bind local illustrations to the current revision", pattern: /raw\.githubusercontent\.com\/Rukawua26\/opencode-ecosystem\/main\/assets\//, shouldNotExist: true },
-  { name: "should verify the Bash checkout against the release commit", pattern: /EXPECTED_COMMIT="36f41541536747c74d467856ca7cfede8f28c028"[\s\S]*test "\$\(git rev-parse HEAD\)" = "\$EXPECTED_COMMIT"[\s\S]*bash install\.sh/, shouldNotExist: false },
-  { name: "should verify the PowerShell checkout against the release commit", pattern: /\$expectedCommit = "36f41541536747c74d467856ca7cfede8f28c028"[\s\S]*git rev-parse HEAD\) -ne \$expectedCommit[\s\S]*\.\\install\.ps1/, shouldNotExist: false },
-  { name: "should verify Bash sync against its published commit", pattern: /SYNC_COMMIT="5b42e7f7be280911982e80be5c3d8476a97fd134"[\s\S]*git fetch --depth 1 origin "\$SYNC_COMMIT"[\s\S]*git rev-parse HEAD[\s\S]*bash install\.sh --sync/, shouldNotExist: false },
-  { name: "should verify PowerShell sync against its published commit", pattern: /\$syncCommit = "5b42e7f7be280911982e80be5c3d8476a97fd134"[\s\S]*git fetch --depth 1 origin \$syncCommit[\s\S]*git rev-parse HEAD[\s\S]*\.\\install\.ps1 -Sync/, shouldNotExist: false },
+  { name: "should verify the Bash checkout against the exact release tag", pattern: /RELEASE_TAG="v1\.10\.0"[\s\S]*git describe --tags --exact-match[\s\S]*bash install\.sh/, shouldNotExist: false },
+  { name: "should verify the PowerShell checkout against the exact release tag", pattern: /\$releaseTag = "v1\.10\.0"[\s\S]*git describe --tags --exact-match[\s\S]*\.\\install\.ps1/, shouldNotExist: false },
   { name: "should not pipe remote installers into a shell", pattern: /(?:curl|wget|irm|iwr|Invoke-WebRequest)[^\n|]*\|\s*(?:bash|sh|zsh|iex|Invoke-Expression)\b/i, shouldNotExist: true },
   { name: "should not embed flowcharts or graphs", pattern: /```mermaid|\bflowchart\s+(?:LR|RL|TB|BT)|\bgraph\s+(?:LR|RL|TD|TB|BT)/i, shouldNotExist: true },
   { name: "should not use made-with-love closings", pattern: /hecho con amor|made with love/i, shouldNotExist: true },
@@ -104,11 +104,11 @@ checkFile("README.md", [
   { name: "should distinguish deterministic checks from agent evals", pattern: /checks deterministas de software, no Agent Evals/i, shouldNotExist: false },
   { name: "should describe provider keys as optional", pattern: /API keys son opcionales/i, shouldNotExist: false },
 ]);
-checkPinnedInstallerBlocks();
+checkTaggedInstallerBlocks();
 
 checkFile("README.es.md", [
   { name: "should not claim FTS5", pattern: /FTS5/i, shouldNotExist: true },
-  { name: "should document v1.9.0", pattern: /v1\.9\.0/, shouldNotExist: false },
+  { name: "should document v1.10.0", pattern: /v1\.10\.0/, shouldNotExist: false },
   { name: "should mention local-model-router or Router local", pattern: /local-model-router|Router local/, shouldNotExist: false },
   { name: "should not duplicate obsolete plugin counts", pattern: /8 plugins|4 MCP servers/i, shouldNotExist: true },
 ]);
@@ -127,9 +127,10 @@ checkFile("docs/_sidebar.md", [
 
 checkFile("packages/memory-adapter/README.md", [
   { name: "should not claim FTS5", pattern: /FTS5/i, shouldNotExist: true },
-  { name: "should document v1.9.0", pattern: /v1\.9\.0/, shouldNotExist: false },
+  { name: "should document v1.10.0", pattern: /v1\.10\.0/, shouldNotExist: false },
   { name: "should mention SQLite", pattern: /SQLite/, shouldNotExist: false },
   { name: "should mention MCP", pattern: /MCP/, shouldNotExist: false },
+  { name: "should not execute an installer from mutable main", pattern: /raw\.githubusercontent\.com\/Rukawua26\/opencode-ecosystem\/main\/install/, shouldNotExist: true },
 ]);
 
 checkFile("docs/architecture/diagrams.md", [
@@ -149,6 +150,16 @@ checkFile("docs/token-economy/study.md", [
 
 checkFile("docs/README.md", [
   { name: "should not expose machine-local vault commands", pattern: /~\/docs\/scripts/, shouldNotExist: true },
+  { name: "should link to the canonical Quick Start", pattern: /README\.md#quick-start/, shouldNotExist: false },
+  { name: "should not execute an installer from mutable main", pattern: /raw\.githubusercontent\.com\/Rukawua26\/opencode-ecosystem\/main\/install/, shouldNotExist: true },
+  { name: "should document 45 memory-adapter tests", pattern: /Memory adapter: 45 tests/, shouldNotExist: false },
+]);
+
+checkFile("docs/guides/quick-start.md", [
+  { name: "should link to the canonical Quick Start", pattern: /README\.md#quick-start/, shouldNotExist: false },
+  { name: "should not execute an installer from mutable main", pattern: /raw\.githubusercontent\.com\/Rukawua26\/opencode-ecosystem\/main\/install/, shouldNotExist: true },
+  { name: "should not document unsupported installer profiles", pattern: /install\.sh --profile|opencode --profile/, shouldNotExist: true },
+  { name: "should not claim MCP write tools", pattern: /`save_(?:decision|bug_fix|architecture)`/, shouldNotExist: true },
 ]);
 
 checkFile("assets/hero.svg", [
@@ -165,6 +176,19 @@ checkPassiveSvg("assets/toolkit.svg");
 
 checkFile("config/mcp/package.json", [
   { name: "should declare SDK", pattern: /@modelcontextprotocol\/sdk/, shouldNotExist: false },
+]);
+
+checkFile(".github/workflows/test.yml", [
+  { name: "should release only through explicit dispatch", pattern: /workflow_dispatch:[\s\S]*github\.event_name == 'workflow_dispatch'/, shouldNotExist: false },
+  { name: "should reject an existing release tag for another commit", pattern: /verify-release-tag\.sh "\$TAG" "\$GITHUB_SHA"/, shouldNotExist: false },
+  { name: "should run the executable release tag contract", pattern: /npm run test:release/, shouldNotExist: false },
+  { name: "should pin first-party actions to immutable SHAs", pattern: /uses:\s+actions\/(?:checkout|setup-node)@v\d/, shouldNotExist: true },
+  { name: "should publish npm provenance", pattern: /npm publish --access public --provenance/, shouldNotExist: false },
+  { name: "should verify existing npm package gitHead", pattern: /PUBLISHED_GIT_HEAD[\s\S]*GITHUB_SHA/, shouldNotExist: false },
+]);
+
+checkFile(".github/workflows/codeql.yml", [
+  { name: "should pin CodeQL workflow actions to immutable SHAs", pattern: /uses:\s+(?:actions\/checkout|github\/codeql-action\/[^@]+)@v\d/, shouldNotExist: true },
 ]);
 
 checkFile("config/plugins/sandbox.js", [
@@ -190,11 +214,11 @@ checkFile("tools/scripts/skills.js", [
 ]);
 
 checkFile("install.sh", [
-  { name: "should install v1.9.0 by default", pattern: /INSTALL_TAG=.*v1\.9\.0/, shouldNotExist: false },
+  { name: "should install v1.10.0 by default", pattern: /INSTALL_TAG=.*v1\.10\.0/, shouldNotExist: false },
 ]);
 
 checkFile("install.ps1", [
-  { name: "should install v1.9.0 by default", pattern: /InstallTag[\s\S]*v1\.9\.0/, shouldNotExist: false },
+  { name: "should install v1.10.0 by default", pattern: /InstallTag[\s\S]*v1\.10\.0/, shouldNotExist: false },
 ]);
 
 if (errors === 0) {

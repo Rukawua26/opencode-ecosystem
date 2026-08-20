@@ -2,7 +2,7 @@
 
 > Ecosistema open source para potenciar OpenCode con memoria persistente, SDD, skills, multi-modelo y multiagentes.
 
-Version documentada: **v1.9.0**.
+Version documentada: **v1.10.0**.
 
 ## Componentes
 
@@ -20,17 +20,14 @@ Version documentada: **v1.9.0**.
 
 ## Instalacion
 
-Instalacion completa:
+La instalacion canonica, con checkout y validacion del tag exacto, vive en el
+[Quick Start del README principal](../README.md#quick-start). No ejecutes scripts
+descargados desde la rama mutable `main`.
 
-```bash
-curl -sSL https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.sh | bash
-```
-
-El instalador usa la release `v1.9.0` por defecto. Define `INSTALL_TAG` solo para instalar otra release explicitamente.
-
-Para sincronizar una instalacion existente con `main` sin reemplazar
-`opencode.jsonc`, ejecuta `install.sh --sync` o `install.ps1 -Sync`. La primera
-sincronizacion crea el manifiesto sin borrar archivos desconocidos.
+El instalador usa la release `v1.10.0` por defecto. Para sincronizar una
+instalacion existente, usa `install.sh --sync` o `install.ps1 -Sync` desde el
+checkout verificado. La primera sincronizacion crea el manifiesto sin borrar
+archivos desconocidos.
 
 Paquetes individuales:
 
@@ -62,7 +59,7 @@ npm install @rukawua26/opencode-skills
 
 - Vitest: suite determinista de plugins, tools, perfiles y skills
 - Router MCP: 23 tests
-- Memory adapter: 43 tests
+- Memory adapter: 45 tests
 - Instaladores: Linux, macOS, Alpine y Windows
 - CI: lint, coverage, contratos, hooks e instaladores multiplataforma
 - Eval local opt-in: `npm run eval:local-structure` (fuera de CI)

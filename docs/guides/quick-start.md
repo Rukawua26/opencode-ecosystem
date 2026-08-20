@@ -8,25 +8,9 @@
 
 ## Instalacion
 
-### Linux / macOS (recomendado)
-
-```bash
-curl -sSL https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.sh | bash
-```
-
-### Windows (PowerShell)
-
-```powershell
-irm -useb https://raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install.ps1 | iex
-```
-
-### Git clone (manual)
-
-```bash
-git clone https://github.com/Rukawua26/opencode-ecosystem.git
-cd opencode-ecosystem
-./install.sh
-```
+Usa el [Quick Start canonico](../../README.md#quick-start), que clona y valida
+el tag exacto antes de ejecutar Bash o PowerShell. Esta guia no duplica comandos
+de descarga para evitar que una ruta secundaria quede apuntando a `main`.
 
 ### Opciones de instalacion
 
@@ -37,8 +21,8 @@ cd opencode-ecosystem
 # Sin memory adapter
 ./install.sh --skip-memory
 
-# Perfil ligero (para PCs con poca RAM)
-./install.sh --profile light
+# Previsualizar una sincronizacion sin escribir
+./install.sh --sync --dry-run
 ```
 
 ## Post-Install
@@ -71,16 +55,16 @@ opencode
 
 ## Memoria Persistente
 
-El memory adapter se carga automaticamente. Herramientas disponibles:
+El memory adapter se carga automaticamente. MCP solo expone lecturas:
 
 | Herramienta | Uso |
 |---|---|
 | `get_context` | Cargar decisiones, bugs y arquitectura previa |
-| `save_decision` | Guardar una decision tecnica |
-| `save_bug_fix` | Guardar un fix y leccion aprendida |
-| `save_architecture` | Guardar info de componentes |
 | `search_memory` | Buscar en toda la memoria |
 | `export_project` | Exportar datos de un proyecto |
+
+Las escrituras persistentes requieren el CLI local `memory-adapter` y una accion
+humana explicita.
 
 ## Skills
 
@@ -96,24 +80,20 @@ Las skills se cargan por necesidad. Ejemplos:
 
 ```bash
 # Perfil completo (trabajo)
-opencode --profile work
+opencode-work
 
 # Perfil ligero (personal)
-opencode --profile personal
+opencode-personal
 
 # Perfil minimo (PCs limitadas)
-opencode --profile light
+opencode-light
 ```
 
 ## Backup
 
-```bash
-# Backup manual
-~/tools/backup-opencode-config.sh
-
-# Auto-backup (cron, cada 5 min)
-# Ya configurado si tienes el timer activo
-```
+El instalador conserva hasta 10 backups de rutas gestionadas en
+`~/.local/share/opencode/install-backups/`. Los secretos y personalizaciones
+privadas requieren un backup separado y nunca deben entrar al repositorio.
 
 ## Solucion de problemas
 

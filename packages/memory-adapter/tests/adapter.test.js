@@ -1,7 +1,8 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import { strict as assert } from "node:assert";
 import { MemoryAdapter } from "../src/adapter.js";
-import { chmodSync, existsSync, rmSync, mkdirSync, statSync } from "node:fs";
+import { chmodSync, existsSync, rmSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -365,6 +366,48 @@ describe("MemoryAdapter", () => {
   });
 
   describe("searchMemory", () => {
+    it("detects an Ollama CLI without the embed subcommand", () => {
+      if (process.platform === "win32") return;
+      const fakeBin = join(TMP_ROOT, "fake-bin");
+      const fakeOllama = join(fakeBin, "ollama");
+      mkdirSync(fakeBin, { recursive: true });
+      writeFileSync(fakeOllama, "#!/bin/sh\nexit 1\n");
+      chmodSync(fakeOllama, 0o700);
+      const adapterUrl = new URL("../src/adapter.js", import.meta.url).href;
+      const probe = spawnSync(
+        process.execPath,
+        [
+          "--input-type=module",
+          "-e",
+          `import { MemoryAdapter } from ${JSON.stringify(adapterUrl)}; process.stdout.write(String(new MemoryAdapter("/tmp/unused.db").useEmbeddings));`,
+        ],
+        { encoding: "utf8", env: { ...process.env, PATH: fakeBin } },
+      );
+
+      assert.strictEqual(probe.status, 0, probe.stderr);
+      assert.strictEqual(probe.stdout, "false");
+    });
+
+    it("falls back to text search when semantic embeddings are unavailable", () => {
+      adapter.useEmbeddings = false;
+      adapter.saveDecision({
+        project: "fallback-project",
+        projectPath: join(TMP_ROOT, "fallback"),
+        title: "Use deterministic fallback",
+        content: "Search remains available without Ollama embeddings",
+      });
+
+      const results = adapter.searchMemory({
+        project: "fallback-project",
+        projectPath: join(TMP_ROOT, "fallback"),
+        query: "deterministic fallback",
+        semantic: true,
+      });
+
+      assert.strictEqual(results.decisions.length, 1);
+      assert.strictEqual(results.decisions[0].title, "Use deterministic fallback");
+    });
+
     it("treats whitespace-only queries as unranked text searches", () => {
       adapter.saveDecision({
         project: "whitespace-project",

@@ -12,7 +12,7 @@ param(
 $ErrorActionPreference = "Stop"
 if ($Force -and $Sync) { throw "-Force and -Sync cannot be used together" }
 $RepoUrl = "https://github.com/Rukawua26/opencode-ecosystem.git"
-$InstallTag = if ($env:INSTALL_TAG) { $env:INSTALL_TAG } else { "v1.9.0" }
+$InstallTag = if ($env:INSTALL_TAG) { $env:INSTALL_TAG } else { "v1.10.0" }
 
 function Write-Log { param($Message) Write-Host "[opencode-ecosystem] $Message" -ForegroundColor Green }
 function Write-Warn { param($Message) Write-Host "[warn] $Message" -ForegroundColor Yellow }

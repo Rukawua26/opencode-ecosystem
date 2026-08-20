@@ -44,44 +44,30 @@ Requiere **Node.js 22+**, npm y Git.
 ### Linux / macOS
 
 ```bash
-EXPECTED_COMMIT="36f41541536747c74d467856ca7cfede8f28c028"
-git clone --branch v1.9.0 --depth 1 https://github.com/Rukawua26/opencode-ecosystem.git
+RELEASE_TAG="v1.10.0"
+git clone --branch "$RELEASE_TAG" --depth 1 https://github.com/Rukawua26/opencode-ecosystem.git
 cd opencode-ecosystem
-test "$(git rev-parse HEAD)" = "$EXPECTED_COMMIT" || { echo "Commit inesperado" >&2; exit 1; }
+test "$(git describe --tags --exact-match)" = "$RELEASE_TAG" || { echo "Tag inesperado" >&2; exit 1; }
 bash install.sh
 ```
 
 ### Windows
 
 ```powershell
-$expectedCommit = "36f41541536747c74d467856ca7cfede8f28c028"
-git clone --branch v1.9.0 --depth 1 https://github.com/Rukawua26/opencode-ecosystem.git
+$releaseTag = "v1.10.0"
+git clone --branch $releaseTag --depth 1 https://github.com/Rukawua26/opencode-ecosystem.git
 Set-Location opencode-ecosystem
-if ((git rev-parse HEAD) -ne $expectedCommit) { throw "Commit inesperado" }
+if ((git describe --tags --exact-match) -ne $releaseTag) { throw "Tag inesperado" }
 .\install.ps1
 ```
 
-Los instaladores descargan `v1.9.0` por defecto. Una reinstalacion normal conserva los archivos existentes. `main` incorpora un modo de sincronizacion que se publicara en la siguiente release; para probarlo sin sustituir `opencode.jsonc` ni archivos custom:
+Los instaladores descargan `v1.10.0` por defecto. Una reinstalacion normal conserva los archivos existentes. Para actualizar una instalacion sin sustituir `opencode.jsonc` ni archivos custom:
 
 ```bash
-SYNC_COMMIT="5b42e7f7be280911982e80be5c3d8476a97fd134"
-git init opencode-ecosystem
-cd opencode-ecosystem
-git remote add origin https://github.com/Rukawua26/opencode-ecosystem.git
-git fetch --depth 1 origin "$SYNC_COMMIT"
-git checkout --detach FETCH_HEAD
-test "$(git rev-parse HEAD)" = "$SYNC_COMMIT" || { echo "Commit inesperado" >&2; exit 1; }
 bash install.sh --sync
 ```
 
 ```powershell
-$syncCommit = "5b42e7f7be280911982e80be5c3d8476a97fd134"
-git init opencode-ecosystem
-Set-Location opencode-ecosystem
-git remote add origin https://github.com/Rukawua26/opencode-ecosystem.git
-git fetch --depth 1 origin $syncCommit
-git checkout --detach FETCH_HEAD
-if ((git rev-parse HEAD) -ne $syncCommit) { throw "Commit inesperado" }
 .\install.ps1 -Sync
 ```
 
@@ -111,15 +97,17 @@ anterior para reintentar.
 
 ## Estado Actual
 
-`main` mantiene la base de `v1.9.0` y agrega:
+La release `v1.10.0` agrega sobre `v1.9.0`:
 
 - sincronizacion gestionada opt-in con manifiesto, backups y pruning seguro;
 - preservacion de `opencode.jsonc` y rutas personalizadas;
 - scaffolders aislados en tests, nombres kebab-case seguros y destinos symlink rechazados;
 - tests de regresion para traversal, symlinks, retencion y entradas ejecutables.
 - preview read-only para install, force y sync; doctor con salida JSON versionada.
+- perfiles reproducibles `work`, `personal` y `light` con diagnostico efectivo;
+- registro index-first de skills con refresh explicito y busqueda acotada.
 
-La release `v1.9.0` introdujo:
+La base endurecida conserva:
 
 - Instaladores Bash y PowerShell verificados en Linux, macOS, Alpine y Windows.
 - Router MCP reproducible con SDK y lockfile propios.
@@ -127,6 +115,7 @@ La release `v1.9.0` introdujo:
 - Checkpoints que excluyen `.env`, claves privadas, certificados y credenciales.
 - Memory adapter read-only por MCP, SQLite local, busqueda textual y embeddings opcionales.
 - Queries vacias no arrancan Ollama; filas sin embedding usan fallback textual.
+- Si el CLI local no ofrece `ollama embed`, la busqueda semantica degrada a texto sin bloquear MCP.
 - Pipeline unico y bloqueante antes del tag, GitHub Release y publicacion npm.
 
 ## Optimizacion De Contexto
@@ -185,7 +174,7 @@ codigo de terceros no empaquetado.
 - escritura solo por CLI explicita.
 
 ```bash
-npm install -g @rukawua26/opencode-memory-adapter@1.9.0
+npm install -g @rukawua26/opencode-memory-adapter@1.10.0
 memory-adapter --help
 ```
 
@@ -228,7 +217,7 @@ El estado actual del repositorio se valida con:
 
 - 105 tests Vitest;
 - 23 tests del router MCP;
-- 43 tests del memory adapter;
+- 45 tests del memory adapter;
 - lint, coverage V8, contratos documentales y hooks;
 - instaladores reales en Linux, macOS, Alpine y Windows;
 - `npm audit` sin vulnerabilidades en la release;
@@ -338,7 +327,7 @@ No incluyas `.env`, tokens o credenciales en commits.
 
 ## Releases
 
-- GitHub: [`v1.9.0`](https://github.com/Rukawua26/opencode-ecosystem/releases/tag/v1.9.0)
+- GitHub: [`v1.10.0`](https://github.com/Rukawua26/opencode-ecosystem/releases/tag/v1.10.0)
 - npm: [`@rukawua26/opencode-memory-adapter`](https://www.npmjs.com/package/@rukawua26/opencode-memory-adapter)
 - npm: [`@rukawua26/opencode-skills`](https://www.npmjs.com/package/@rukawua26/opencode-skills)
 - Documentacion extendida: [`docs/README.md`](docs/README.md)

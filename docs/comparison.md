@@ -24,7 +24,7 @@ ahorro de tokens medido, no supuesto.
 | Routing | Directo, delegado u SDD opcional | Directo, maximo 3 subagentes, SDD opcional y router Ollama |
 | Review | RDD nativo y delivery gates | Organic RDD con receipts ligados al candidato |
 | Instalacion | TUI, Go install, Homebrew y binarios | Bash/PowerShell, manifest, dry-run y sync opt-in |
-| Releases | Checksums firmados y updater binario | Checkout fijado a commit y CI multiplataforma |
+| Releases | Checksums firmados y updater binario | Checkout por tag exacto y CI multiplataforma |
 
 ## Fortalezas De Gentle AI
 

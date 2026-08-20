@@ -2,7 +2,8 @@ $ErrorActionPreference = "Stop"
 
 $RepoDir = Split-Path $PSScriptRoot -Parent
 $TempRoot = $env:RUNNER_TEMP ?? $env:TEMP ?? [System.IO.Path]::GetTempPath()
-$TestHome = Join-Path $TempRoot "opencode-install-home"
+$TestId = [guid]::NewGuid().ToString("N")
+$TestHome = Join-Path $TempRoot "opencode-install-home-$TestId"
 $OriginalUserProfile = $env:USERPROFILE
 $OriginalLocalAppData = $env:LOCALAPPDATA
 $OriginalTemp = $env:TEMP
@@ -25,7 +26,7 @@ try {
         if (-not $DryRunOutput.Contains($Expected)) { throw "DryRun output missing: $Expected" }
     }
 
-    $DetachedDir = Join-Path $TempRoot "opencode-detached-dry-run"
+    $DetachedDir = Join-Path $TempRoot "opencode-detached-dry-run-$TestId"
     Remove-Item $DetachedDir -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path (Join-Path $DetachedDir "tmp") | Out-Null
     Copy-Item (Join-Path $RepoDir "install.ps1") (Join-Path $DetachedDir "install.ps1")
@@ -34,7 +35,7 @@ try {
     $env:TEMP = $OriginalTemp
     if (Test-Path $TestHome) { throw "Detached DryRun modified USERPROFILE" }
     if (@(Get-ChildItem (Join-Path $DetachedDir "tmp") -Force).Count -ne 0) { throw "Detached DryRun created temporary files" }
-    if (-not $DetachedOutput.Contains("clone https://github.com/Rukawua26/opencode-ecosystem.git at tag v1.9.0")) {
+    if (-not $DetachedOutput.Contains("clone https://github.com/Rukawua26/opencode-ecosystem.git at tag v1.10.0")) {
         throw "Detached DryRun did not report remote clone"
     }
     Remove-Item $DetachedDir -Recurse -Force

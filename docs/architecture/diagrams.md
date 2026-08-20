@@ -4,7 +4,7 @@
 
 ```mermaid
 graph TD
-    subgraph "OpenCode Ecosystem v1.9.0"
+    subgraph "OpenCode Ecosystem v1.10.0"
         A[CLI Install] --> B[config/]
         A --> C[skills/]
         A --> D[packages/]
@@ -44,7 +44,7 @@ graph TD
     K -->|verifies via| V[Tests and review receipts]
 
     L[npm registry] <-->|publish| D1
-    M[GitHub Releases] <-->|tag v1.9.0| H3
+    M[GitHub Releases] <-->|tag v1.10.0| H3
 ```
 
 ## Grafo de Trabajo del Agente (SDD + Organic RDD)
@@ -124,7 +124,7 @@ graph LR
     A[PR merged a main] --> B[CI Tests]
     B --> C{Tests pass?}
     C -->|No| D[Fix required]
-    C -->|Yes| E[Tag v1.9.0]
+    C -->|Yes| E[Tag v1.10.0]
     E --> F[Release workflow]
     F --> G[npm publish]
     F --> H[GitHub Release]

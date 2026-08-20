@@ -2,8 +2,9 @@
 # Test that install.sh runs successfully in a clean environment
 set -euo pipefail
 
-export HOME="/tmp/test-install-home"
-rm -rf "$HOME"
+TEST_ROOT=$(mktemp -d)
+trap 'rm -rf "$TEST_ROOT"' EXIT
+export HOME="$TEST_ROOT/home"
 mkdir -p "$HOME"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -28,8 +29,7 @@ snapshot_home() {
 }
 
 # A clean dry-run must describe the plan without creating HOME or running apply-only work.
-DRY_RUN_HOME="/tmp/test-install-dry-run-home"
-rm -rf "$DRY_RUN_HOME"
+DRY_RUN_HOME="$TEST_ROOT/dry-run-home"
 DRY_RUN_OUTPUT="$(HOME="$DRY_RUN_HOME" bash "$REPO_DIR/install.sh" --dry-run --verbose 2>&1)"
 if [[ -e "$DRY_RUN_HOME" ]]; then
   echo "[FAIL] Clean dry-run modified HOME"
@@ -53,7 +53,7 @@ if [[ -e "$DRY_RUN_HOME" || -n "$(find "$DETACHED_TMP" -mindepth 1 -print -quit)
   echo "[FAIL] Detached dry-run created HOME or temporary files"
   exit 1
 fi
-if [[ "$DETACHED_OUTPUT" != *"clone https://github.com/Rukawua26/opencode-ecosystem.git at tag v1.9.0"* || "$DETACHED_OUTPUT" != *"detailed plan requires distribution contents"* ]]; then
+if [[ "$DETACHED_OUTPUT" != *"clone https://github.com/Rukawua26/opencode-ecosystem.git at tag v1.10.0"* || "$DETACHED_OUTPUT" != *"detailed plan requires distribution contents"* ]]; then
   echo "[FAIL] Detached dry-run did not report deferred remote planning"
   exit 1
 fi

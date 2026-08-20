@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.10.0
+
+- Added reproducible `work`, `personal`, and `light` profile launchers with effective configuration diagnostics.
+- Added an index-first skill registry with explicit refresh, bounded metadata parsing, and read-only search.
+- Published managed sync, dry-run previews, structured doctor output, and safe pruning as release behavior.
+- Replaced self-referential commit pins in install examples with exact release-tag verification.
+- Made releases explicit, pinned workflow actions to immutable SHAs, and enabled npm provenance with `gitHead` checks on retries.
+- Clarified that semantic memory search falls back to deterministic text search when `ollama embed` is unavailable.
+
 ## v1.9.0
 
 - Added deterministic Obsidian project discovery and source ingestion with bounded local-first synthesis.

@@ -8,7 +8,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_URL="https://github.com/Rukawua26/opencode-ecosystem.git"
-INSTALL_TAG="${INSTALL_TAG:-v1.9.0}"
+INSTALL_TAG="${INSTALL_TAG:-v1.10.0}"
 OPENCODE_DIR="$HOME/.config/opencode"
 OPENCODE_BIN_DIR="$HOME/.opencode/bin"
 VERBOSE=false

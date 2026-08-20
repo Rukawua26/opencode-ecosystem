@@ -5,6 +5,12 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Exact release version from package.json (for example 1.10.0)"
+        required: true
+        type: string
 
 jobs:
   test:
@@ -16,10 +22,10 @@ jobs:
         node-version: [22]
 
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: ${{ matrix.node-version }}
 
@@ -59,13 +65,17 @@ jobs:
       - name: Run hook safety test
         run: npm run test:hooks
 
+      - name: Run release tag contract test
+        if: matrix.os == 'ubuntu-latest'
+        run: npm run test:release
+
   test-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
 
@@ -91,7 +101,7 @@ jobs:
     runs-on: ubuntu-latest
     container: node:22-alpine
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install git
         run: apk add --no-cache git bash
@@ -111,20 +121,22 @@ jobs:
           echo "Install validation OK"
 
   release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     needs: [test, test-windows, install-validation]
     runs-on: ubuntu-latest
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
     permissions:
       contents: write
-      issues: write
-      pull-requests: write
+      id-token: write
     steps:
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
@@ -138,11 +150,18 @@ jobs:
       - name: Create version tag
         env:
           GH_TOKEN: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
+          REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
+          if [ "$VERSION" != "$REQUESTED_VERSION" ]; then
+            echo "Requested version $REQUESTED_VERSION does not match package.json $VERSION" >&2
+            exit 1
+          fi
           TAG="v$VERSION"
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+            bash tools/scripts/verify-release-tag.sh "$TAG" "$GITHUB_SHA"
             echo "$TAG already exists; continuing idempotent publication checks."
           else
             git config user.name "github-actions[bot]"
@@ -150,6 +169,10 @@ jobs:
             git tag -a "$TAG" -m "Release $TAG"
             git push origin "$TAG"
           fi
+
+      - name: Restore public git remote
+        if: always()
+        run: git remote set-url origin https://github.com/${{ github.repository }}.git
 
       - name: Create GitHub release for latest tag
         env:
@@ -163,7 +186,12 @@ jobs:
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1 || npm publish --access public
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+            PUBLISHED_GIT_HEAD=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" gitHead)
+            test "$PUBLISHED_GIT_HEAD" = "$GITHUB_SHA" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION was published from $PUBLISHED_GIT_HEAD, not $GITHUB_SHA" >&2; exit 1; }
+          else
+            npm publish --access public --provenance
+          fi
 
       - name: Publish skills to npm
         working-directory: packages/skills
@@ -172,8 +200,9 @@ jobs:
         run: |
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1 || npm publish --access public
-
-      - name: Restore remote URL
-        if: always()
-        run: git remote set-url origin https://github.com/${{ github.repository }}.git
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
+            PUBLISHED_GIT_HEAD=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" gitHead)
+            test "$PUBLISHED_GIT_HEAD" = "$GITHUB_SHA" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION was published from $PUBLISHED_GIT_HEAD, not $GITHUB_SHA" >&2; exit 1; }
+          else
+            npm publish --access public --provenance
+          fi
