@@ -91,7 +91,7 @@ exit /b %errorlevel%
         $WrapperLaunch = Get-Content -LiteralPath $WrapperCapture -Raw | ConvertFrom-Json
         if ($WrapperLaunch.node -ne $NodeExecutable -or $WrapperLaunch.mode -ne "light" -or
             $WrapperLaunch.args.Count -ne 1 -or $WrapperLaunch.args[0] -ne "--test-arg") {
-            throw "Light profile command wrapper did not configure Node, mode, and arguments"
+            throw "Light profile command wrapper mismatch: actual=$($WrapperLaunch | ConvertTo-Json -Compress); expectedNode=$NodeExecutable"
         }
         Remove-Item -LiteralPath $WrapperCapture
 
