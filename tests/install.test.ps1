@@ -73,7 +73,7 @@ param([string]$Mode)
 call "%USERPROFILE%\.opencode\bin\opencode-light.cmd" --test-arg
 exit /b %errorlevel%
 '@
-        & $env:ComSpec /d /c "`"$WrapperDriver`""
+        & $env:ComSpec /d /c $WrapperDriver
         $WrapperExitCode = $LASTEXITCODE
         Copy-Item -LiteralPath $ProfileBackup -Destination $ProfilePowerShell -Force
         Remove-Item -LiteralPath @($ProfileBackup, $WrapperDriver)
