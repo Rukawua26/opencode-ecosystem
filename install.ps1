@@ -451,10 +451,22 @@ if ((Test-Path $ProfileSource) -and (Test-Path $ProfilePowerShellSource)) {
     $PowerShellCommand = (Get-Process -Id $PID).Path
     if (-not $PowerShellCommand -or $PowerShellCommand -match '[%\r\n]') { throw "Cannot resolve a safe PowerShell path" }
     $ProfileCommands = @{
-        "opencode-profile.cmd" = @('@set "OPENCODE_NODE=' + $NodeCommand + '"', "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" %*")
-        "opencode-work.cmd" = @('@set "OPENCODE_NODE=' + $NodeCommand + '"', "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" work %*")
-        "opencode-personal.cmd" = @('@set "OPENCODE_NODE=' + $NodeCommand + '"', "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" personal %*")
-        "opencode-light.cmd" = @('@set "OPENCODE_NODE=' + $NodeCommand + '"', "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" light %*")
+        "opencode-profile.cmd" = @(
+            '@set "OPENCODE_NODE=' + $NodeCommand + '"'
+            "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" %*"
+        )
+        "opencode-work.cmd" = @(
+            '@set "OPENCODE_NODE=' + $NodeCommand + '"'
+            "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" work %*"
+        )
+        "opencode-personal.cmd" = @(
+            '@set "OPENCODE_NODE=' + $NodeCommand + '"'
+            "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" personal %*"
+        )
+        "opencode-light.cmd" = @(
+            '@set "OPENCODE_NODE=' + $NodeCommand + '"'
+            "@`"$PowerShellCommand`" -NoProfile -ExecutionPolicy Bypass -File `"%USERPROFILE%\.config\opencode\tools\opencode-profile.ps1`" light %*"
+        )
     }
     foreach ($Name in $ProfileCommands.Keys) {
         $Command = Join-Path $OpenCodeBinDir $Name
