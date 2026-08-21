@@ -55,19 +55,24 @@ try {
     Assert-Path (Join-Path $TestHome ".opencode\bin\opencode-skills.cmd")
 
     if ($IsWindows) {
-        $LaunchOutput = Join-Path $TestHome "profile-launch.txt"
-        $env:PROFILE_TEST_OUTPUT = $LaunchOutput
         Set-Content -LiteralPath (Join-Path $TestHome ".opencode\bin\opencode.cmd") -Encoding ascii -Value @'
 @echo off
-"%OPENCODE_NODE%" -e "require('node:fs').writeFileSync(process.env.PROFILE_TEST_OUTPUT, [process.env.OPENCODE_CONFIG, process.env.OPENCODE_EFFORT_MODE, ...process.argv.slice(1)].join(String.fromCharCode(124)))" -- %*
+> "%USERPROFILE%\profile-config.txt" echo %OPENCODE_CONFIG%
+> "%USERPROFILE%\profile-effort.txt" echo %OPENCODE_EFFORT_MODE%
+> "%USERPROFILE%\profile-args.txt" echo %*
+exit /b 0
 '@
         & (Join-Path $TestHome ".opencode\bin\opencode-light.cmd") --test-arg
         if ($LASTEXITCODE -ne 0) { throw "Light profile launcher failed" }
-        $ExpectedLaunch = "$(Join-Path $OpenCodeDir 'profiles\light\opencode.jsonc')|low|--test-arg"
-        if ((Get-Content $LaunchOutput -Raw) -ne $ExpectedLaunch) {
-            throw "Light profile launcher did not forward config, effort, and arguments"
+        if ((Get-Content (Join-Path $TestHome "profile-config.txt") -Raw).Trim() -ne (Join-Path $OpenCodeDir "profiles\light\opencode.jsonc")) {
+            throw "Light profile launcher did not select its config"
         }
-        Remove-Item Env:PROFILE_TEST_OUTPUT
+        if ((Get-Content (Join-Path $TestHome "profile-effort.txt") -Raw).Trim() -ne "low") {
+            throw "Light profile launcher did not select low effort"
+        }
+        if ((Get-Content (Join-Path $TestHome "profile-args.txt") -Raw).Trim() -ne "--test-arg") {
+            throw "Light profile launcher did not forward arguments"
+        }
     }
 
     Set-Content (Join-Path $OpenCodeDir "agents\ai-matcher.md") "user-agent-marker"
