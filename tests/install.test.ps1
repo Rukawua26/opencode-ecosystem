@@ -67,8 +67,10 @@ writeFileSync(join(process.env.USERPROFILE, "profile-launch.json"), JSON.stringi
   args: process.argv.slice(2),
 }));
 '@
-        & (Join-Path $TestHome ".opencode\bin\opencode-light.cmd") $CaptureScript --test-arg
-        if ($LASTEXITCODE -ne 0) { throw "Light profile launcher failed" }
+        $Launcher = Join-Path $TestHome ".opencode\bin\opencode-light.cmd"
+        $LaunchCommand = '""{0}" "{1}" --test-arg"' -f $Launcher, $CaptureScript
+        $LaunchProcess = Start-Process -FilePath $env:ComSpec -ArgumentList "/d", "/s", "/c", $LaunchCommand -Wait -PassThru -NoNewWindow
+        if ($LaunchProcess.ExitCode -ne 0) { throw "Light profile launcher failed" }
         $Launch = Get-Content -LiteralPath (Join-Path $TestHome "profile-launch.json") -Raw | ConvertFrom-Json
         if ($Launch.config -ne (Join-Path $OpenCodeDir "profiles\light\opencode.jsonc")) {
             throw "Light profile launcher did not select its config"
