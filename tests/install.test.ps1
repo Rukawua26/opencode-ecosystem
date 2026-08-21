@@ -7,6 +7,7 @@ $TestHome = Join-Path $TempRoot "opencode-install-home-$TestId"
 $OriginalUserProfile = $env:USERPROFILE
 $OriginalLocalAppData = $env:LOCALAPPDATA
 $OriginalTemp = $env:TEMP
+$OriginalOpenCodeNode = $env:OPENCODE_NODE
 
 function Assert-Path { param($Path)
     if (-not (Test-Path $Path)) { throw "Expected path: $Path" }
@@ -56,6 +57,34 @@ try {
 
     if ($IsWindows) {
         $NodeExecutable = (Get-Command node -CommandType Application -ErrorAction Stop).Source
+        $ProfilePowerShell = Join-Path $OpenCodeDir "tools\opencode-profile.ps1"
+        $ProfileBackup = "$ProfilePowerShell.test-backup"
+        $WrapperCapture = Join-Path $TestHome "wrapper-launch.json"
+        $WrapperDriver = Join-Path $TestHome "run-profile-launcher.cmd"
+        Copy-Item -LiteralPath $ProfilePowerShell -Destination $ProfileBackup
+        Set-Content -LiteralPath $ProfilePowerShell -Encoding ascii -Value @'
+param([string]$Mode)
+@{ node = $env:OPENCODE_NODE; mode = $Mode; args = @($args) } |
+    ConvertTo-Json -Compress |
+    Set-Content -LiteralPath (Join-Path $env:USERPROFILE "wrapper-launch.json") -NoNewline
+'@
+        Set-Content -LiteralPath $WrapperDriver -Encoding ascii -Value @'
+@echo off
+call "%USERPROFILE%\.opencode\bin\opencode-light.cmd" --test-arg
+exit /b %errorlevel%
+'@
+        & $env:ComSpec /d /c "`"$WrapperDriver`""
+        $WrapperExitCode = $LASTEXITCODE
+        Copy-Item -LiteralPath $ProfileBackup -Destination $ProfilePowerShell -Force
+        Remove-Item -LiteralPath @($ProfileBackup, $WrapperDriver)
+        if ($WrapperExitCode -ne 0) { throw "Light profile command wrapper failed" }
+        $WrapperLaunch = Get-Content -LiteralPath $WrapperCapture -Raw | ConvertFrom-Json
+        if ($WrapperLaunch.node -ne $NodeExecutable -or $WrapperLaunch.mode -ne "light" -or
+            $WrapperLaunch.args.Count -ne 1 -or $WrapperLaunch.args[0] -ne "--test-arg") {
+            throw "Light profile command wrapper did not configure Node, mode, and arguments"
+        }
+        Remove-Item -LiteralPath $WrapperCapture
+
         Copy-Item -LiteralPath $NodeExecutable -Destination (Join-Path $TestHome ".opencode\bin\opencode.exe")
         $CaptureScript = Join-Path $TestHome "capture-profile.cjs"
         Set-Content -LiteralPath $CaptureScript -Encoding ascii -Value @'
@@ -67,10 +96,10 @@ writeFileSync(join(process.env.USERPROFILE, "profile-launch.json"), JSON.stringi
   args: process.argv.slice(2),
 }));
 '@
-        $Launcher = Join-Path $TestHome ".opencode\bin\opencode-light.cmd"
-        $LaunchCommand = '""{0}" "{1}" --test-arg"' -f $Launcher, $CaptureScript
-        $LaunchProcess = Start-Process -FilePath $env:ComSpec -ArgumentList "/d", "/s", "/c", $LaunchCommand -Wait -PassThru -NoNewWindow
-        if ($LaunchProcess.ExitCode -ne 0) { throw "Light profile launcher failed" }
+        $env:OPENCODE_NODE = $NodeExecutable
+        $PowerShellExecutable = (Get-Process -Id $PID).Path
+        & $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $ProfilePowerShell light $CaptureScript --test-arg
+        if ($LASTEXITCODE -ne 0) { throw "Light profile launcher failed" }
         $Launch = Get-Content -LiteralPath (Join-Path $TestHome "profile-launch.json") -Raw | ConvertFrom-Json
         if ($Launch.config -ne (Join-Path $OpenCodeDir "profiles\light\opencode.jsonc")) {
             throw "Light profile launcher did not select its config"
@@ -280,5 +309,6 @@ writeFileSync(join(process.env.USERPROFILE, "profile-launch.json"), JSON.stringi
     $env:USERPROFILE = $OriginalUserProfile
     $env:LOCALAPPDATA = $OriginalLocalAppData
     $env:TEMP = $OriginalTemp
+    $env:OPENCODE_NODE = $OriginalOpenCodeNode
     Remove-Item $TestHome -Recurse -Force -ErrorAction SilentlyContinue
 }
