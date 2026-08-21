@@ -17,7 +17,7 @@ function checkFile(relPath, checks) {
   }
   const content = readFileSync(absPath, "utf-8");
   for (const { name, pattern, shouldNotExist } of checks) {
-    const found = pattern.test(content);
+    const found = typeof pattern === "string" ? content.includes(pattern) : pattern.test(content);
     if (shouldNotExist && found) {
       console.error(`[FAIL] ${relPath}: ${name}`);
       errors++;
@@ -94,7 +94,7 @@ checkFile("README.md", [
   { name: "should document direct light profile", pattern: /opencode-light/, shouldNotExist: false },
   { name: "should document index-first skill registry", pattern: /opencode-skills --refresh/, shouldNotExist: false },
   { name: "should use the representative toolkit illustration", pattern: /assets\/toolkit\.svg/, shouldNotExist: false },
-  { name: "should bind local illustrations to the current revision", pattern: /raw\.githubusercontent\.com\/Rukawua26\/opencode-ecosystem\/main\/assets\//, shouldNotExist: true },
+  { name: "should bind local illustrations to the current revision", pattern: "raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/assets/", shouldNotExist: true },
   { name: "should verify the Bash checkout against the exact release tag", pattern: /RELEASE_TAG="v1\.10\.0"[\s\S]*git describe --tags --exact-match[\s\S]*bash install\.sh/, shouldNotExist: false },
   { name: "should verify the PowerShell checkout against the exact release tag", pattern: /\$releaseTag = "v1\.10\.0"[\s\S]*git describe --tags --exact-match[\s\S]*\.\\install\.ps1/, shouldNotExist: false },
   { name: "should not pipe remote installers into a shell", pattern: /(?:curl|wget|irm|iwr|Invoke-WebRequest)[^\n|]*\|\s*(?:bash|sh|zsh|iex|Invoke-Expression)\b/i, shouldNotExist: true },
@@ -130,7 +130,7 @@ checkFile("packages/memory-adapter/README.md", [
   { name: "should document v1.10.0", pattern: /v1\.10\.0/, shouldNotExist: false },
   { name: "should mention SQLite", pattern: /SQLite/, shouldNotExist: false },
   { name: "should mention MCP", pattern: /MCP/, shouldNotExist: false },
-  { name: "should not execute an installer from mutable main", pattern: /raw\.githubusercontent\.com\/Rukawua26\/opencode-ecosystem\/main\/install/, shouldNotExist: true },
+  { name: "should not execute an installer from mutable main", pattern: "raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install", shouldNotExist: true },
 ]);
 
 checkFile("docs/architecture/diagrams.md", [
@@ -151,13 +151,13 @@ checkFile("docs/token-economy/study.md", [
 checkFile("docs/README.md", [
   { name: "should not expose machine-local vault commands", pattern: /~\/docs\/scripts/, shouldNotExist: true },
   { name: "should link to the canonical Quick Start", pattern: /README\.md#quick-start/, shouldNotExist: false },
-  { name: "should not execute an installer from mutable main", pattern: /raw\.githubusercontent\.com\/Rukawua26\/opencode-ecosystem\/main\/install/, shouldNotExist: true },
+  { name: "should not execute an installer from mutable main", pattern: "raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install", shouldNotExist: true },
   { name: "should document 45 memory-adapter tests", pattern: /Memory adapter: 45 tests/, shouldNotExist: false },
 ]);
 
 checkFile("docs/guides/quick-start.md", [
   { name: "should link to the canonical Quick Start", pattern: /README\.md#quick-start/, shouldNotExist: false },
-  { name: "should not execute an installer from mutable main", pattern: /raw\.githubusercontent\.com\/Rukawua26\/opencode-ecosystem\/main\/install/, shouldNotExist: true },
+  { name: "should not execute an installer from mutable main", pattern: "raw.githubusercontent.com/Rukawua26/opencode-ecosystem/main/install", shouldNotExist: true },
   { name: "should not document unsupported installer profiles", pattern: /install\.sh --profile|opencode --profile/, shouldNotExist: true },
   { name: "should not claim MCP write tools", pattern: /`save_(?:decision|bug_fix|architecture)`/, shouldNotExist: true },
 ]);

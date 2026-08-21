@@ -6,6 +6,7 @@ import {
   chmodSync,
   closeSync,
   existsSync,
+  fstatSync,
   mkdirSync,
   openSync,
   readFileSync,
@@ -87,13 +88,19 @@ function pathsReferToSameFile(left, right) {
 }
 
 function readEventState(filePath) {
-  const size = statSync(filePath).size;
-  if (size > MAX_STATE_BYTES) throw new Error("invalid: event state exceeds 64 MiB; rotate or replace the --state file");
-  const contents = readFileSync(filePath, "utf8");
-  if (Buffer.byteLength(contents) > MAX_STATE_BYTES) {
-    throw new Error("invalid: event state exceeds 64 MiB; rotate or replace the --state file");
+  const descriptor = openSync(filePath, "r");
+  try {
+    if (fstatSync(descriptor).size > MAX_STATE_BYTES) {
+      throw new Error("invalid: event state exceeds 64 MiB; rotate or replace the --state file");
+    }
+    const contents = readFileSync(descriptor, "utf8");
+    if (Buffer.byteLength(contents) > MAX_STATE_BYTES) {
+      throw new Error("invalid: event state exceeds 64 MiB; rotate or replace the --state file");
+    }
+    return contents;
+  } finally {
+    closeSync(descriptor);
   }
-  return contents;
 }
 
 function ensureStateSize(contents) {
@@ -103,30 +110,12 @@ function ensureStateSize(contents) {
   return contents;
 }
 
-function processIsRunning(pid) {
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (error) {
-    return error.code !== "ESRCH";
-  }
-}
-
 function acquireStateLock(lockPath) {
   let descriptor;
   try {
     descriptor = openSync(lockPath, "wx", 0o600);
   } catch (error) {
     if (error.code !== "EEXIST") throw error;
-    try {
-      const metadata = JSON.parse(readFileSync(lockPath, "utf8"));
-      if (Number.isInteger(metadata.pid) && metadata.pid > 0 && !processIsRunning(metadata.pid)) {
-        rmSync(lockPath, { force: true });
-        return acquireStateLock(lockPath);
-      }
-    } catch {
-      // Unknown lock contents fail closed and require explicit cleanup.
-    }
     throw new Error(`event state is locked; remove stale lock if no export is running: ${lockPath}`);
   }
   try {

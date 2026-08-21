@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -53,9 +53,8 @@ function snapshot(root, current = root) {
     .flatMap((entry) => {
       const path = join(current, entry.name);
       const relativePath = path.slice(root.length + 1);
-      const stats = lstatSync(path);
-      if (stats.isSymbolicLink()) return [`${relativePath}|link|${readlinkSync(path)}`];
-      if (stats.isDirectory()) return [`${relativePath}|dir`, ...snapshot(root, path)];
+      if (entry.isSymbolicLink()) return [`${relativePath}|link|${readlinkSync(path)}`];
+      if (entry.isDirectory()) return [`${relativePath}|dir`, ...snapshot(root, path)];
       return [`${relativePath}|file|${readFileSync(path, "base64")}`];
     })
     .sort();

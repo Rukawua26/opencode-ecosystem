@@ -3,6 +3,7 @@ import { strict as assert } from "node:assert";
 import {
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   rmSync,
   symlinkSync,
@@ -16,13 +17,15 @@ import { fileURLToPath } from "node:url";
 import { parseEventJsonl } from "../src/memory-events.js";
 
 const CLI = fileURLToPath(new URL("../src/cli.js", import.meta.url));
-const ROOT = join(tmpdir(), "memory-adapter-cli-incremental");
-const PROJECT_PATH = join(ROOT, "project");
-const DB = join(ROOT, "memory.db");
+let ROOT;
+let PROJECT_PATH;
+let DB;
 
 describe("memory-adapter incremental event CLI", () => {
   beforeEach(() => {
-    rmSync(ROOT, { recursive: true, force: true });
+    ROOT = mkdtempSync(join(tmpdir(), "memory-adapter-cli-incremental-"));
+    PROJECT_PATH = join(ROOT, "project");
+    DB = join(ROOT, "memory.db");
     mkdirSync(PROJECT_PATH, { recursive: true });
   });
 
@@ -140,16 +143,17 @@ describe("memory-adapter incremental event CLI", () => {
     assert.strictEqual(existsSync(out), false);
   });
 
-  it("recovers a state lock owned by a dead process", () => {
+  it("fails closed for a state lock owned by a dead process", () => {
     const state = join(ROOT, "state.jsonl");
     const out = join(ROOT, "delta.jsonl");
     save("One");
     writeFileSync(`${state}.lock`, JSON.stringify({ pid: 2147483647, created_at: "2000-01-01T00:00:00.000Z" }));
 
     const result = exportDelta(state, out);
-    assert.strictEqual(result.status, 0, result.stderr);
-    assert.strictEqual(parseEventJsonl(readFileSync(out, "utf8")).length, 1);
-    assert.strictEqual(existsSync(`${state}.lock`), false);
+    assert.notStrictEqual(result.status, 0);
+    assert.match(result.stderr, /state is locked/);
+    assert.strictEqual(existsSync(out), false);
+    assert.strictEqual(existsSync(`${state}.lock`), true);
   });
 
   it("rejects oversized state files before reading or writing output", () => {

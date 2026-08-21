@@ -1,18 +1,20 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import { strict as assert } from "node:assert";
 import { MemoryAdapter } from "../src/adapter.js";
-import { chmodSync, existsSync, rmSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 
-const TMP_ROOT = join(tmpdir(), "opencode-test");
-const TEST_DB = join(TMP_ROOT, "memory-adapter", "memory.db");
+let TMP_ROOT;
+let TEST_DB;
 
 describe("MemoryAdapter", () => {
   let adapter;
 
   beforeEach(() => {
+    TMP_ROOT = mkdtempSync(join(tmpdir(), "opencode-test-"));
+    TEST_DB = join(TMP_ROOT, "memory-adapter", "memory.db");
     const dir = dirname(TEST_DB);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
     adapter = new MemoryAdapter(TEST_DB);

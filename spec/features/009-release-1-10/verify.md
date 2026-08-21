@@ -15,12 +15,13 @@ del workflow bloqueante de `main`.
 | R4 Verificacion local | PASS | Suites, coverage, install Bash, hooks, audit, packs, doctor y diff pasan |
 | R5 Publicacion | PENDING | Requiere push a `main` y dispatch remoto `version=1.10.0` |
 | R6 Fallback Ollama | PASS | Deteccion del CLI incompatible, fallback explicito y 45/45 tests del adapter |
+| R7 Windows y CodeQL | PENDING | Correcciones locales listas; requiere repetir ambos workflows remotos |
 
 ## Evidencia local
 
-- `npm test`: 105/105 PASS.
-- `npm run test:coverage`: PASS; 93.61% statements, 77.48% branches,
-  100% functions y 96.63% lines.
+- `npm test`: 106/106 PASS.
+- `npm run test:coverage`: PASS; 93.91% statements, 76.12% branches,
+  100% functions y 96.8% lines.
 - `npm run test:router`: 23/23 PASS.
 - Memory adapter: 45/45 PASS, incluida deteccion de CLI sin `embed` y fallback a texto.
 - `npm run test:install`: PASS.
@@ -52,6 +53,11 @@ antes de crear el tag o publicar npm.
   documental impide reintroducir el pin `1.9.0`.
 - Un proceso aislado con un CLI Ollama sin `embed` verifica la deteccion real,
   ademas del test funcional de fallback textual.
+- CodeQL conserva SARIF cuando Code Scanning no esta disponible, resuelve reglas
+  driver/extension y falla cerrado ante metadata desconocida o severidad alta.
+- Lectura de estado y locks usa descriptores estables; locks obsoletos requieren
+  limpieza explicita para evitar dos recuperaciones concurrentes.
+- Metricas rechaza symlinks, exige archivo regular y aplica permisos `0600`.
 
 ## Publicacion remota
 

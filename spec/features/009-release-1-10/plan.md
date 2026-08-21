@@ -5,7 +5,9 @@
 2. Alinear la base de conocimiento y runbooks con el repositorio canonico.
 3. Elevar versiones a `1.10.0` y actualizar changelog, README e instaladores.
 4. Verificar suites, instaladores, paquetes, dry-run, doctor y fallback Ollama.
-5. Completar Organic RDD, fusionar a `main`, solicitar el workflow de release
+5. Resolver los bloqueos Windows y CodeQL observados en el primer push, conservar
+   SARIF como artefacto y repetir todos los gates remotos.
+6. Completar Organic RDD, fusionar a `main`, solicitar el workflow de release
    con version explicita y comprobar artefactos remotos.
 
 ## Archivos previstos

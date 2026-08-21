@@ -13,6 +13,8 @@ commit autorreferenciales que no pueden prepararse dentro del mismo release.
 2. Usar el tag exacto de release como contrato reproducible de checkout.
 3. Declarar `/home/miguel/opencode-ecosystem` como fuente canonica local.
 4. Mantener embeddings Ollama opcionales y el fallback textual operativo.
+5. Corregir los bloqueos de portabilidad y analisis estatico descubiertos por el
+   primer CI remoto del candidato.
 
 ## Fuera de alcance
 
@@ -35,6 +37,9 @@ commit autorreferenciales que no pueden prepararse dentro del mismo release.
   paquetes npm `1.10.0` con provenance.
 - **R6**: la ausencia de `ollama embed` MUST degradar a busqueda textual y MUST
   quedar documentada como capacidad opcional, no como fallo de instalacion.
+- **R7**: Windows y CodeQL MUST finalizar sin omitir hallazgos; cuando GitHub Code
+  Scanning no este disponible, el SARIF MUST conservarse y bloquear severidades
+  altas mediante un gate local del workflow.
 
 ## Escenarios de aceptacion
 

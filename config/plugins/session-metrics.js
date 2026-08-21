@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, closeSync, constants, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { metricFromMessage } from "../lib/session-metrics.js";
 
@@ -73,9 +73,23 @@ function metricState(state) {
 function appendMetric(metric) {
   try {
     const logFile = process.env.OPENCODE_METRICS_FILE || join(DATA_DIR, "session-metrics.jsonl");
-    if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
-    if (!existsSync(logFile)) writeFileSync(logFile, "", { mode: 0o600 });
-    appendFileSync(logFile, `${JSON.stringify(metric)}\n`);
+    mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
+    if (process.platform !== "win32") chmodSync(DATA_DIR, 0o700);
+    const flags = constants.O_APPEND | constants.O_CREAT | constants.O_WRONLY
+      | constants.O_NONBLOCK | (constants.O_NOFOLLOW ?? 0);
+    const descriptor = openSync(logFile, flags, 0o600);
+    try {
+      const descriptorStats = fstatSync(descriptor);
+      const pathStats = lstatSync(logFile);
+      if (!descriptorStats.isFile() || pathStats.isSymbolicLink()
+        || descriptorStats.dev !== pathStats.dev || descriptorStats.ino !== pathStats.ino) {
+        throw new Error("metrics path is not the opened regular file");
+      }
+      if (process.platform !== "win32") fchmodSync(descriptor, 0o600);
+      appendFileSync(descriptor, `${JSON.stringify(metric)}\n`);
+    } finally {
+      closeSync(descriptor);
+    }
   } catch {
     // Metrics must never interrupt the coding session.
   }

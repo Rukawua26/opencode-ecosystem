@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sessionMetricsPlugin from "../../config/plugins/session-metrics.js";
@@ -87,5 +87,27 @@ describe("Session metrics behavior", () => {
     const records = readFileSync(file, "utf8").trim().split("\n").map(JSON.parse);
     expect(records[0].loop_detected).toBe(true);
     expect(records[1].loop_detected).toBe(false);
+  });
+
+  it.skipIf(process.platform === "win32")("rejects symlinks and enforces private log permissions", async () => {
+    const { hooks, file } = await loadPlugin();
+    const target = join(file, "..", "target.jsonl");
+    writeFileSync(target, "unchanged");
+    symlinkSync(target, file);
+
+    await hooks.event({ event: { type: "message.updated", properties: {
+      sessionID: "metrics-security",
+      info: assistantInfo("metrics-security", "metrics-symlink"),
+    } } });
+    expect(readFileSync(target, "utf8")).toBe("unchanged");
+
+    rmSync(file);
+    writeFileSync(file, "");
+    chmodSync(file, 0o666);
+    await hooks.event({ event: { type: "message.updated", properties: {
+      sessionID: "metrics-security",
+      info: assistantInfo("metrics-security", "metrics-permissions", 300),
+    } } });
+    expect(statSync(file).mode & 0o777).toBe(0o600);
   });
 });

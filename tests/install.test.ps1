@@ -59,8 +59,7 @@ try {
         $env:PROFILE_TEST_OUTPUT = $LaunchOutput
         Set-Content -LiteralPath (Join-Path $TestHome ".opencode\bin\opencode.cmd") -Encoding ascii -Value @'
 @echo off
-> "%PROFILE_TEST_OUTPUT%" <nul set /p "=%OPENCODE_CONFIG%|%OPENCODE_EFFORT_MODE%|%*"
-exit /b 0
+"%OPENCODE_NODE%" -e "require('node:fs').writeFileSync(process.env.PROFILE_TEST_OUTPUT, [process.env.OPENCODE_CONFIG, process.env.OPENCODE_EFFORT_MODE, ...process.argv.slice(1)].join(String.fromCharCode(124)))" -- %*
 '@
         & (Join-Path $TestHome ".opencode\bin\opencode-light.cmd") --test-arg
         if ($LASTEXITCODE -ne 0) { throw "Light profile launcher failed" }

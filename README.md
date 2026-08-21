@@ -215,7 +215,7 @@ Un receipt congela los hashes del candidato y registra lentes, verificacion y ga
 
 El estado actual del repositorio se valida con:
 
-- 105 tests Vitest;
+- 106 tests Vitest;
 - 23 tests del router MCP;
 - 45 tests del memory adapter;
 - lint, coverage V8, contratos documentales y hooks;

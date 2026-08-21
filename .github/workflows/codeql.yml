@@ -53,7 +53,14 @@ jobs:
         run: |
           jq -s -e '
             [.[] | .runs[] | . as $run | $run.results[]? | . as $result
-              | ($run.tool.driver.rules[$result.ruleIndex].properties["security-severity"] // "0" | tonumber) as $severity
-              | select(($result.level // "warning") == "error" or $severity >= 7)]
+              | ((if ($result.rule.toolComponent.index? != null and $result.rule.index? != null)
+                  then $run.tool.extensions[$result.rule.toolComponent.index].rules[$result.rule.index]
+                  elif $result.ruleIndex? != null then $run.tool.driver.rules[$result.ruleIndex]
+                  else null end)
+                // ([$run.tool.driver.rules[]?, $run.tool.extensions[]?.rules[]?]
+                    | map(select(.id == $result.ruleId)) | first)
+                // error("unmapped SARIF rule: \($result.ruleId // "unknown")")) as $rule
+              | ($rule.properties["security-severity"] // "0" | tonumber) as $severity
+              | select(($result.level // $rule.defaultConfiguration.level // "warning") == "error" or $severity >= 7)]
             | length == 0
           ' "$SARIF_DIR"/*.sarif
