@@ -77,11 +77,16 @@ param(
 call "%USERPROFILE%\.opencode\bin\opencode-light.cmd" --test-arg
 exit /b %errorlevel%
 '@
-        & $env:ComSpec /d /c $WrapperDriver
-        $WrapperExitCode = $LASTEXITCODE
+        $WrapperStartInfo = [System.Diagnostics.ProcessStartInfo]::new($env:ComSpec)
+        $WrapperStartInfo.UseShellExecute = $false
+        $WrapperStartInfo.ArgumentList.Add("/d")
+        $WrapperStartInfo.ArgumentList.Add("/c")
+        $WrapperStartInfo.ArgumentList.Add($WrapperDriver)
+        $WrapperProcess = [System.Diagnostics.Process]::Start($WrapperStartInfo)
+        $WrapperProcess.WaitForExit()
         Copy-Item -LiteralPath $ProfileBackup -Destination $ProfilePowerShell -Force
         Remove-Item -LiteralPath @($ProfileBackup, $WrapperDriver)
-        if ($WrapperExitCode -ne 0) { throw "Light profile command wrapper failed" }
+        if ($WrapperProcess.ExitCode -ne 0) { throw "Light profile command wrapper failed" }
         if (-not (Test-Path -LiteralPath $WrapperCapture)) { throw "Light profile command wrapper did not invoke the profile script" }
         $WrapperLaunch = Get-Content -LiteralPath $WrapperCapture -Raw | ConvertFrom-Json
         if ($WrapperLaunch.node -ne $NodeExecutable -or $WrapperLaunch.mode -ne "light" -or
