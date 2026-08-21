@@ -55,24 +55,35 @@ try {
     Assert-Path (Join-Path $TestHome ".opencode\bin\opencode-skills.cmd")
 
     if ($IsWindows) {
-        Set-Content -LiteralPath (Join-Path $TestHome ".opencode\bin\opencode.cmd") -Encoding ascii -Value @'
-@echo off
-> "%USERPROFILE%\profile-config.txt" echo %OPENCODE_CONFIG%
-> "%USERPROFILE%\profile-effort.txt" echo %OPENCODE_EFFORT_MODE%
-> "%USERPROFILE%\profile-args.txt" echo %*
-exit /b 0
+        $NodeExecutable = (Get-Command node -CommandType Application -ErrorAction Stop).Source
+        Copy-Item -LiteralPath $NodeExecutable -Destination (Join-Path $TestHome ".opencode\bin\opencode.exe")
+        $CaptureScript = Join-Path $TestHome "capture-profile.cjs"
+        Set-Content -LiteralPath $CaptureScript -Encoding ascii -Value @'
+const { writeFileSync } = require("node:fs");
+const { join } = require("node:path");
+writeFileSync(join(process.env.USERPROFILE, "profile-launch.json"), JSON.stringify({
+  config: process.env.OPENCODE_CONFIG,
+  effort: process.env.OPENCODE_EFFORT_MODE,
+  args: process.argv.slice(2),
+}));
 '@
-        & (Join-Path $TestHome ".opencode\bin\opencode-light.cmd") --test-arg
+        & (Join-Path $TestHome ".opencode\bin\opencode-light.cmd") $CaptureScript --test-arg
         if ($LASTEXITCODE -ne 0) { throw "Light profile launcher failed" }
-        if ((Get-Content (Join-Path $TestHome "profile-config.txt") -Raw).Trim() -ne (Join-Path $OpenCodeDir "profiles\light\opencode.jsonc")) {
+        $Launch = Get-Content -LiteralPath (Join-Path $TestHome "profile-launch.json") -Raw | ConvertFrom-Json
+        if ($Launch.config -ne (Join-Path $OpenCodeDir "profiles\light\opencode.jsonc")) {
             throw "Light profile launcher did not select its config"
         }
-        if ((Get-Content (Join-Path $TestHome "profile-effort.txt") -Raw).Trim() -ne "low") {
+        if ($Launch.effort -ne "low") {
             throw "Light profile launcher did not select low effort"
         }
-        if ((Get-Content (Join-Path $TestHome "profile-args.txt") -Raw).Trim() -ne "--test-arg") {
+        if ($Launch.args.Count -ne 1 -or $Launch.args[0] -ne "--test-arg") {
             throw "Light profile launcher did not forward arguments"
         }
+        Remove-Item -LiteralPath @(
+            (Join-Path $TestHome ".opencode\bin\opencode.exe")
+            $CaptureScript
+            (Join-Path $TestHome "profile-launch.json")
+        )
     }
 
     Set-Content (Join-Path $OpenCodeDir "agents\ai-matcher.md") "user-agent-marker"
