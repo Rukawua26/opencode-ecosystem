@@ -56,7 +56,7 @@ try {
     Assert-Path (Join-Path $TestHome ".opencode\bin\opencode-skills.cmd")
 
     if ($IsWindows) {
-        $NodeExecutable = (Get-Command node -CommandType Application -ErrorAction Stop).Source
+        $NodeExecutable = @(Get-Command node -CommandType Application -ErrorAction Stop)[0].Source
         $ProfilePowerShell = Join-Path $OpenCodeDir "tools\opencode-profile.ps1"
         $ProfileBackup = "$ProfilePowerShell.test-backup"
         $WrapperCapture = Join-Path $TestHome "wrapper-launch.json"
