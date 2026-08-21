@@ -1,9 +1,9 @@
 param(
     [Parameter(Position = 0)]
-    [string]$Mode
+    [string]$Mode,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$OpenCodeArgs
 )
-
-$OpenCodeArgs = @($args)
 
 $ProfileJs = Join-Path $env:USERPROFILE ".config\opencode\tools\profile.js"
 if (-not (Test-Path -LiteralPath $ProfileJs -PathType Leaf)) {
