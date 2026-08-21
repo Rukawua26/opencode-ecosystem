@@ -4,6 +4,7 @@ $RepoDir = Split-Path $PSScriptRoot -Parent
 $TempRoot = $env:RUNNER_TEMP ?? $env:TEMP ?? [System.IO.Path]::GetTempPath()
 $TestId = [guid]::NewGuid().ToString("N")
 $TestHome = Join-Path $TempRoot "opencode-install-home-$TestId"
+$OriginalHome = $env:HOME
 $OriginalUserProfile = $env:USERPROFILE
 $OriginalLocalAppData = $env:LOCALAPPDATA
 $OriginalTemp = $env:TEMP
@@ -16,6 +17,7 @@ function Assert-Path { param($Path)
 try {
     Remove-Item $TestHome -Recurse -Force -ErrorAction SilentlyContinue
     New-Item -ItemType Directory -Force -Path $TestHome | Out-Null
+    $env:HOME = $TestHome
     $env:USERPROFILE = $TestHome
     $env:LOCALAPPDATA = Join-Path $TestHome "AppData\Local"
 
@@ -316,6 +318,7 @@ writeFileSync(join(process.env.USERPROFILE, "profile-launch.json"), JSON.stringi
 
     Write-Host "[PASS] PowerShell install, preserve, sync, pruning, SDK, and rollback checks passed"
 } finally {
+    $env:HOME = $OriginalHome
     $env:USERPROFILE = $OriginalUserProfile
     $env:LOCALAPPDATA = $OriginalLocalAppData
     $env:TEMP = $OriginalTemp
