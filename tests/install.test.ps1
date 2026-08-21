@@ -63,8 +63,12 @@ try {
         $WrapperDriver = Join-Path $TestHome "run-profile-launcher.cmd"
         Copy-Item -LiteralPath $ProfilePowerShell -Destination $ProfileBackup
         Set-Content -LiteralPath $ProfilePowerShell -Encoding ascii -Value @'
-param([string]$Mode)
-@{ node = $env:OPENCODE_NODE; mode = $Mode; args = @($args) } |
+param(
+    [string]$Mode,
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$ForwardedArgs
+)
+@{ node = $env:OPENCODE_NODE; mode = $Mode; args = @($ForwardedArgs) } |
     ConvertTo-Json -Compress |
     Set-Content -LiteralPath (Join-Path $env:USERPROFILE "wrapper-launch.json") -NoNewline
 '@
@@ -78,6 +82,7 @@ exit /b %errorlevel%
         Copy-Item -LiteralPath $ProfileBackup -Destination $ProfilePowerShell -Force
         Remove-Item -LiteralPath @($ProfileBackup, $WrapperDriver)
         if ($WrapperExitCode -ne 0) { throw "Light profile command wrapper failed" }
+        if (-not (Test-Path -LiteralPath $WrapperCapture)) { throw "Light profile command wrapper did not invoke the profile script" }
         $WrapperLaunch = Get-Content -LiteralPath $WrapperCapture -Raw | ConvertFrom-Json
         if ($WrapperLaunch.node -ne $NodeExecutable -or $WrapperLaunch.mode -ne "light" -or
             $WrapperLaunch.args.Count -ne 1 -or $WrapperLaunch.args[0] -ne "--test-arg") {
