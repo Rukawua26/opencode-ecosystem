@@ -8,7 +8,9 @@
 5. Resolver los bloqueos Windows y CodeQL observados en el primer push, conservar
    SARIF como artefacto y repetir todos los gates remotos.
 6. Completar Organic RDD, fusionar a `main`, solicitar el workflow de release
-   con version explicita y comprobar artefactos remotos.
+   con version explicita y comprobar artefactos remotos. Si npm deja una
+   publicacion parcial, reintentar contra el SHA completo del tag y ejecutar
+   todos los gates sobre ese mismo commit.
 
 ## Archivos previstos
 
@@ -28,6 +30,12 @@
 - `1.10.0` es minor porque incorpora comandos publicos de perfiles y skills.
 - El tag exacto evita el hash circular sin introducir firmas o servicios nuevos.
 - La publicacion es manual y versionada; los pushes normales solo ejecutan CI.
-- Acciones por SHA y npm provenance reducen riesgo de supply chain.
+- Acciones por SHA y verificacion de `gitHead` reducen riesgo de supply chain;
+  npm provenance se omite porque el registro no lo admite desde repos privados.
+- El preflight exige CodeQL exitoso para el SHA exacto y la integridad npm se
+  compara con un pack local sin lifecycle scripts.
+- La secuencia tag, GitHub Release y npm es forward-only: un fallo parcial se
+  completa por reintento exacto; un artefacto incorrecto se depreca y requiere
+  una version correctiva.
 - Embeddings no bloquean la release: el runtime soportado sigue siendo textual
   con enriquecimiento semantico solo cuando Ollama ofrece la capacidad.

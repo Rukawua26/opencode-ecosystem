@@ -11,9 +11,65 @@ on:
         description: "Exact release version from package.json (for example 1.10.0)"
         required: true
         type: string
+      release_sha:
+        description: "Existing release commit for an idempotent retry; leave empty for a new release"
+        required: false
+        type: string
+
+permissions:
+  actions: read
+  contents: read
 
 jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      source_sha: ${{ steps.source.outputs.source_sha }}
+    steps:
+      - name: Resolve trusted source commit
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA_INPUT: ${{ inputs.release_sha }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ]; then
+            echo "source_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          [[ "$REQUESTED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Version must be an exact stable semver" >&2; exit 1; }
+          SOURCE_SHA=$GITHUB_SHA
+          TAG="v$REQUESTED_VERSION"
+          TAG_EXISTS=false
+          TAG_REFS=$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/$TAG" --jq '.[].ref')
+          while IFS= read -r TAG_REF; do
+            [ "$TAG_REF" = "refs/tags/$TAG" ] && TAG_EXISTS=true
+          done <<< "$TAG_REFS"
+          if [ -z "$RELEASE_SHA_INPUT" ]; then
+            [ "$TAG_EXISTS" = false ] || { echo "$TAG already exists; release_sha is required for a retry" >&2; exit 1; }
+            echo "Preparing a new release from $SOURCE_SHA"
+          else
+            [[ "$RELEASE_SHA_INPUT" =~ ^[0-9a-f]{40}$ ]] || { echo "Release commit must be a full lowercase SHA" >&2; exit 1; }
+            [ "$TAG_EXISTS" = true ] || { echo "$TAG does not exist; retry refused" >&2; exit 1; }
+            TAG_OBJECT=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha')
+            read -r TAG_TYPE TAG_SHA <<< "$TAG_OBJECT"
+            if [ "$TAG_TYPE" = "tag" ]; then
+              TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_SHA" --jq .object.sha)
+            elif [ "$TAG_TYPE" != "commit" ]; then
+              echo "Unsupported tag object type: $TAG_TYPE" >&2
+              exit 1
+            fi
+            test "$TAG_SHA" = "$RELEASE_SHA_INPUT" || { echo "Existing tag does not point to $RELEASE_SHA_INPUT" >&2; exit 1; }
+            SOURCE_SHA=$RELEASE_SHA_INPUT
+          fi
+          CODEQL_RUN=$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/codeql.yml/runs" -f head_sha="$SOURCE_SHA" -f branch=main -f event=push -f status=success -f per_page=1 --jq '.workflow_runs[0] | [.html_url, .event, .head_branch, .head_sha, .conclusion] | @tsv')
+          read -r CODEQL_URL CODEQL_EVENT CODEQL_BRANCH CODEQL_SHA CODEQL_CONCLUSION <<< "$CODEQL_RUN"
+          test "$CODEQL_EVENT" = "push" && test "$CODEQL_BRANCH" = "main" && test "$CODEQL_SHA" = "$SOURCE_SHA" && test "$CODEQL_CONCLUSION" = "success" || { echo "No successful main push CodeQL run exists for $SOURCE_SHA" >&2; exit 1; }
+          echo "Using successful CodeQL run $CODEQL_URL"
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
   test:
+    needs: preflight
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -23,6 +79,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.preflight.outputs.source_sha }}
 
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -70,9 +129,13 @@ jobs:
         run: npm run test:release
 
   test-windows:
+    needs: preflight
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.preflight.outputs.source_sha }}
 
       - name: Setup Node.js 22
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -98,10 +161,14 @@ jobs:
         run: npm run test:install:windows
 
   install-validation:
+    needs: preflight
     runs-on: ubuntu-latest
     container: node:22-alpine
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ needs.preflight.outputs.source_sha }}
 
       - name: Install git
         run: apk add --no-cache git bash
@@ -122,18 +189,19 @@ jobs:
 
   release:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-    needs: [test, test-windows, install-validation]
+    needs: [preflight, test, test-windows, install-validation]
     runs-on: ubuntu-latest
     concurrency:
       group: release-${{ github.ref }}
       cancel-in-progress: false
     permissions:
       contents: write
-      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ needs.preflight.outputs.source_sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -141,68 +209,125 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
-      - name: Install release dependencies
-        run: npm ci
-
-      - name: Configure git remote with PAT
-        run: git remote set-url origin https://x-access-token:${{ secrets.ECOSYSTEMAPUBLISH2 }}@github.com/${{ github.repository }}.git
+      - name: Verify release candidate
+        env:
+          RELEASE_SHA: ${{ needs.preflight.outputs.source_sha }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(node -p "require('./package.json').name")" = "opencode-ecosystem"
+          test "$(node -p "require('./package.json').version")" = "$REQUESTED_VERSION"
+          test "$(node -p "require('./package.json').private")" = "true"
+          test "$(node -p "require('./package.json').repository.url")" = "https://github.com/Rukawua26/opencode-ecosystem.git"
+          test "$(node -p "require('./config/mcp/package.json').name")" = "local-model-router"
+          test "$(node -p "require('./config/mcp/package.json').version")" = "$REQUESTED_VERSION"
+          test "$(node -p "require('./config/mcp/package.json').private")" = "true"
+          test "$(node -p "require('./packages/memory-adapter/package.json').name")" = "@rukawua26/opencode-memory-adapter"
+          test "$(node -p "require('./packages/memory-adapter/package.json').version")" = "$REQUESTED_VERSION"
+          test "$(node -p "require('./packages/skills/package.json').name")" = "@rukawua26/opencode-skills"
+          test "$(node -p "require('./packages/skills/package.json').version")" = "$REQUESTED_VERSION"
 
       - name: Create version tag
         env:
-          GH_TOKEN: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PAT: ${{ secrets.ECOSYSTEMAPUBLISH2 }}
           REQUESTED_VERSION: ${{ inputs.version }}
+          RELEASE_SHA_INPUT: ${{ inputs.release_sha }}
+          RELEASE_SHA: ${{ needs.preflight.outputs.source_sha }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          if [ "$VERSION" != "$REQUESTED_VERSION" ]; then
-            echo "Requested version $REQUESTED_VERSION does not match package.json $VERSION" >&2
-            exit 1
-          fi
           TAG="v$VERSION"
           echo "RELEASE_TAG=$TAG" >> "$GITHUB_ENV"
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
-            bash tools/scripts/verify-release-tag.sh "$TAG" "$GITHUB_SHA"
+          if TAG_OBJECT=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.type + " " + .object.sha' 2>/dev/null); then
+            test -n "$RELEASE_SHA_INPUT" || { echo "$TAG appeared after preflight; start an explicit retry" >&2; exit 1; }
+            read -r TAG_TYPE TAG_SHA <<< "$TAG_OBJECT"
+            if [ "$TAG_TYPE" = "tag" ]; then TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_SHA" --jq .object.sha); fi
+            test "$TAG_SHA" = "$RELEASE_SHA" || { echo "$TAG does not point to $RELEASE_SHA" >&2; exit 1; }
             echo "$TAG already exists; continuing idempotent publication checks."
           else
+            test -z "$RELEASE_SHA_INPUT" || { echo "$TAG does not exist; release_sha is only valid for retries" >&2; exit 1; }
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git tag -a "$TAG" -m "Release $TAG"
-            git push origin "$TAG"
+            BASIC_AUTH=$(printf 'x-access-token:%s' "$RELEASE_PAT" | base64 -w0)
+            git -c http.extraheader="AUTHORIZATION: basic $BASIC_AUTH" push origin "refs/tags/$TAG"
           fi
-
-      - name: Restore public git remote
-        if: always()
-        run: git remote set-url origin https://github.com/${{ github.repository }}.git
+          echo "RELEASE_SHA=$RELEASE_SHA" >> "$GITHUB_ENV"
 
       - name: Create GitHub release for latest tag
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --generate-notes --latest
+        run: |
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --verify-tag --generate-notes --latest
+          TAG_OBJECT=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')
+          read -r TAG_TYPE TAG_SHA <<< "$TAG_OBJECT"
+          if [ "$TAG_TYPE" = "tag" ]; then TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_SHA" --jq .object.sha); fi
+          test "$TAG_SHA" = "$RELEASE_SHA" || { echo "$RELEASE_TAG moved from $RELEASE_SHA" >&2; exit 1; }
 
       - name: Publish memory-adapter to npm
         working-directory: packages/memory-adapter
         env:
+          GH_TOKEN: ${{ github.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          TAG_OBJECT=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')
+          read -r TAG_TYPE TAG_SHA <<< "$TAG_OBJECT"
+          if [ "$TAG_TYPE" = "tag" ]; then TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_SHA" --jq .object.sha); fi
+          test "$TAG_SHA" = "$RELEASE_SHA" || { echo "$RELEASE_TAG moved from $RELEASE_SHA" >&2; exit 1; }
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
-            PUBLISHED_GIT_HEAD=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" gitHead)
-            test "$PUBLISHED_GIT_HEAD" = "$GITHUB_SHA" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION was published from $PUBLISHED_GIT_HEAD, not $GITHUB_SHA" >&2; exit 1; }
+          test "$PACKAGE_NAME" = "@rukawua26/opencode-memory-adapter"
+          EXPECTED_INTEGRITY=$(npm pack --ignore-scripts --dry-run --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);console.log((Array.isArray(p)?p[0]:Object.values(p)[0]).integrity)})')
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then
+            PUBLISHED_GIT_HEAD=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" gitHead --registry=https://registry.npmjs.org)
+            PUBLISHED_INTEGRITY=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" dist.integrity --registry=https://registry.npmjs.org)
+            test "$PUBLISHED_GIT_HEAD" = "$RELEASE_SHA" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION was published from $PUBLISHED_GIT_HEAD, not $RELEASE_SHA" >&2; exit 1; }
+            test "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION tarball does not match the release source" >&2; exit 1; }
           else
-            npm publish --access public --provenance
+            npm publish --registry=https://registry.npmjs.org --access public --ignore-scripts
+            for attempt in 1 2 3 4 5; do
+              PUBLISHED_GIT_HEAD=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" gitHead --registry=https://registry.npmjs.org 2>/dev/null || true)
+              PUBLISHED_INTEGRITY=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" dist.integrity --registry=https://registry.npmjs.org 2>/dev/null || true)
+              [ "$PUBLISHED_GIT_HEAD" = "$RELEASE_SHA" ] && [ "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" ] && break
+              sleep 3
+            done
+            test "$PUBLISHED_GIT_HEAD" = "$RELEASE_SHA" && test "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION publication could not be verified" >&2; exit 1; }
           fi
+          TAG_OBJECT=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')
+          read -r TAG_TYPE TAG_SHA <<< "$TAG_OBJECT"
+          if [ "$TAG_TYPE" = "tag" ]; then TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_SHA" --jq .object.sha); fi
+          test "$TAG_SHA" = "$RELEASE_SHA" || { echo "$RELEASE_TAG moved during publication" >&2; exit 1; }
 
       - name: Publish skills to npm
         working-directory: packages/skills
         env:
+          GH_TOKEN: ${{ github.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          TAG_OBJECT=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')
+          read -r TAG_TYPE TAG_SHA <<< "$TAG_OBJECT"
+          if [ "$TAG_TYPE" = "tag" ]; then TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_SHA" --jq .object.sha); fi
+          test "$TAG_SHA" = "$RELEASE_SHA" || { echo "$RELEASE_TAG moved from $RELEASE_SHA" >&2; exit 1; }
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
-          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version >/dev/null 2>&1; then
-            PUBLISHED_GIT_HEAD=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" gitHead)
-            test "$PUBLISHED_GIT_HEAD" = "$GITHUB_SHA" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION was published from $PUBLISHED_GIT_HEAD, not $GITHUB_SHA" >&2; exit 1; }
+          test "$PACKAGE_NAME" = "@rukawua26/opencode-skills"
+          EXPECTED_INTEGRITY=$(npm pack --ignore-scripts --dry-run --json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const p=JSON.parse(s);console.log((Array.isArray(p)?p[0]:Object.values(p)[0]).integrity)})')
+          if npm view "$PACKAGE_NAME@$PACKAGE_VERSION" version --registry=https://registry.npmjs.org >/dev/null 2>&1; then
+            PUBLISHED_GIT_HEAD=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" gitHead --registry=https://registry.npmjs.org)
+            PUBLISHED_INTEGRITY=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" dist.integrity --registry=https://registry.npmjs.org)
+            test "$PUBLISHED_GIT_HEAD" = "$RELEASE_SHA" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION was published from $PUBLISHED_GIT_HEAD, not $RELEASE_SHA" >&2; exit 1; }
+            test "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION tarball does not match the release source" >&2; exit 1; }
           else
-            npm publish --access public --provenance
+            npm publish --registry=https://registry.npmjs.org --access public --ignore-scripts
+            for attempt in 1 2 3 4 5; do
+              PUBLISHED_GIT_HEAD=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" gitHead --registry=https://registry.npmjs.org 2>/dev/null || true)
+              PUBLISHED_INTEGRITY=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" dist.integrity --registry=https://registry.npmjs.org 2>/dev/null || true)
+              [ "$PUBLISHED_GIT_HEAD" = "$RELEASE_SHA" ] && [ "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" ] && break
+              sleep 3
+            done
+            test "$PUBLISHED_GIT_HEAD" = "$RELEASE_SHA" && test "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION publication could not be verified" >&2; exit 1; }
           fi
+          TAG_OBJECT=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')
+          read -r TAG_TYPE TAG_SHA <<< "$TAG_OBJECT"
+          if [ "$TAG_TYPE" = "tag" ]; then TAG_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$TAG_SHA" --jq .object.sha); fi
+          test "$TAG_SHA" = "$RELEASE_SHA" || { echo "$RELEASE_TAG moved during publication" >&2; exit 1; }

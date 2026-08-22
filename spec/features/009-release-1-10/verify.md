@@ -42,9 +42,15 @@ antes de crear el tag o publicar npm.
 
 ## Hallazgos corregidos
 
-- El workflow ahora rechaza un tag existente si no apunta a `GITHUB_SHA`.
+- El workflow rechaza un tag existente si no apunta al `RELEASE_SHA` validado
+  antes de ejecutar el candidato.
 - La release requiere dispatch y version explicitos, acciones fijadas a SHA y
-  npm provenance; una version npm existente debe coincidir en `gitHead`.
+  publicacion npm sin lifecycle scripts ni provenance no soportado; toda version
+  npm debe coincidir en `gitHead` e integridad despues de publicarse o durante
+  un reintento. El preflight exige CodeQL exitoso para el SHA exacto.
+- Los tests de release ejercitan modo nuevo, tag ya existente, retry sin tag,
+  retry exacto y retry conflictivo. La recuperacion es forward-only: npm no se
+  reemplaza; un artefacto incorrecto se depreca y se corrige con otra version.
 - Las guias secundarias enlazan al Quick Start canonico y ya no ejecutan `main`,
   documentan flags inexistentes ni atribuyen escrituras al MCP read-only.
 - Los tests Bash y PowerShell usan directorios temporales unicos para evitar

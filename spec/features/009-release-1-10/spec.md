@@ -34,7 +34,12 @@ commit autorreferenciales que no pueden prepararse dentro del mismo release.
   MUST pasar antes del push.
 - **R5**: la publicacion MUST iniciarse mediante `workflow_dispatch` explicito,
   depender de todos los jobs bloqueantes y producir tag, GitHub Release y
-  paquetes npm `1.10.0` con provenance.
+  paquetes npm `1.10.0` desde el commit exacto del tag. En repositorios privados,
+  la publicacion MUST omitir provenance no soportado por npm y MUST verificar
+  `gitHead` e integridad del tarball en reintentos idempotentes. El commit de
+  release MUST tener un run CodeQL exitoso antes de ejecutar el candidato. Un
+  release nuevo MUST requerir ausencia del tag; un reintento MUST requerir el
+  tag existente y su SHA completo explicito.
 - **R6**: la ausencia de `ollama embed` MUST degradar a busqueda textual y MUST
   quedar documentada como capacidad opcional, no como fallo de instalacion.
 - **R7**: Windows y CodeQL MUST finalizar sin omitir hallazgos; cuando GitHub Code
@@ -58,6 +63,10 @@ operaciones actuales.
 
 Dado el candidato verificado en `main`, cuando el humano solicita exactamente
 la version `1.10.0`, entonces CI pasa antes de crear el tag y publicar paquetes.
+Si una publicacion parcial requiere reintento, todos los jobs prueban el SHA
+completo del tag existente antes de continuar sin moverlo.
+Una publicacion npm incorrecta no se reemplaza: se depreca y se corrige en una
+nueva version.
 
 ### D. Ollama incompatible
 

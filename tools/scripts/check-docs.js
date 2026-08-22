@@ -28,6 +28,15 @@ function checkFile(relPath, checks) {
   }
 }
 
+function checkPatternCount(relPath, name, pattern, expected) {
+  const content = readFileSync(join(repoRoot, relPath), "utf-8");
+  const count = content.match(pattern)?.length ?? 0;
+  if (count !== expected) {
+    console.error(`[FAIL] ${relPath}: ${name} (expected ${expected}, found ${count})`);
+    errors++;
+  }
+}
+
 function checkPassiveSvg(relPath) {
   const content = readFileSync(join(repoRoot, relPath), "utf-8");
   const forbidden = [
@@ -180,11 +189,33 @@ checkFile("config/mcp/package.json", [
 
 checkFile(".github/workflows/test.yml", [
   { name: "should release only through explicit dispatch", pattern: /workflow_dispatch:[\s\S]*github\.event_name == 'workflow_dispatch'/, shouldNotExist: false },
-  { name: "should reject an existing release tag for another commit", pattern: /verify-release-tag\.sh "\$TAG" "\$GITHUB_SHA"/, shouldNotExist: false },
+  { name: "should reject an existing release tag for another commit", pattern: /git\/ref\/tags\/\$TAG[\s\S]*TAG_SHA[\s\S]*RELEASE_SHA/, shouldNotExist: false },
   { name: "should run the executable release tag contract", pattern: /npm run test:release/, shouldNotExist: false },
   { name: "should pin first-party actions to immutable SHAs", pattern: /uses:\s+actions\/(?:checkout|setup-node)@v\d/, shouldNotExist: true },
-  { name: "should publish npm provenance", pattern: /npm publish --access public --provenance/, shouldNotExist: false },
-  { name: "should verify existing npm package gitHead", pattern: /PUBLISHED_GIT_HEAD[\s\S]*GITHUB_SHA/, shouldNotExist: false },
+  { name: "should not request unsupported private-repository provenance", pattern: /npm publish[^\n]*--provenance/, shouldNotExist: true },
+  { name: "should publish npm without lifecycle scripts", pattern: /npm publish --registry=https:\/\/registry\.npmjs\.org --access public --ignore-scripts/, shouldNotExist: false },
+  { name: "should verify existing npm package gitHead", pattern: /PUBLISHED_GIT_HEAD[\s\S]*RELEASE_SHA/, shouldNotExist: false },
+  { name: "should pin idempotent retries to a full release commit", pattern: /release_sha:[\s\S]*\^\[0-9a-f\]\{40\}\$/, shouldNotExist: false },
+  { name: "should validate retries before candidate checkout", pattern: /preflight:[\s\S]*Existing tag does not point to[\s\S]*source_sha=\$SOURCE_SHA/, shouldNotExist: false },
+  { name: "should require tag absence for new releases", pattern: /already exists; release_sha is required for a retry/, shouldNotExist: false },
+  { name: "should require tag presence for retries", pattern: /does not exist; retry refused/, shouldNotExist: false },
+  { name: "should reject a tag race instead of changing modes", pattern: /appeared after preflight; start an explicit retry/, shouldNotExist: false },
+  { name: "should require successful main push CodeQL for the release commit", pattern: /workflows\/codeql\.yml\/runs[\s\S]*head_sha="\$SOURCE_SHA"[\s\S]*branch=main[\s\S]*event=push[\s\S]*status=success/, shouldNotExist: false },
+  { name: "should create releases only from an existing verified tag", pattern: /gh release create[^\n]*--verify-tag/, shouldNotExist: false },
+]);
+checkPatternCount(".github/workflows/test.yml", "all checkouts should use the preflight commit", /ref: \$\{\{ needs\.preflight\.outputs\.source_sha \}\}/g, 4);
+checkPatternCount(".github/workflows/test.yml", "all checkouts should discard credentials", /persist-credentials: false/g, 4);
+checkPatternCount(".github/workflows/test.yml", "both packages should use the fixed npm registry", /npm publish --registry=https:\/\/registry\.npmjs\.org --access public --ignore-scripts/g, 2);
+checkPatternCount(".github/workflows/test.yml", "both publications should verify gitHead", /publication could not be verified/g, 2);
+checkPatternCount(".github/workflows/test.yml", "both publications should verify tarball integrity", /tarball does not match the release source/g, 2);
+checkPatternCount(".github/workflows/test.yml", "both publications should recheck the tag afterward", /moved during publication/g, 2);
+
+checkFile("tests/release-workflow.test.sh", [
+  { name: "should test a new release without a tag", pattern: /run_case new-release success/, shouldNotExist: false },
+  { name: "should reject a new release with an existing tag", pattern: /run_case new-release-existing-tag failure/, shouldNotExist: false },
+  { name: "should reject a retry without a tag", pattern: /run_case retry-missing-tag failure/, shouldNotExist: false },
+  { name: "should accept an exact retry", pattern: /run_case retry-matching-tag success/, shouldNotExist: false },
+  { name: "should reject a conflicting retry", pattern: /run_case retry-conflicting-tag failure/, shouldNotExist: false },
 ]);
 
 checkFile(".github/workflows/codeql.yml", [
