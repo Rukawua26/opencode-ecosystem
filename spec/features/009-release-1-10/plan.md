@@ -34,6 +34,8 @@
   npm provenance se omite porque el registro no lo admite desde repos privados.
 - El preflight exige CodeQL exitoso para el SHA exacto y la integridad npm se
   compara con un pack local sin lifecycle scripts.
+- El job de publicacion fija Node `22.23.2` y npm `10.9.8` porque la normalizacion
+  del tarball forma parte de la integridad que debe repetirse en un retry.
 - La secuencia tag, GitHub Release y npm es forward-only: un fallo parcial se
   completa por reintento exacto; un artefacto incorrecto se depreca y requiere
   una version correctiva.

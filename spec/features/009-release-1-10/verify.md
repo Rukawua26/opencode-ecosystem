@@ -2,8 +2,8 @@
 
 ## Estado
 
-PASS local en Linux. La publicacion y validacion Windows nativa quedan pendientes
-del workflow bloqueante de `main`.
+PASS completo. Verificacion local, Windows, CodeQL, tag, GitHub Release y los dos
+paquetes npm finalizaron correctamente.
 
 ## Matriz
 
@@ -13,9 +13,9 @@ del workflow bloqueante de `main`.
 | R2 Checkout reproducible | PASS | README y contrato documental validan `git describe --tags --exact-match` |
 | R3 Fuente canonica | PASS | MOC, resumen, alias legado y tres runbooks usan `opencode-ecosystem` |
 | R4 Verificacion local | PASS | Suites, coverage, install Bash, hooks, audit, packs, doctor y diff pasan |
-| R5 Publicacion | PENDING | Requiere push a `main` y dispatch remoto `version=1.10.0` |
+| R5 Publicacion | PASS | Recovery run `32585511443`; tag, GitHub Release y dos paquetes npm verificados |
 | R6 Fallback Ollama | PASS | Deteccion del CLI incompatible, fallback explicito y 45/45 tests del adapter |
-| R7 Windows y CodeQL | PENDING | Correcciones locales listas; requiere repetir ambos workflows remotos |
+| R7 Windows y CodeQL | PASS | CI `32585330953` y CodeQL `32585330966` sobre `ae4a911`; recovery Windows verde |
 
 ## Evidencia local
 
@@ -34,11 +34,11 @@ del workflow bloqueante de `main`.
 - `node tools/scripts/doctor.js --json`: `ok: true`, 18 checks requeridos.
 - `git diff --check` y `bash -n`: PASS.
 
-## Limitacion local
+## Cobertura remota
 
-`pwsh` no esta instalado en la maquina. `npm run test:install:windows` no pudo
-iniciar por ausencia del ejecutable; el workflow Windows nativo es obligatorio
-antes de crear el tag o publicar npm.
+`pwsh` no esta instalado en la maquina, por lo que Windows se valido en el runner
+nativo `windows-latest`. El job paso tanto en CI de `main` como en el recovery
+antes de publicar npm.
 
 ## Hallazgos corregidos
 
@@ -51,6 +51,9 @@ antes de crear el tag o publicar npm.
 - Los tests de release ejercitan modo nuevo, tag ya existente, retry sin tag,
   retry exacto y retry conflictivo. La recuperacion es forward-only: npm no se
   reemplaza; un artefacto incorrecto se depreca y se corrige con otra version.
+- El recovery publicado resolvio Node `22.23.2` y npm `10.9.8`, confirmado en
+  logs y metadata npm. El workflow posterior fija esos valores para que futuros
+  reintentos reproduzcan la misma normalizacion y `dist.integrity`.
 - Las guias secundarias enlazan al Quick Start canonico y ya no ejecutan `main`,
   documentan flags inexistentes ni atribuyen escrituras al MCP read-only.
 - Los tests Bash y PowerShell usan directorios temporales unicos para evitar
@@ -67,4 +70,12 @@ antes de crear el tag o publicar npm.
 
 ## Publicacion remota
 
-Pendiente de completar con URL de workflow, tag, GitHub Release y versiones npm.
+- Commit del workflow de recovery: `ae4a911cc5eaaee15f6a1206fed00c3077ffb0e1`.
+- CI de `main`: <https://github.com/Rukawua26/opencode-ecosystem/actions/runs/32585330953>.
+- CodeQL del commit publicado `aa119ef`: <https://github.com/Rukawua26/opencode-ecosystem/actions/runs/32512238886>.
+- CodeQL del workflow de recovery `ae4a911`: <https://github.com/Rukawua26/opencode-ecosystem/actions/runs/32585330966>.
+- Recovery exitoso: <https://github.com/Rukawua26/opencode-ecosystem/actions/runs/32585511443>.
+- `v1.10.0` permanece en `aa119ef0db12fa168cabe468ad7c5c1fab86eeba`.
+- GitHub Release: <https://github.com/Rukawua26/opencode-ecosystem/releases/tag/v1.10.0>.
+- `@rukawua26/opencode-memory-adapter@1.10.0`: publicado con `gitHead=aa119ef0db12fa168cabe468ad7c5c1fab86eeba`.
+- `@rukawua26/opencode-skills@1.10.0`: publicado con `gitHead=aa119ef0db12fa168cabe468ad7c5c1fab86eeba`.

@@ -202,6 +202,8 @@ checkFile(".github/workflows/test.yml", [
   { name: "should reject a tag race instead of changing modes", pattern: /appeared after preflight; start an explicit retry/, shouldNotExist: false },
   { name: "should require successful main push CodeQL for the release commit", pattern: /workflows\/codeql\.yml\/runs[\s\S]*head_sha="\$SOURCE_SHA"[\s\S]*branch=main[\s\S]*event=push[\s\S]*status=success/, shouldNotExist: false },
   { name: "should create releases only from an existing verified tag", pattern: /gh release create[^\n]*--verify-tag/, shouldNotExist: false },
+  { name: "should pin the Node release toolchain", pattern: /node-version: 22\.23\.2/, shouldNotExist: false },
+  { name: "should fail closed on the npm release toolchain version", pattern: /test "\$\(npm --version\)" = "10\.9\.8"/, shouldNotExist: false },
 ]);
 checkPatternCount(".github/workflows/test.yml", "all checkouts should use the preflight commit", /ref: \$\{\{ needs\.preflight\.outputs\.source_sha \}\}/g, 4);
 checkPatternCount(".github/workflows/test.yml", "all checkouts should discard credentials", /persist-credentials: false/g, 4);

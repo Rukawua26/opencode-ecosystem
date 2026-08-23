@@ -206,7 +206,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 22
+          node-version: 22.23.2
           registry-url: https://registry.npmjs.org
 
       - name: Verify release candidate
@@ -215,6 +215,7 @@ jobs:
           REQUESTED_VERSION: ${{ inputs.version }}
         run: |
           test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
+          test "$(npm --version)" = "10.9.8"
           test "$(node -p "require('./package.json').name")" = "opencode-ecosystem"
           test "$(node -p "require('./package.json').version")" = "$REQUESTED_VERSION"
           test "$(node -p "require('./package.json').private")" = "true"
