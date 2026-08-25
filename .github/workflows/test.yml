@@ -64,7 +64,10 @@ jobs:
           fi
           CODEQL_RUN=$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/codeql.yml/runs" -f head_sha="$SOURCE_SHA" -f branch=main -f event=push -f status=success -f per_page=1 --jq '.workflow_runs[0] | [.html_url, .event, .head_branch, .head_sha, .conclusion] | @tsv')
           read -r CODEQL_URL CODEQL_EVENT CODEQL_BRANCH CODEQL_SHA CODEQL_CONCLUSION <<< "$CODEQL_RUN"
-          test "$CODEQL_EVENT" = "push" && test "$CODEQL_BRANCH" = "main" && test "$CODEQL_SHA" = "$SOURCE_SHA" && test "$CODEQL_CONCLUSION" = "success" || { echo "No successful main push CodeQL run exists for $SOURCE_SHA" >&2; exit 1; }
+          if [ "$CODEQL_EVENT" != "push" ] || [ "$CODEQL_BRANCH" != "main" ] || [ "$CODEQL_SHA" != "$SOURCE_SHA" ] || [ "$CODEQL_CONCLUSION" != "success" ]; then
+            echo "No successful main push CodeQL run exists for $SOURCE_SHA" >&2
+            exit 1
+          fi
           echo "Using successful CodeQL run $CODEQL_URL"
           echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
 
@@ -82,6 +85,23 @@ jobs:
         with:
           persist-credentials: false
           ref: ${{ needs.preflight.outputs.source_sha }}
+
+      - name: Run workflow static analysis
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+        run: |
+          set -euo pipefail
+          WORK_DIR="$(mktemp -d)"
+          curl -sSLo "$WORK_DIR/actionlint.tar.gz" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -sSLo "$WORK_DIR/actionlint-checksums.txt" "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_checksums.txt"
+          grep "actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz" "$WORK_DIR/actionlint-checksums.txt" | sed "s|actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz|actionlint.tar.gz|" | (cd "$WORK_DIR" && sha256sum -c -)
+          tar -xzf "$WORK_DIR/actionlint.tar.gz" -C "$WORK_DIR" actionlint
+          "$WORK_DIR/actionlint" -color
+
+      - name: Run shell script analysis
+        if: matrix.os == 'ubuntu-latest'
+        run: shellcheck --severity=warning install.sh tools/scripts/*.sh tests/*.sh
 
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
@@ -286,13 +306,16 @@ jobs:
             test "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION tarball does not match the release source" >&2; exit 1; }
           else
             npm publish --registry=https://registry.npmjs.org --access public --ignore-scripts
-            for attempt in 1 2 3 4 5; do
+            for _ in 1 2 3 4 5; do
               PUBLISHED_GIT_HEAD=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" gitHead --registry=https://registry.npmjs.org 2>/dev/null || true)
               PUBLISHED_INTEGRITY=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" dist.integrity --registry=https://registry.npmjs.org 2>/dev/null || true)
               [ "$PUBLISHED_GIT_HEAD" = "$RELEASE_SHA" ] && [ "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" ] && break
               sleep 3
             done
-            test "$PUBLISHED_GIT_HEAD" = "$RELEASE_SHA" && test "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION publication could not be verified" >&2; exit 1; }
+            if [ "$PUBLISHED_GIT_HEAD" != "$RELEASE_SHA" ] || [ "$PUBLISHED_INTEGRITY" != "$EXPECTED_INTEGRITY" ]; then
+              echo "$PACKAGE_NAME@$PACKAGE_VERSION publication could not be verified" >&2
+              exit 1
+            fi
           fi
           TAG_OBJECT=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')
           read -r TAG_TYPE TAG_SHA <<< "$TAG_OBJECT"
@@ -320,13 +343,16 @@ jobs:
             test "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION tarball does not match the release source" >&2; exit 1; }
           else
             npm publish --registry=https://registry.npmjs.org --access public --ignore-scripts
-            for attempt in 1 2 3 4 5; do
+            for _ in 1 2 3 4 5; do
               PUBLISHED_GIT_HEAD=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" gitHead --registry=https://registry.npmjs.org 2>/dev/null || true)
               PUBLISHED_INTEGRITY=$(npm view "$PACKAGE_NAME@$PACKAGE_VERSION" dist.integrity --registry=https://registry.npmjs.org 2>/dev/null || true)
               [ "$PUBLISHED_GIT_HEAD" = "$RELEASE_SHA" ] && [ "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" ] && break
               sleep 3
             done
-            test "$PUBLISHED_GIT_HEAD" = "$RELEASE_SHA" && test "$PUBLISHED_INTEGRITY" = "$EXPECTED_INTEGRITY" || { echo "$PACKAGE_NAME@$PACKAGE_VERSION publication could not be verified" >&2; exit 1; }
+            if [ "$PUBLISHED_GIT_HEAD" != "$RELEASE_SHA" ] || [ "$PUBLISHED_INTEGRITY" != "$EXPECTED_INTEGRITY" ]; then
+              echo "$PACKAGE_NAME@$PACKAGE_VERSION publication could not be verified" >&2
+              exit 1
+            fi
           fi
           TAG_OBJECT=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.type + " " + .object.sha')
           read -r TAG_TYPE TAG_SHA <<< "$TAG_OBJECT"

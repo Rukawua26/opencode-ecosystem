@@ -57,6 +57,7 @@ run_case() {
   if [ "$expected" = success ]; then
     # shellcheck disable=SC1090
     source "$output"
+    # shellcheck disable=SC2154
     test "$source_sha" = "$expected_source" || { echo "$name: unexpected source SHA" >&2; exit 1; }
   fi
 }

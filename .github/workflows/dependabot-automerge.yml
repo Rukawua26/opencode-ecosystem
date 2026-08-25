@@ -15,7 +15,6 @@ jobs:
       - name: Wait for CI checks to complete
         run: |
           PR_NUMBER=${{ github.event.pull_request.number }}
-          PR_REF=${{ github.event.pull_request.head.sha }}
           MAX_WAIT=600
           INTERVAL=30
           ELAPSED=0

@@ -228,6 +228,7 @@ is_protected_managed_path() {
 retain_install_backups() {
   local root="$HOME/.local/share/opencode/install-backups" backups=()
   [[ -d "$root" ]] || return 0
+  assert_no_symlink_components "$root" "$HOME"
   local backup path index
   while IFS= read -r backup; do backups+=("$backup"); done < <(
     for path in "$root"/*; do
@@ -235,7 +236,10 @@ retain_install_backups() {
     done | sort -r
   )
   for ((index=MAX_INSTALL_BACKUPS; index<${#backups[@]}; index++)); do
-    rm -rf "$root/${backups[$index]}"
+    case "${backups[$index]}" in
+      */*|"") error "Unsafe backup entry name: ${backups[$index]}"; exit 1 ;;
+    esac
+    rm -rf "$root/${backups[$index]:?}"
   done
 }
 
@@ -282,6 +286,7 @@ backup_sync_file() {
     return 0
   fi
   if [[ -z "$SYNC_BACKUP_DIR" ]]; then
+    assert_no_symlink_components "$HOME/.local/share/opencode/install-backups" "$HOME"
     SYNC_BACKUP_DIR="$HOME/.local/share/opencode/install-backups/$(date +%s)-$$"
     mkdir -p "$SYNC_BACKUP_DIR"
     retain_install_backups
@@ -413,7 +418,8 @@ copy_tree_if_ok() {
   fi
   if [[ -d "$dst_dir" && "$FORCE" == true ]]; then
     assert_managed_path_safe "$dst_dir"
-    local backup="$dst_dir.bak-$(date +%s)"
+    local backup
+    backup="$dst_dir.bak-$(date +%s)"
     if [[ "$DRY_RUN" == true ]]; then
       plan "backup: $label tree $dst_dir"
     else

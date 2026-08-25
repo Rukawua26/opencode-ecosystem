@@ -2,6 +2,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkWorkflowAnalysisSteps } from "./check-workflow.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..", "..");
@@ -37,8 +38,7 @@ function checkPatternCount(relPath, name, pattern, expected) {
   }
 }
 
-function checkPassiveSvg(relPath) {
-  const content = readFileSync(join(repoRoot, relPath), "utf-8");
+function checkPassiveSvg(relPath) {  const content = readFileSync(join(repoRoot, relPath), "utf-8");
   const forbidden = [
     /<!DOCTYPE|<!ENTITY/i,
     /<(?:\w+:)?(?:script|foreignObject|style|use|image|a|animate|animateColor|animateTransform|animateMotion|mpath|discard|set|iframe|object|embed)\b/i,
@@ -205,6 +205,12 @@ checkFile(".github/workflows/test.yml", [
   { name: "should pin the Node release toolchain", pattern: /node-version: 22\.23\.2/, shouldNotExist: false },
   { name: "should fail closed on the npm release toolchain version", pattern: /test "\$\(npm --version\)" = "10\.9\.8"/, shouldNotExist: false },
 ]);
+
+const workflowSource = readFileSync(join(repoRoot, ".github/workflows/test.yml"), "utf-8");
+for (const message of checkWorkflowAnalysisSteps(workflowSource)) {
+  console.error(`[FAIL] .github/workflows/test.yml: ${message}`);
+  errors++;
+}
 checkPatternCount(".github/workflows/test.yml", "all checkouts should use the preflight commit", /ref: \$\{\{ needs\.preflight\.outputs\.source_sha \}\}/g, 4);
 checkPatternCount(".github/workflows/test.yml", "all checkouts should discard credentials", /persist-credentials: false/g, 4);
 checkPatternCount(".github/workflows/test.yml", "both packages should use the fixed npm registry", /npm publish --registry=https:\/\/registry\.npmjs\.org --access public --ignore-scripts/g, 2);

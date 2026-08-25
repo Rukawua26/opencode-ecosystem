@@ -23,7 +23,7 @@
     "test:install": "bash tests/install.test.sh",
     "test:install:windows": "pwsh -NoProfile -File tests/install.test.ps1",
     "test:hooks": "bash tests/hooks.test.sh",
-    "test:release": "bash tests/release-tag.test.sh && bash tests/release-workflow.test.sh",
+    "test:release": "bash tests/release-tag.test.sh && bash tests/release-workflow.test.sh && node --test tests/workflow-static-analysis.test.mjs",
     "test:router": "node --test config/mcp/local-model-router.test.js",
     "eval:local-structure": "node tools/evals/local-model-structure.js",
     "check-docs": "node tools/scripts/check-docs.js",
@@ -33,7 +33,8 @@
     "@eslint/js": "^10.0.1",
     "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.8.1",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "yaml": "^2.9.0"
   },
   "overrides": {
     "brace-expansion": "5.0.9",

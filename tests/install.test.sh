@@ -11,12 +11,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 snapshot_home() {
-  local root="$1" current="$1"
-  local entry path rel stats target
+  local root="$1"
+  local entry path rel target
   while IFS= read -r -d '' entry; do
     path="${entry}"
     rel="${path#"$root"/}"
-    stats=''
     if [[ -L "$path" ]]; then
       target="$(readlink "$path")"
       printf '%s|link|%s\n' "$rel" "$target"
@@ -263,6 +262,23 @@ fi
 rm -f "$HOME/.config/opencode/plugins/guardrails.js"
 cp "$REPO_DIR/config/plugins/guardrails.js" "$HOME/.config/opencode/plugins/guardrails.js"
 echo "[OK] Sync refused managed symbolic links"
+
+# Backup retention must refuse a symlinked backups root instead of deleting beyond it.
+rm -rf "$HOME/.local/share/opencode/install-backups"
+mkdir -p "$HOME/outside-opencode"
+printf '%s\n' 'kept' > "$HOME/outside-opencode/must-survive"
+ln -s "$HOME/outside-opencode" "$HOME/.local/share/opencode/install-backups"
+if bash "$REPO_DIR/install.sh" --skip-memory --sync >/dev/null 2>&1; then
+  echo "[FAIL] Backup retention followed a symlinked backups root"
+  exit 1
+fi
+if [[ ! -f "$HOME/outside-opencode/must-survive" ]]; then
+  echo "[FAIL] Backup retention deleted data behind a symlinked root"
+  exit 1
+fi
+rm -f "$HOME/.local/share/opencode/install-backups" "$HOME/outside-opencode/must-survive"
+rmdir "$HOME/outside-opencode"
+echo "[OK] Backup retention refused a symlinked root"
 
 rm -f "$HOME/.config/opencode/plugins/guardrails.js"
 ln -s "$HOME/symlink-target" "$HOME/.config/opencode/plugins/guardrails.js"
