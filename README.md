@@ -133,8 +133,8 @@ depender de codigo externo inestable:
   tools, delegaciones, lecturas amplias, compactaciones y loops desde
   `session-metrics.jsonl`, como proxy de presupuesto sin conteo de tokens crudos.
 - **Dedupe SDD**: `sdd-phase-common.md` compartido por las 4 fases
-  (specify/plan/tasks/implement); ~63% menos tokens por ciclo SDD conservando
-  el flujo unico de cada fase.
+  (specify/plan/tasks/implement); presupuesto local medido 9356 -> 9744 bytes
+  (+4.15%) y el 63% upstream no se extrapola.
 - **DCP opcional**: Dynamic Context Pruning no se instala automaticamente (no
   esta en npm; PR upstream inmaduro). Se documenta como paso opt-in
   "enable-after-verify" con fallback a un hook propio minimo (dedup/purge).
@@ -215,9 +215,8 @@ Un receipt congela los hashes del candidato y registra lentes, verificacion y ga
 
 El estado actual del repositorio se valida con:
 
-- 106 tests Vitest;
-- 23 tests del router MCP;
-- 45 tests del memory adapter;
+- 119 tests Vitest (incluye 13 contratos SDD A-D), 23 tests del router MCP,
+  45 tests del memory adapter, 8 install tests en bash y Windows;
 - lint, coverage V8, contratos documentales y hooks;
 - instaladores reales en Linux, macOS, Alpine y Windows;
 - `npm audit` sin vulnerabilidades en la release;
@@ -287,8 +286,9 @@ detras de una aplicacion monolitica:
   de `opencode.jsonc` ni de archivos personalizados;
 - los agentes y skills viven como definiciones legibles, cargadas solo cuando la
   tarea las necesita;
-- `memory-adapter` mantiene la persistencia local y deja las escrituras como una
-  accion explicita;
+- `memory-adapter` mantiene la persistencia local dejando las escrituras como
+  una accion explicita, y las fases SDD referencian `skills/sdd-phase-common.md`
+  para no duplicar su envelope;
 - `local-model-router` separa trabajo local acotado de tareas que requieren el
   modelo cloud;
 - doctor, tests, CI y Organic RDD producen evidencia independiente del discurso
