@@ -56,6 +56,7 @@ try {
     Assert-Path (Join-Path $TestHome ".opencode\bin\opencode-light.cmd")
     Assert-Path (Join-Path $OpenCodeDir "tools\skills.js")
     Assert-Path (Join-Path $TestHome ".opencode\bin\opencode-skills.cmd")
+    Assert-Path (Join-Path $SkillsDir "sdd-phase-common.md")
 
     if ($IsWindows) {
         $NodeExecutable = @(Get-Command node -CommandType Application -ErrorAction Stop)[0].Source

@@ -5,8 +5,8 @@ description: Produce a technical implementation plan from an approved project-lo
 
 # SDD Plan
 
-Convierte `spec.md` existente en plan técnico local. Reglas transversales y plantillas en
-`../sdd-phase-common.md`.
+Convierte `spec.md` existente en plan técnico local. Aplica las secciones A-D y
+plantillas de `../sdd-phase-common.md`.
 
 ## Cuándo usar / Trigger
 - Existe `spec/features/<feature>/spec.md` y el usuario pide planificar.
@@ -29,11 +29,5 @@ Lee solo: `spec/constitution/working-agreement.md`, `spec/constitution/tech-stac
 - No planifiques sobre APIs/tipos/archivos no verificados en código real.
 
 ## Output
-```
-SDD PLAN CREATED
-Feature: spec/features/NNN-name/
-Plan: spec/features/NNN-name/plan.md
-Archivos previstos: X
-Riesgos: X
-Próximo paso: crear tasks con sdd-tasks
-```
+Usa el envelope de la sección D con encabezado `SDD PLAN CREATED`, artefacto
+`spec/features/NNN-name/plan.md`, número de archivos previstos y siguiente paso `sdd-tasks`.

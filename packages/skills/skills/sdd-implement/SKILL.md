@@ -5,8 +5,8 @@ description: Implement an approved project-local SDD feature task by task and ve
 
 # SDD Implement
 
-Implementa siguiendo `spec.md`+`plan.md`+`tasks.md` como ancla de verdad. Reglas transversales y
-plantillas en `../sdd-phase-common.md`.
+Implementa siguiendo `spec.md`+`plan.md`+`tasks.md` como ancla de verdad. Aplica las
+secciones A-D y plantillas de `../sdd-phase-common.md`.
 
 ## Trigger
 - Existen `spec.md`, `plan.md`, `tasks.md`; usuario pide implementar (`/implement-spec`, `SDD implement`).
@@ -41,11 +41,5 @@ Lee solo: `spec/constitution/{working-agreement,tech-stack}.md`,
 - No implementes features fuera de la spec; no ignores criterios fallidos; no ocultes fallos de test.
 
 ## Output
-```
-SDD IMPLEMENTATION COMPLETE
-Feature: spec/features/NNN-name/
-Tasks completed: X/Y
-Verification: PASS/FAIL
-Comandos ejecutados: ...
-Archivos modificados: ...
-```
+Usa el envelope de la sección D con encabezado `SDD IMPLEMENTATION COMPLETE`, tareas
+completadas, veredicto de verificación, comandos ejecutados y archivos modificados.

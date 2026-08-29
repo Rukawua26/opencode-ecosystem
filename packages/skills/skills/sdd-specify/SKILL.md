@@ -6,7 +6,7 @@ description: Create a project-local feature specification with scope and accepta
 # SDD Specify
 
 Convierte una idea de feature en una especificación técnica local al proyecto.
-Reglas transversales y plantillas en `../sdd-phase-common.md`.
+Aplica las secciones A-D y plantillas de `../sdd-phase-common.md`.
 
 ## Cuándo usar / Trigger
 - Usuario pide feature nueva, cambio complejo o behavior contract; o menciona `spec`, `especifica`,
@@ -29,10 +29,5 @@ Reglas transversales y plantillas en `../sdd-phase-common.md`.
 - Deja preguntas abiertas en `spec.md` y pregunta si falta info crítica.
 
 ## Output
-```
-SDD SPEC CREATED
-Feature: spec/features/NNN-name/
-Spec: spec/features/NNN-name/spec.md
-Preguntas abiertas: X
-Próximo paso: planificar con sdd-plan
-```
+Usa el envelope de la sección D con encabezado `SDD SPEC CREATED`, artefacto
+`spec/features/NNN-name/spec.md`, número de preguntas abiertas y siguiente paso `sdd-plan`.

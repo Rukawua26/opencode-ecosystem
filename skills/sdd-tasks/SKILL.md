@@ -5,8 +5,8 @@ description: Break an approved SDD plan into ordered, verifiable implementation 
 
 # SDD Tasks
 
-Divide `plan.md` en tareas atómicas, ordenadas y verificables. Reglas transversales y plantillas
-en `../sdd-phase-common.md`.
+Divide `plan.md` en tareas atómicas, ordenadas y verificables. Aplica las secciones
+A-D y plantillas de `../sdd-phase-common.md`.
 
 ## Cuándo usar / Trigger
 - Existen `spec.md` y `plan.md`; falta `tasks.md`. Usuario pide dividir en tareas
@@ -14,8 +14,8 @@ en `../sdd-phase-common.md`.
 
 ## Flujo
 1. **Leer**: `spec.md` + `plan.md` de la feature.
-2. **Crear `tasks.md`** (formato en `../sdd-phase-common.md`): cada tarea pequeña, ordenada,
-   verificable, un cambio claro, TDD cuando aplique (RED/GREEN/REFACTOR/VERIFY).
+2. **Crear `tasks.md`**: cada tarea lleva checkbox y define un cambio pequeño, ordenado y
+   verificable; usa TDD cuando aplique (RED/GREEN/REFACTOR/VERIFY).
 3. **Crear `verify.md`** si no existe.
 
 ## Restricciones (específicas)
@@ -23,10 +23,5 @@ en `../sdd-phase-common.md`.
 - No crees tareas vagas ("mejorar código"); si no verificable, reescríbela.
 
 ## Output
-```
-SDD TASKS CREATED
-Feature: spec/features/NNN-name/
-Tasks: X
-Verify file: spec/features/NNN-name/verify.md
-Próximo paso: implementar con sdd-implement
-```
+Usa el envelope de la sección D con encabezado `SDD TASKS CREATED`, número de tareas,
+artefactos `tasks.md` y `verify.md`, y siguiente paso `sdd-implement`.

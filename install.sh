@@ -543,6 +543,9 @@ copy_config() {
       skill_name="$(basename "$skill_dir")"
       copy_tree_if_ok "$skill_dir" "$HOME/opencode-custom/skills/$skill_name" "Skill $skill_name" || true
     done
+    if [[ -f "$repo_dir/skills/sdd-phase-common.md" ]]; then
+      copy_if_ok "$repo_dir/skills/sdd-phase-common.md" "$HOME/opencode-custom/skills/sdd-phase-common.md"
+    fi
   fi
 
   # .env.example

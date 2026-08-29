@@ -397,6 +397,10 @@ foreach ($d in $SkillDirs) {
     $dest = Join-Path $SkillsDir $d.Name
     $null = Copy-TreeIfOk $d.FullName $dest "Skill $($d.Name)"
 }
+$SddCommon = Join-Path $RepoDir "skills\sdd-phase-common.md"
+if (Test-Path $SddCommon) {
+    Copy-IfOk $SddCommon (Join-Path $SkillsDir "sdd-phase-common.md")
+}
 
 # .env.example
 $EnvExample = Join-Path $OpenCodeDir ".env.example"
