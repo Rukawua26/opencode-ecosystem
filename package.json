@@ -30,7 +30,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@opencode-ai/plugin": "1.18.14"
+    "@opencode-ai/plugin": "1.18.25"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
