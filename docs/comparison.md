@@ -6,8 +6,8 @@ Comparacion tecnica para decidir que adoptar sin copiar una plataforma completa.
 
 | Proyecto | Version analizada | Fecha |
 |---|---|---|
-| Gentle AI | `main` `b002e0e7dfd30d7dbf5c3b43cf8be4e0fa7162da`; estable `v2.3.0` | 2026-08-14 |
-| OpenCode Ecosystem | `main` desde `70ad924`; release `v1.9.0` | 2026-08-14 |
+| Gentle AI | `main` `1863432`; beta token-optimization `420555a`; estable `v2.3.0` | 2026-08-31 |
+| OpenCode Ecosystem | `main` `b32e0bc` (post Feature 012, CI verde) | 2026-08-31 |
 
 Filtro de decision: i5-1235U, 8 GB RAM, Ollama local, YAGNI, memoria acotada y
 ahorro de tokens medido, no supuesto.
@@ -22,7 +22,7 @@ ahorro de tokens medido, no supuesto.
 | Perfiles | Orquestadores y modelos por fase | `work`, `personal`, `light` y `default` |
 | Skills | 22 skills y registry | 21 skills, agentes especializados y registry index-first |
 | Routing | Directo, delegado u SDD opcional | Directo, maximo 3 subagentes, SDD opcional y router Ollama |
-| Review | RDD nativo y delivery gates | Organic RDD con receipts ligados al candidato |
+| Review | RDD nativo opt-in con outcomes informacionales | Organic RDD unificado (Feature 012): receipts, lineage, refuter y hook pre-commit |
 | Instalacion | TUI, Go install, Homebrew y binarios | Bash/PowerShell, manifest, dry-run y sync opt-in |
 | Releases | Checksums firmados y updater binario | Checkout por tag exacto y CI multiplataforma |
 
@@ -67,6 +67,10 @@ ahorro de tokens medido, no supuesto.
 6. Judgment Day o revisores duplicados para cambios ordinarios.
 7. Updater binario y Minisign mientras no exista un binario propio.
 8. La rama `main` externa como dependencia operativa.
+9. Community plugins TUI (sub-agent-statusline, sdd-engram-plugin): consumen
+   contexto y numerosos permisos; nuestros plugins cubren el caso con menos RAM.
+10. Compresion/deduplicacion de backups sin medicion: la retencion actual de
+    checkpoints (keep-N) debe medirse antes de añadir complejidad.
 
 ## Actualizaciones
 

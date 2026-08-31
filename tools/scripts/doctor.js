@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
-import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
-import { delimiter, join, relative, resolve, sep } from "node:path";
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { basename, delimiter, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { inspectConfiguration } from "./config-inspect.js";
 
@@ -242,6 +242,29 @@ addCheck("router.sdk", "router", "router @modelcontextprotocol/sdk installed", t
 const manifest = inspectManifest();
 addCheck("manifest.integrity", "manifest", "managed manifest valid", true, () => manifest.status === "valid");
 
+function listPluginFiles(directory) {
+  try {
+    return readdirSync(directory, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".js") && !entry.name.endsWith("-helpers.js"))
+      .map((entry) => entry.name)
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
+const plugins = {
+  configured: [...new Set([
+    ...(config.main.valid ? config.main.plugins : []),
+    ...(config.activeConfig.valid ? config.activeConfig.plugins : []),
+  ].map((entry) => basename(entry)))].sort(),
+  discoveredActive: listPluginFiles(join(OPENCODE_DIR, "plugins")),
+  disabled: listPluginFiles(join(OPENCODE_DIR, "plugins.disabled")),
+};
+const undeclaredActive = plugins.discoveredActive.filter((name) => !plugins.configured.includes(name));
+plugins.undeclaredActive = undeclaredActive;
+addCheck("plugins.auto-discovery", "plugins", "no undeclared plugins auto-load", false, () => undeclaredActive.length === 0);
+
 addCheck("optional.ollama", "optional", "Ollama server", false, () => commandWorks("ollama", ["list"]));
 addCheck("optional.doctor-command", "optional", "opencode-doctor installed", false, () => {
   const suffix = process.platform === "win32" ? ".cmd" : "";
@@ -263,12 +286,13 @@ const summary = {
 const ok = requiredChecks.every((check) => check.status === "pass");
 
 if (jsonMode) {
-  console.log(JSON.stringify({ schemaVersion: 1, ok, checks, summary, manifest, config }, null, 2));
+  console.log(JSON.stringify({ schemaVersion: 1, ok, checks, summary, manifest, config, plugins }, null, 2));
 } else {
   const sections = [
     ["runtime", "Runtime"],
     ["opencode", "OpenCode"],
     ["config", "Configuration and profiles"],
+    ["plugins", "Plugins"],
     ["memory", "Memory adapter"],
     ["router", "Local model router"],
     ["manifest", "Managed manifest"],
@@ -282,6 +306,10 @@ if (jsonMode) {
     for (const check of checks.filter((item) => item.section === id)) {
       const prefix = check.status === "pass" ? "OK" : check.status === "skip" ? "SKIP" : check.status.toUpperCase();
       console.log(`[${prefix}] ${check.name}${check.detail ? `: ${check.detail}` : ""}`);
+    }
+    if (id === "plugins") {
+      console.log(`active: ${plugins.discoveredActive.join(", ") || "none"}`);
+      console.log(`disabled: ${plugins.disabled.join(", ") || "none"}`);
     }
   }
   console.log("\n=== Summary ===");

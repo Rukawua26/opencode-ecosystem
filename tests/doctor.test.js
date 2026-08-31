@@ -84,7 +84,28 @@ describe("opencode-doctor", () => {
       expect.objectContaining({ name: "light", valid: true, model: "openai/test-light" }),
     ]));
     expect(report.config.notes).toEqual(expect.arrayContaining([expect.stringContaining("sdd_multi_model")]));
+    expect(report.plugins.configured).toEqual([]);
+    expect(report.plugins.discoveredActive).toEqual(["guardrails.js"]);
+    expect(report.plugins.disabled).toEqual([]);
+    expect(report.plugins.undeclaredActive).toEqual(["guardrails.js"]);
     expect(snapshot(home)).toEqual(before);
+  });
+
+  it("reports configured, discovered and disabled plugin files without loading them", () => {
+    write(".config/opencode/opencode.jsonc", '{ "plugin": ["./plugins/guardrails.js"] }');
+    write(".config/opencode/plugins/personal-extra.js");
+    write(".config/opencode/plugins/kanban-helpers.js");
+    write(".config/opencode/plugins.disabled/kanban.js");
+    const result = runDoctor(["--json"]);
+    expect(result.status).toBe(0);
+    const report = JSON.parse(result.stdout);
+    expect(report.plugins.configured).toEqual(["guardrails.js"]);
+    expect(report.plugins.discoveredActive).toEqual(["guardrails.js", "personal-extra.js"]);
+    expect(report.plugins.disabled).toEqual(["kanban.js"]);
+    expect(report.plugins.undeclaredActive).toEqual(["personal-extra.js"]);
+    expect(report.checks).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "plugins.auto-discovery", status: "skip" }),
+    ]));
   });
 
   it("reports invalid config without changing legacy required-check exits", () => {
