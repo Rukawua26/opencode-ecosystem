@@ -23,6 +23,17 @@ Aplica las secciones A-D y plantillas de `../sdd-phase-common.md`.
    Fuentes de verdad, Criterios de aceptación verificables, Riesgos, Preguntas abiertas
    (usa las plantillas de `../sdd-phase-common.md`).
 
+## Clarificación (opcional)
+Ejecuta solo si la spec quedó con "Preguntas abiertas" o la autoauditoría no tiene
+respuesta clara al alcance. Revisa `spec.md` como un QA, en una lista numerada, **sin
+proponer soluciones todavía**:
+- ambigüedades (términos o criterios con más de un significado);
+- contradicciones entre requisitos;
+- casos límite no cubiertos;
+- conflictos con `spec/constitution/`.
+
+Si hay hallazgos, resuélvelos en `spec.md` antes de cerrar; si no, se marca "sin hallazgos".
+
 ## Restricciones (específicas)
 - No implementes código durante Specify.
 - No leas specs de otras features salvo dependencia explícita.

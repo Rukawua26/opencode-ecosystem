@@ -136,6 +136,9 @@ jobs:
       - name: Run local-model-router tests (node:test)
         run: npm run test:router
 
+      - name: Run Organic RDD tests (node:test)
+        run: node --test tests/organic-rdd.test.js tests/organic-rdd-plugin.test.js tests/organic-rdd-gate-hook.test.js
+
       - name: Run install test
         run: npm run test:install
         env:
@@ -176,6 +179,9 @@ jobs:
 
       - name: Run local-model-router tests (node:test)
         run: npm run test:router
+
+      - name: Run Organic RDD tests (node:test)
+        run: node --test tests/organic-rdd.test.js tests/organic-rdd-plugin.test.js tests/organic-rdd-gate-hook.test.js
 
       - name: Run PowerShell install test
         run: npm run test:install:windows

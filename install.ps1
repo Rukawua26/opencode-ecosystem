@@ -113,6 +113,7 @@ $InstallDirectories = @(
     $OpenCodeDir,
     (Join-Path $OpenCodeDir "plugins"),
     (Join-Path $OpenCodeDir "lib"),
+    (Join-Path $OpenCodeDir "commands"),
     (Join-Path $OpenCodeDir "mcp"),
     (Join-Path $OpenCodeDir "agents"),
     (Join-Path $OpenCodeDir "profiles"),
@@ -341,6 +342,56 @@ if (Test-Path (Join-Path $RepoDir "config\plugins")) {
 if (Test-Path (Join-Path $RepoDir "config\lib")) {
     Copy-DirIfOk (Join-Path $RepoDir "config\lib") (Join-Path $OpenCodeDir "lib") "Plugin libraries"
     Write-Info "Plugin libraries copied"
+}
+
+# Commands
+if (Test-Path (Join-Path $RepoDir "config\commands")) {
+    Copy-DirIfOk (Join-Path $RepoDir "config\commands") (Join-Path $OpenCodeDir "commands") "Commands"
+    Write-Info "Commands copied"
+}
+
+# Plugin runtime dependencies (@opencode-ai/plugin)
+$ConfigPkg = Join-Path $RepoDir "config\package.json"
+$ConfigLock = Join-Path $RepoDir "config\package-lock.json"
+if ((Test-Path $ConfigPkg) -and (Test-Path $ConfigLock)) {
+    $UserManifest = $false
+    $ExistingPkg = Join-Path $OpenCodeDir "package.json"
+    if (Test-Path $ExistingPkg) {
+        $ExistingPkgContent = Get-Content -LiteralPath $ExistingPkg -Raw
+        if ($ExistingPkgContent -notmatch '"opencode-config-runtime"') { $UserManifest = $true }
+    }
+    if ($UserManifest) {
+        # Never npm ci over a user-owned manifest: it would delete their deps.
+        if ($DryRun) {
+            Write-Plan "install @opencode-ai/plugin --no-save" "user-owned manifest"
+        } else {
+            Push-Location $OpenCodeDir
+            & $NpmCommand install --no-save --ignore-scripts "@opencode-ai/plugin@1.18.14"
+            if ($LASTEXITCODE -ne 0) {
+                Pop-Location
+                Write-Err "Failed to install plugin runtime dependency into user manifest"
+                exit 1
+            }
+            Pop-Location
+            Write-Info "Plugin runtime dependency installed alongside user manifest"
+        }
+    } else {
+        Copy-IfOk $ConfigPkg (Join-Path $OpenCodeDir "package.json")
+        Copy-IfOk $ConfigLock (Join-Path $OpenCodeDir "package-lock.json")
+        if ($DryRun) {
+            Write-Plan "install-dependencies" "$OpenCodeDir (plugin runtime)"
+        } else {
+            Push-Location $OpenCodeDir
+            & $NpmCommand ci --omit=dev --ignore-scripts
+            if ($LASTEXITCODE -ne 0) {
+                Pop-Location
+                Write-Err "Failed to install plugin runtime dependencies in $OpenCodeDir"
+                exit 1
+            }
+            Pop-Location
+            Write-Info "Plugin runtime dependencies installed"
+        }
+    }
 }
 
 # MCP servers
@@ -597,7 +648,20 @@ Assert-Path (Join-Path $OpenCodeBinDir "opencode-profile.cmd") "opencode-profile
 Assert-Path (Join-Path $OpenCodeBinDir "opencode-light.cmd") "opencode-light command"
 Assert-Path (Join-Path $ToolsDir "skills.js") "skill registry"
 Assert-Path (Join-Path $OpenCodeBinDir "opencode-skills.cmd") "opencode-skills command"
+Assert-Path (Join-Path $OpenCodeDir "plugins\organic-rdd.js") "organic-rdd plugin"
+Assert-Path (Join-Path $OpenCodeDir "lib\organic-rdd.js") "organic-rdd library"
+Assert-Path (Join-Path $OpenCodeDir "commands\review-start.md") "review commands"
+Assert-Path (Join-Path $OpenCodeDir "node_modules\@opencode-ai\plugin\package.json") "plugin runtime dependency"
 if (-not $SkipMemory) { Assert-Path (Join-Path $OpenCodeBinDir "memory-adapter.cmd") "memory-adapter command" }
+
+# Verify Organic RDD plugin actually loads with its runtime dependency
+if (Test-Path (Join-Path $OpenCodeDir "node_modules\@opencode-ai\plugin\package.json")) {
+    $checks++
+    $RddImport = 'const m = await import(process.argv[1]); const p = await m.default(); process.exit(p.tool && p.tool.review_gate ? 0 : 1);'
+    & node --input-type=module -e $RddImport (Join-Path $OpenCodeDir "plugins\organic-rdd.js") 2>$null
+    if ($LASTEXITCODE -eq 0) { $passed++; Write-Host "[OK] Organic RDD plugin import" -ForegroundColor Green }
+    else { Write-Warn "[FAIL] Organic RDD plugin import" }
+}
 
 $agentCount = (Get-ChildItem (Join-Path $OpenCodeDir "agents") -Filter "*.md" -ErrorAction SilentlyContinue).Count
 $pluginCount = (Get-ChildItem (Join-Path $OpenCodeDir "plugins") -Filter "*.js" -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike "*-helpers.js" }).Count

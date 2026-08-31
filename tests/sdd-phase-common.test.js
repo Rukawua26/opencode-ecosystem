@@ -114,3 +114,27 @@ describe("SDD phase integration", () => {
     expect(reviewRisk.split("## Output contract")).toHaveLength(2);
   });
 });
+
+describe("SDD clarification and RF traceability", () => {
+  it("adds a QA clarification checklist to specify", () => {
+    const content = phaseContents["sdd-specify"];
+    expect(content).toContain("## Clarificación (opcional)");
+    for (const item of [
+      "ambigüedades",
+      "contradicciones",
+      "casos límite no cubiertos",
+      "conflictos con `spec/constitution/`",
+      "sin\nproponer soluciones",
+    ]) expect(content).toContain(item);
+  });
+
+  it("references functional requirements per task", () => {
+    expect(phaseContents["sdd-tasks"]).toContain("RF: <números>");
+  });
+
+  it("verifies requirement by requirement during implement", () => {
+    const content = phaseContents["sdd-implement"];
+    expect(content).toContain("cubierto/no");
+    expect(content).toContain("requisito huérfano = bloqueante");
+  });
+});

@@ -40,14 +40,23 @@
   "skills": {
     "paths": ["~/opencode-custom/skills"]
   },
+  "permission": {
+    "review_mode_get": "allow",
+    "review_status": "allow",
+    "review_validate": "allow",
+    "review_mode_set": "ask",
+    "review_start": "ask",
+    "review_capture": "ask",
+    "review_verify": "ask",
+    "review_finalize": "ask",
+    "review_gate": "ask"
+  },
   "plugin": [
-    "./plugins/personalities.js",
     "./plugins/guardrails.js",
     "./plugins/checkpoints.js",
-    "./plugins/kanban.js",
-    "./plugins/sandbox.js",
     "./plugins/validator.js",
-    "./plugins/session-metrics.js"
+    "./plugins/session-metrics.js",
+    "./plugins/organic-rdd.js"
   ],
   "mcp": {
     "memory-adapter": {

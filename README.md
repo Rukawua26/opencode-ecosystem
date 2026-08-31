@@ -211,6 +211,19 @@ Organic RDD revisa el candidato ya producido segun impacto:
 
 Un receipt congela los hashes del candidato y registra lentes, verificacion y gate. No sustituye los tests ni convierte cambios pequenos en features complejas.
 
+Los comandos `/review-start`, `/review-capture`, `/review-verify`, `/review-finalize`,
+`/review-validate` y `/review-gate` se instalan en `~/.config/opencode/commands/`.
+Una correccion humana crea un receipt sucesor con `parent_review_id`, mantiene el
+mismo scope y permite un maximo de dos intentos; `refuter` es un lens opcional.
+El gate pre-commit se instala por proyecto, opt-in:
+
+```bash
+tools/scripts/install-rdd-hook.sh /ruta/al/proyecto
+```
+
+Respeta hooks existentes (backup) y puede omitirse con `--no-verify`; es una
+barrera local, no autoridad remota.
+
 ## Verificacion
 
 El estado actual del repositorio se valida con:

@@ -30,7 +30,8 @@ Lee solo: `spec/constitution/{working-agreement,tech-stack}.md`,
 2.5 **Loop auto-correctivo**: máx 3 iter/tarea; tras 3 fallos, bloqueante en `verify.md`.
 2.6 **Anti-alucinación** (obligatorio antes de cerrar): lee archivos modificados, compara con
    spec/plan/tasks, verifica tipos/imports/APIs reales; corrige lo inventado.
-3. **Verificar**: checks de `plan.md`; registra en `verify.md` (sección anti-alucinación).
+3. **Verificar**: checks de `plan.md`; recorre cada RF de la spec marcando cubierto/no
+   cubierto (requisito huérfano = bloqueante); registra en `verify.md` (sección anti-alucinación).
 3.5 **Cross-Review**: subagente `code-reviewer-v2` con contexto limpio (`git diff` + spec/plan/tasks +
    tech-stack); CRITICAL→corregir y repetir; HIGH→documentar; escala a multi-agent si 3+ capas.
 3.6 **Reality-Check Gate**: PASS+sin CRITICAL/HIGH → AUTO-APPROVE; CRITICAL → pausar/corregir;

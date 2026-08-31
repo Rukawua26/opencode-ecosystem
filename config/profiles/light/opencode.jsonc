@@ -8,11 +8,23 @@
     "tail_turns": 3
   },
   "tool_output": { "max_lines": 60, "max_bytes": 2048 },
+  "permission": {
+    "review_mode_get": "allow",
+    "review_status": "allow",
+    "review_validate": "allow",
+    "review_mode_set": "ask",
+    "review_start": "ask",
+    "review_capture": "ask",
+    "review_verify": "ask",
+    "review_finalize": "ask",
+    "review_gate": "ask"
+  },
   "plugin": [
     "__OPENCODE_DIR__/plugins/guardrails.js",
     "__OPENCODE_DIR__/plugins/checkpoints.js",
     "__OPENCODE_DIR__/plugins/validator.js",
-    "__OPENCODE_DIR__/plugins/session-metrics.js"
+    "__OPENCODE_DIR__/plugins/session-metrics.js",
+    "__OPENCODE_DIR__/plugins/organic-rdd.js"
   ],
   "mcp": {
     "memory-adapter": {

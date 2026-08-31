@@ -11,6 +11,7 @@ export default defineConfig({
     exclude: [
       "packages/**",
       "**/node_modules/**",
+      "tests/organic-rdd*.test.js",
     ],
     coverage: {
       reporter: ["text", "json-summary"],

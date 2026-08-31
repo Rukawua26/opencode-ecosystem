@@ -29,6 +29,9 @@
     "check-docs": "node tools/scripts/check-docs.js",
     "lint": "eslint ."
   },
+  "dependencies": {
+    "@opencode-ai/plugin": "1.18.14"
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@vitest/coverage-v8": "^4.1.10",

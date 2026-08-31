@@ -30,3 +30,35 @@ test -f "${SYNC_FILES[0]}"
 test ! -e "$TARGET/.opencode-memory"
 
 echo "[PASS] Hook is target-safe, idempotent, non-recursive, and exports outside the repo"
+
+# Organic RDD pre-commit hook (opt-in): installs, backs up existing hooks and
+# never touches post-commit.
+RDD_TARGET="$TEMP/rdd-repo"
+mkdir -p "$RDD_TARGET"
+git -C "$RDD_TARGET" init -b main >/dev/null
+git -C "$RDD_TARGET" config user.name "Hook Test"
+git -C "$RDD_TARGET" config user.email "hook@example.invalid"
+
+bash "$ROOT/tools/scripts/install-rdd-hook.sh" "$RDD_TARGET" >/dev/null
+RDD_HOOKS="$(git -C "$RDD_TARGET" rev-parse --path-format=absolute --git-path hooks)"
+test -x "$RDD_HOOKS/pre-commit"
+sh -n "$RDD_HOOKS/pre-commit"
+grep -q "organic-rdd" "$RDD_HOOKS/pre-commit"
+
+echo "custom" > "$RDD_HOOKS/post-commit"
+echo "existing hook" > "$RDD_HOOKS/pre-commit"
+bash "$ROOT/tools/scripts/install-rdd-hook.sh" "$RDD_TARGET" >/dev/null
+test "$(cat "$RDD_HOOKS/pre-commit.pre-organic-rdd")" = "existing hook"
+test "$(cat "$RDD_HOOKS/post-commit")" = "custom"
+
+bash "$ROOT/tools/scripts/install-rdd-hook.sh" "$RDD_TARGET" >/dev/null
+grep -q "organic-rdd" "$RDD_HOOKS/pre-commit"
+
+# A composite hook that merely mentions organic-rdd must be backed up, not
+# silently replaced as if it were a managed copy.
+printf '#!/bin/sh\necho custom-check\necho uses-organic-rdd-string\n' > "$RDD_HOOKS/pre-commit"
+bash "$ROOT/tools/scripts/install-rdd-hook.sh" "$RDD_TARGET" >/dev/null
+grep -q "custom-check" "$RDD_HOOKS/pre-commit.pre-organic-rdd"
+grep -q "Organic RDD pre-commit gate" "$RDD_HOOKS/pre-commit"
+
+echo "[PASS] RDD hook is opt-in, backs up pre-commit, updates idempotently and preserves post-commit"

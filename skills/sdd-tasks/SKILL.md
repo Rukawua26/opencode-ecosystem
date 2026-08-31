@@ -15,7 +15,8 @@ A-D y plantillas de `../sdd-phase-common.md`.
 ## Flujo
 1. **Leer**: `spec.md` + `plan.md` de la feature.
 2. **Crear `tasks.md`**: cada tarea lleva checkbox y define un cambio pequeño, ordenado y
-   verificable; usa TDD cuando aplique (RED/GREEN/REFACTOR/VERIFY).
+   verificable; usa TDD cuando aplique (RED/GREEN/REFACTOR/VERIFY). Cada tarea referencia
+   los requisitos funcionales que cubre con `RF: <números>` de la spec.
 3. **Crear `verify.md`** si no existe.
 
 ## Restricciones (específicas)

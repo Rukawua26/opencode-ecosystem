@@ -1,0 +1,10 @@
+{
+  "name": "opencode-config-runtime",
+  "version": "1.10.0",
+  "private": true,
+  "type": "module",
+  "description": "Runtime dependencies for ~/.config/opencode plugins",
+  "dependencies": {
+    "@opencode-ai/plugin": "1.18.14"
+  }
+}

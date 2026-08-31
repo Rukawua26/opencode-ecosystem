@@ -92,6 +92,12 @@ assert_exists "$HOME/.opencode/bin/opencode-personal"
 assert_exists "$HOME/.opencode/bin/opencode-light"
 assert_exists "$HOME/.config/opencode/tools/skills.js"
 assert_exists "$HOME/.opencode/bin/opencode-skills"
+assert_exists "$HOME/.config/opencode/plugins/organic-rdd.js"
+assert_exists "$HOME/.config/opencode/lib/organic-rdd.js"
+assert_exists "$HOME/.config/opencode/commands/review-start.md"
+assert_exists "$HOME/.config/opencode/commands/review-gate.md"
+assert_exists "$HOME/.config/opencode/package.json"
+assert_exists "$HOME/.config/opencode/node_modules/@opencode-ai/plugin/package.json"
 
 # Verify MCP router SDK
 assert_exists "$HOME/.config/opencode/mcp/package.json"
@@ -123,6 +129,20 @@ if [[ $SKILL_COUNT -lt 10 ]]; then
   exit 1
 fi
 echo "[OK] $SKILL_COUNT skills installed"
+
+# A user-owned package.json is never clobbered; runtime dep is added via --no-save.
+printf '%s\n' '{"name":"user-custom","private":true}' > "$HOME/.config/opencode/package.json"
+bash "$REPO_DIR/install.sh" --skip-memory >/dev/null
+if ! grep -q '"user-custom"' "$HOME/.config/opencode/package.json"; then
+  echo "[FAIL] Install overwrote a user-owned package.json"
+  exit 1
+fi
+assert_exists "$HOME/.config/opencode/node_modules/@opencode-ai/plugin/package.json"
+if ! node --input-type=module -e 'const m = await import(process.argv[1]); const p = await m.default(); process.exit(p.tool && p.tool.review_gate ? 0 : 1);' "$HOME/.config/opencode/plugins/organic-rdd.js" 2>/dev/null; then
+  echo "[FAIL] Organic RDD plugin failed to load on a user-owned manifest"
+  exit 1
+fi
+echo "[OK] User-owned package.json preserved; plugin runtime installed no-save and loads"
 
 # A normal reinstall must preserve user customizations.
 printf '%s\n' 'user-agent-marker' > "$HOME/.config/opencode/agents/ai-matcher.md"

@@ -115,7 +115,7 @@ create_dirs() {
   log "Creating directories..."
   local directories=(
     "$OPENCODE_DIR" "$OPENCODE_DIR/plugins" "$OPENCODE_DIR/lib"
-    "$OPENCODE_DIR/mcp" "$OPENCODE_DIR/agents" "$OPENCODE_DIR/profiles"
+    "$OPENCODE_DIR/commands" "$OPENCODE_DIR/mcp" "$OPENCODE_DIR/agents" "$OPENCODE_DIR/profiles"
     "$OPENCODE_DIR/tools" "$OPENCODE_BIN_DIR"
     "$HOME/.local/share/opencode/plugins-data"
   )
@@ -485,6 +485,44 @@ copy_config() {
     info "Plugin libraries copied"
   fi
 
+  # Commands
+  if [[ -d "$repo_dir/config/commands" ]]; then
+    copy_dir_if_ok "$repo_dir/config/commands/*.md" "$OPENCODE_DIR/commands" "Commands"
+    info "Commands copied"
+  fi
+
+  # Plugin runtime dependencies (@opencode-ai/plugin resolution from config root)
+  if [[ -f "$repo_dir/config/package.json" && -f "$repo_dir/config/package-lock.json" ]]; then
+    local user_manifest=false
+    if [[ -f "$OPENCODE_DIR/package.json" ]] && ! grep -q '"opencode-config-runtime"' "$OPENCODE_DIR/package.json" 2>/dev/null; then
+      user_manifest=true
+    fi
+    if [[ "$user_manifest" == true ]]; then
+      # Never npm ci over a user-owned manifest: it would delete their deps.
+      if [[ "$DRY_RUN" == true ]]; then
+        plan "install @opencode-ai/plugin with --no-save into user-owned manifest"
+      else
+        (cd "$OPENCODE_DIR" && npm install --no-save --ignore-scripts @opencode-ai/plugin@1.18.14) || {
+          error "Failed to install plugin runtime dependency into user manifest"
+          exit 1
+        }
+        info "Plugin runtime dependency installed alongside user manifest"
+      fi
+    else
+      copy_if_ok "$repo_dir/config/package.json" "$OPENCODE_DIR/package.json"
+      copy_if_ok "$repo_dir/config/package-lock.json" "$OPENCODE_DIR/package-lock.json"
+      if [[ "$DRY_RUN" == true ]]; then
+        plan "install-dependencies: $OPENCODE_DIR (plugin runtime)"
+      else
+        (cd "$OPENCODE_DIR" && npm ci --omit=dev --ignore-scripts) || {
+          error "Failed to install plugin runtime dependencies in $OPENCODE_DIR"
+          exit 1
+        }
+        info "Plugin runtime dependencies installed"
+      fi
+    fi
+  fi
+
   # MCP servers
   log "Installing MCP servers..."
   if [[ -d "$repo_dir/config/mcp" ]]; then
@@ -638,6 +676,10 @@ verify_install() {
 
   check "$OPENCODE_DIR/opencode.jsonc"
   check "$OPENCODE_DIR/.env.example"
+  check "$OPENCODE_DIR/plugins/organic-rdd.js"
+  check "$OPENCODE_DIR/lib/organic-rdd.js"
+  check "$OPENCODE_DIR/commands/review-start.md"
+  check "$OPENCODE_DIR/commands/review-gate.md"
   check "$OPENCODE_DIR/tools/doctor.js"
   check "$OPENCODE_BIN_DIR/opencode-doctor"
   check "$OPENCODE_DIR/lib/session-metrics.js"
@@ -655,6 +697,20 @@ verify_install() {
   if [[ "$SKIP_MEMORY" != true ]]; then
     check "$OPENCODE_DIR/mcp/memory-adapter/package.json"
     check "$OPENCODE_BIN_DIR/memory-adapter"
+  fi
+
+  # Verify Organic RDD plugin actually loads with its runtime dependency
+  if [[ -d "$OPENCODE_DIR/node_modules/@opencode-ai/plugin" ]]; then
+    checks=$((checks+1))
+    if node --input-type=module -e "import(process.argv[1]).then(async m => { if (!m.default || typeof m.default !== 'function') process.exit(1); const p = await m.default(); process.exit(p.tool && p.tool.review_gate ? 0 : 1); }).catch(() => process.exit(1))" "$OPENCODE_DIR/plugins/organic-rdd.js" 2>/dev/null; then
+      passed=$((passed+1))
+      info "Organic RDD plugin import OK"
+    else
+      warn "Organic RDD plugin import failed"
+    fi
+  else
+    checks=$((checks+1))
+    warn "Missing plugin runtime dependency @opencode-ai/plugin"
   fi
 
   # Verify MCP router SDK can import
