@@ -81,3 +81,28 @@ Findings: 0 CRITICAL / 0 HIGH / 0 WARN
 - Ambos repositorios locales: arbol limpio y sincronizado con origin.
 - Runtime activo: plugin `organic-rdd.js` carga correctamente tras el reinicio.
 - Pendiente externo: validacion `tests/install.test.ps1` en Windows con `pwsh` (no disponible en esta maquina).
+
+## Correcciones Post-Publicacion (31-08-2026)
+
+La CI de `main` salio roja tras el commit de unificacion; correcciones aplicadas:
+
+1. **Windows (CRLF)**: `tests/sdd-phase-common.test.js` normaliza `\r\n` -> `\n`
+   en lecturas antes de las aserciones y compara el pack npm por contenido
+   normalizado (agnostic al autocrlf del checkout).
+2. **macOS (node 22)**:
+   - tests: fixtures canonizados con `realpathSync` (`/var` -> `/private/var`);
+   - libreria: `processIdentity()` es ahora cross-platform (Linux `/proc`,
+     Windows PowerShell `StartTime`, resto `ps -o lstart=`); la recuperacion de
+     locks abandonados ya no depende de `/proc`.
+3. **CodeQL**: `js/file-system-race` (sev 7.7) en dos tests eliminado
+   reescribiendo el patron read+stat con un unico descriptor
+   (`openSync`/`fstatSync`/`readFileSync(fd)`), sin TOCTOU real.
+4. **Consistencia de plugins**: los opcionales (`auto-memory`, `kanban`,
+   `personalities`, `sandbox` + helpers) se movieron de `config/plugins/` a
+   `config/plugins.disabled/` porque OpenCode auto-descubre todo el contenido
+   de `plugins/`; los instaladores copian el directorio deshabilitado y la
+   activacion es opt-in. README y `~/AGENTS.md` alineados; runtime activo
+   actualizado (5 nucleo + extras personales).
+
+Suites locales tras los fixes: Vitest 123/123, RDD 101/101, install PASS,
+hooks PASS, lint/check-docs/shellcheck OK.

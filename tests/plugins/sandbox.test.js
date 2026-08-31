@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateImage, buildDockerArgs } from "../../config/plugins/sandbox-helpers.js";
+import { validateImage, buildDockerArgs } from "../../config/plugins.disabled/sandbox-helpers.js";
 
 describe("Sandbox image validation", () => {
   it("accepts a valid image name", () => {

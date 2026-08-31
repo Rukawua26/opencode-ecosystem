@@ -230,7 +230,7 @@ checkFile(".github/workflows/codeql.yml", [
   { name: "should pin CodeQL workflow actions to immutable SHAs", pattern: /uses:\s+(?:actions\/checkout|github\/codeql-action\/[^@]+)@v\d/, shouldNotExist: true },
 ]);
 
-checkFile("config/plugins/sandbox.js", [
+checkFile("config/plugins.disabled/sandbox.js", [
   { name: "should not use shell: true", pattern: /shell:\s*true/, shouldNotExist: true },
 ]);
 

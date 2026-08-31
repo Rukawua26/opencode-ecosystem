@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const skillsDir = join(repoRoot, "skills");
-const common = readFileSync(join(skillsDir, "sdd-phase-common.md"), "utf8");
+const readText = (path) => readFileSync(path, "utf8").replace(/\r\n/g, "\n");
+const common = readText(join(skillsDir, "sdd-phase-common.md"));
 const packageSkillsDir = join(repoRoot, "packages", "skills", "skills");
 const bashInstaller = readFileSync(join(repoRoot, "install.sh"), "utf8");
 const powerShellInstaller = readFileSync(join(repoRoot, "install.ps1"), "utf8");
@@ -19,7 +20,7 @@ const phases = {
   "sdd-implement": "SDD IMPLEMENTATION COMPLETE",
 };
 const phaseContents = Object.fromEntries(
-  Object.keys(phases).map((name) => [name, readFileSync(join(skillsDir, name, "SKILL.md"), "utf8")]),
+  Object.keys(phases).map((name) => [name, readText(join(skillsDir, name, "SKILL.md"))]),
 );
 
 describe("SDD common protocol", () => {
@@ -88,10 +89,10 @@ describe("SDD phase integration", () => {
     });
   }
 
-  it("keeps the npm distribution byte-identical", () => {
-    expect(readFileSync(join(packageSkillsDir, "sdd-phase-common.md"), "utf8")).toBe(common);
+  it("keeps the npm distribution content-identical", () => {
+    expect(readText(join(packageSkillsDir, "sdd-phase-common.md"))).toBe(common);
     for (const [name, content] of Object.entries(phaseContents)) {
-      expect(readFileSync(join(packageSkillsDir, name, "SKILL.md"), "utf8")).toBe(content);
+      expect(readText(join(packageSkillsDir, name, "SKILL.md"))).toBe(content);
     }
   });
 

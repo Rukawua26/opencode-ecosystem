@@ -112,6 +112,7 @@ Write-Log "Creating directories..."
 $InstallDirectories = @(
     $OpenCodeDir,
     (Join-Path $OpenCodeDir "plugins"),
+    (Join-Path $OpenCodeDir "plugins.disabled"),
     (Join-Path $OpenCodeDir "lib"),
     (Join-Path $OpenCodeDir "commands"),
     (Join-Path $OpenCodeDir "mcp"),
@@ -337,6 +338,10 @@ Write-Log "Installing plugins..."
 if (Test-Path (Join-Path $RepoDir "config\plugins")) {
     Copy-DirIfOk (Join-Path $RepoDir "config\plugins") (Join-Path $OpenCodeDir "plugins") "Plugins"
     Write-Info "Plugins copied"
+}
+if (Test-Path (Join-Path $RepoDir "config\plugins.disabled")) {
+    Copy-DirIfOk (Join-Path $RepoDir "config\plugins.disabled") (Join-Path $OpenCodeDir "plugins.disabled") "Optional plugins (disabled)"
+    Write-Info "Optional plugins stored disabled"
 }
 
 if (Test-Path (Join-Path $RepoDir "config\lib")) {

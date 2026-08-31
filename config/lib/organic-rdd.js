@@ -809,11 +809,24 @@ export function createOrganicRdd({ storeDir } = {}) {
   }
 
   function processIdentity(pid) {
-    if (process.platform !== "linux") return null;
     try {
-      const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
-      const fields = stat.slice(stat.lastIndexOf(")") + 2).trim().split(/\s+/);
-      return fields[19] || null;
+      if (process.platform === "linux") {
+        const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+        const fields = stat.slice(stat.lastIndexOf(")") + 2).trim().split(/\s+/);
+        return fields[19] || null;
+      }
+      if (process.platform === "win32") {
+        const out = execFileSync("powershell", [
+          "-NoProfile", "-Command",
+          `(Get-Process -Id ${pid}).StartTime.ToFileTimeUtc()`,
+        ], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+        return out.trim() || null;
+      }
+      const out = execFileSync("ps", ["-o", "lstart=", "-p", String(pid)], {
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      return out.trim() || null;
     } catch {
       return null;
     }

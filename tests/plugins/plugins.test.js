@@ -5,43 +5,60 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pluginsDir = join(__dirname, "..", "..", "config", "plugins");
+const disabledDir = join(__dirname, "..", "..", "config", "plugins.disabled");
 
-function getPluginFiles() {
-  if (!existsSync(pluginsDir)) return [];
-  return readdirSync(pluginsDir).filter((f) => f.endsWith(".js") && !f.endsWith("-helpers.js"));
+function listPlugins(dir) {
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir).filter((f) => f.endsWith(".js") && !f.endsWith("-helpers.js"));
 }
+
+const getPluginFiles = () => listPlugins(pluginsDir);
+const getDisabledPluginFiles = () => listPlugins(disabledDir);
 
 function readPlugin(name) {
-  return readFileSync(join(pluginsDir, name), "utf-8");
+  const dir = existsSync(join(pluginsDir, name)) ? pluginsDir : disabledDir;
+  return readFileSync(join(dir, name), "utf-8");
 }
 
-const REQUIRED_PLUGINS = [
-  "auto-memory.js",
+const CORE_PLUGINS = [
   "checkpoints.js",
   "guardrails.js",
+  "organic-rdd.js",
+  "session-metrics.js",
+  "validator.js",
+];
+
+const OPTIONAL_PLUGINS = [
+  "auto-memory.js",
   "kanban.js",
   "personalities.js",
   "sandbox.js",
-  "session-metrics.js",
-  "validator.js",
 ];
 
 describe("Plugins registry", () => {
   const plugins = getPluginFiles();
 
-  it("should have at least 5 plugin files", () => {
-    expect(plugins.length).toBeGreaterThanOrEqual(5);
+  it("core directory has exactly the 5 core plugins", () => {
+    expect(plugins.sort()).toEqual([...CORE_PLUGINS].sort());
   });
 
-  it("all required plugins should exist", () => {
-    for (const req of REQUIRED_PLUGINS) {
-      expect(plugins, `missing required plugin ${req}`).toContain(req);
+  it("optional plugins live in plugins.disabled", () => {
+    const disabled = getDisabledPluginFiles();
+    for (const optional of OPTIONAL_PLUGINS) {
+      expect(disabled, `missing optional plugin ${optional}`).toContain(optional);
     }
+    for (const core of CORE_PLUGINS) {
+      expect(disabled, `core plugin ${core} must not be disabled`).not.toContain(core);
+    }
+  });
+
+  it("all plugins (core and optional) pass safety checks", () => {
+    expect([...plugins, ...getDisabledPluginFiles()].length).toBe(CORE_PLUGINS.length + OPTIONAL_PLUGINS.length);
   });
 });
 
 describe("Plugin exports", () => {
-  const plugins = getPluginFiles();
+  const plugins = [...getPluginFiles(), ...getDisabledPluginFiles()];
 
   it("each plugin should export an async function", () => {
     for (const plugin of plugins) {
@@ -67,14 +84,14 @@ describe("Plugin exports", () => {
 
 describe("Plugin safety", () => {
   it("plugins should not contain eval()", () => {
-    for (const plugin of getPluginFiles()) {
+    for (const plugin of [...getPluginFiles(), ...getDisabledPluginFiles()]) {
       const content = readPlugin(plugin);
       expect(content.includes("eval("), `${plugin} uses eval()`).toBe(false);
     }
   });
 
   it("plugins should not hardcode secrets or API keys", () => {
-    for (const plugin of getPluginFiles()) {
+    for (const plugin of [...getPluginFiles(), ...getDisabledPluginFiles()]) {
       const content = readPlugin(plugin);
       const hasSecret =
         /(?:sk-|ghp_|gho_|npm_)[A-Za-z0-9]{20,}/.test(content) ||
@@ -84,7 +101,7 @@ describe("Plugin safety", () => {
   });
 
   it("plugins should use process.env for environment access", () => {
-    for (const plugin of getPluginFiles()) {
+    for (const plugin of [...getPluginFiles(), ...getDisabledPluginFiles()]) {
       const content = readPlugin(plugin);
       if (content.includes("process.env")) continue;
       const needsEnv =

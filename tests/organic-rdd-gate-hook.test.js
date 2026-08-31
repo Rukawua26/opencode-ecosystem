@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +17,7 @@ const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const HOOK_PATH = join(repoRoot, "hooks", "pre-commit");
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "organic-rdd-gate-hook-"));
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "organic-rdd-gate-hook-")));
   const project = join(root, "project");
   const store = join(root, "store");
   mkdirSync(project, { recursive: true });

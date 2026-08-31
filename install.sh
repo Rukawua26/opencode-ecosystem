@@ -114,7 +114,7 @@ check_deps() {
 create_dirs() {
   log "Creating directories..."
   local directories=(
-    "$OPENCODE_DIR" "$OPENCODE_DIR/plugins" "$OPENCODE_DIR/lib"
+    "$OPENCODE_DIR" "$OPENCODE_DIR/plugins" "$OPENCODE_DIR/plugins.disabled" "$OPENCODE_DIR/lib"
     "$OPENCODE_DIR/commands" "$OPENCODE_DIR/mcp" "$OPENCODE_DIR/agents" "$OPENCODE_DIR/profiles"
     "$OPENCODE_DIR/tools" "$OPENCODE_BIN_DIR"
     "$HOME/.local/share/opencode/plugins-data"
@@ -478,6 +478,10 @@ copy_config() {
   if [[ -d "$repo_dir/config/plugins" ]]; then
     copy_dir_if_ok "$repo_dir/config/plugins/*.js" "$OPENCODE_DIR/plugins" "Plugins"
     info "Plugins copied"
+  fi
+  if [[ -d "$repo_dir/config/plugins.disabled" ]]; then
+    copy_dir_if_ok "$repo_dir/config/plugins.disabled/*.js" "$OPENCODE_DIR/plugins.disabled" "Optional plugins (disabled)"
+    info "Optional plugins stored disabled"
   fi
 
   if [[ -d "$repo_dir/config/lib" ]]; then

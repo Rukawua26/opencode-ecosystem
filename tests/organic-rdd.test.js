@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, fstatSync, mkdtempSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 const normalizePath = (p) => resolve(p);
@@ -13,7 +13,9 @@ import {
 } from "../config/lib/organic-rdd.js";
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "organic-rdd-"));
+  // macOS tmpdir is /var, symlinked to /private/var; canonicalize so
+  // assertions match the realpath'd paths returned by git and the library.
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "organic-rdd-")));
   const project = join(root, "project");
   const store = join(root, "store");
   mkdirSync(project, { recursive: true });
@@ -1115,12 +1117,19 @@ test("validate is imported for read-only", () => {
   file("docs/readme.md");
   const receipt = rdd.start({ project_path: project, feature_id: "docs", files: ["docs/readme.md"] });
   const receiptPath = join(store, "reviews", `${receipt.review_id}.json`);
-  const before = readFileSync(receiptPath, "utf8");
-  const beforeMtime = statSync(receiptPath).mtimeMs;
+  const snapshot = () => {
+    const fd = openSync(receiptPath, "r");
+    try {
+      return { content: readFileSync(fd, "utf8"), mtime: fstatSync(fd).mtimeMs };
+    } finally {
+      closeSync(fd);
+    }
+  };
+  const before = snapshot();
   rdd.validate(receipt.review_id, project);
-  const after = readFileSync(receiptPath, "utf8");
-  assert.equal(before, after);
-  assert.equal(statSync(receiptPath).mtimeMs, beforeMtime);
+  const after = snapshot();
+  assert.equal(before.content, after.content);
+  assert.equal(after.mtime, before.mtime);
 });
 
 test("validate project binding passes when workspace matches", () => {
@@ -1178,11 +1187,19 @@ test("validate does not refresh or lock the Git index", () => {
   git(["commit", "-m", "initial"], project);
   const receipt = rdd.start({ project_path: project, feature_id: "docs", files: ["docs/a.md"] });
   const indexPath = join(project, ".git", "index");
-  const before = readFileSync(indexPath);
-  const beforeMtime = statSync(indexPath).mtimeMs;
+  const snapshot = () => {
+    const fd = openSync(indexPath, "r");
+    try {
+      return { content: readFileSync(fd), mtime: fstatSync(fd).mtimeMs };
+    } finally {
+      closeSync(fd);
+    }
+  };
+  const before = snapshot();
   rdd.validate(receipt.review_id, project);
-  assert.deepEqual(readFileSync(indexPath), before);
-  assert.equal(statSync(indexPath).mtimeMs, beforeMtime);
+  const after = snapshot();
+  assert.deepEqual(after.content, before.content);
+  assert.equal(after.mtime, before.mtime);
   assert.equal(existsSync(join(project, ".git", "index.lock")), false);
 });
 

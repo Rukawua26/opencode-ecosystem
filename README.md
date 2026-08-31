@@ -124,11 +124,13 @@ Presupuesto de contexto para maquinas modestas (i5/8GB), local-first y sin
 depender de codigo externo inestable:
 
 - **Piso fijo recortado**: triggers de nube ajustados ("arquitectura" suelta ya
-  no fuerza modelo cloud); `playwright` MCP inactivo por defecto; plugins no
-  esenciales (`kanban`, `personalities`, `sandbox`) movidos a `plugins.disabled/`.
-- **Memoria anti-inflacion**: prevencion anti-efimera en `auto-memory`, rotacion
+  no fuerza modelo cloud); `playwright` MCP inactivo por defecto; solo se
+  cargan los 5 plugins nucleo y los opcionales (`auto-memory`, `kanban`,
+  `personalities`, `sandbox`) viven en `config/plugins.disabled/` — se copian
+  deshabilitados y se activan moviendo el archivo a `plugins/` (opt-in).
+- **Memoria anti-inflacion**: registros efimeros no se persisten; rotacion
   de logs, poda diaria por cron (`memory_prune.js`) y bordes que reinyectan
-  decisiones al inicio/fin del contexto (`memory-edges`).
+  decisiones al inicio/fin del contexto (`memory-edges`, plugin personal).
 - **Visibilidad en vivo**: plugin `context-stats` (`/context_stats`) reporta
   tools, delegaciones, lecturas amplias, compactaciones y loops desde
   `session-metrics.jsonl`, como proxy de presupuesto sin conteo de tokens crudos.
@@ -149,6 +151,7 @@ codigo de terceros no empaquetado.
 | **16 agentes** | Definiciones especializadas para arquitectura, backend, frontend, seguridad, revision y producto |
 | **21 skills** | SDD, prompts, debug, seguridad, TDD y `obsidian-ingest`; cargadas bajo demanda |
 | **5 plugins activos por defecto** | guardrails, checkpoints, validator, session-metrics, organic-rdd |
+| **4 plugins opt-in** | auto-memory, kanban, personalities y sandbox en `config/plugins.disabled/` (no se cargan) |
 | **4 MCP locales activos** | local-model-router, memory-adapter, context7 y diagram-generator |
 | **2 MCP opt-in** | Context7 y diagram-generator, deshabilitados por defecto |
 | **3 perfiles** | work, personal y light |
