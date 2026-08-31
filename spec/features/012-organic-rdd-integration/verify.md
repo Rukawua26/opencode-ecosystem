@@ -73,3 +73,11 @@ Findings: 0 CRITICAL / 0 HIGH / 0 WARN
 
 - Feature 014 remota: archivar el repo remoto de opendotfile (hecho localmente: banner en README).
 - `docs/` diagrams pueden mencionar comandos RDD en una revision posterior.
+
+## Publicacion Final
+
+- opencode-ecosystem: commit `f446f57` publicado en `origin/main` (https://github.com/Rukawua26/opencode-ecosystem).
+- opendotfile: commits locales (incluidos 2 adelantados) publicados; commit final `fed22af` en `origin/main`; repositorio remoto **archivado** (`gh repo view` → `archived=true`).
+- Ambos repositorios locales: arbol limpio y sincronizado con origin.
+- Runtime activo: plugin `organic-rdd.js` carga correctamente tras el reinicio.
+- Pendiente externo: validacion `tests/install.test.ps1` en Windows con `pwsh` (no disponible en esta maquina).
