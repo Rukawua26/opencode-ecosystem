@@ -106,3 +106,12 @@ La CI de `main` salio roja tras el commit de unificacion; correcciones aplicadas
 
 Suites locales tras los fixes: Vitest 123/123, RDD 101/101, install PASS,
 hooks PASS, lint/check-docs/shellcheck OK.
+
+### Alcance Windows (decision 31-08-2026)
+
+Los tests `node:test` de Organic RDD son POSIX-only: el primer run de Windows
+expuso 20 fallos de portabilidad (separadores `\\` vs `/`, modos POSIX,
+permisos de hooks). Se retira ese paso del job Windows (queda comentado en el
+workflow) y Windows sigue validando instalacion, Vitest y carga del plugin en
+PowerShell. Soportar RDD completo en Windows queda fuera de alcance mientras
+el runtime de trabajo sea Linux/macOS.

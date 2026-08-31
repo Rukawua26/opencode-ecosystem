@@ -180,8 +180,10 @@ jobs:
       - name: Run local-model-router tests (node:test)
         run: npm run test:router
 
-      - name: Run Organic RDD tests (node:test)
-        run: node --test tests/organic-rdd.test.js tests/organic-rdd-plugin.test.js tests/organic-rdd-gate-hook.test.js
+      # Organic RDD core tests are POSIX-only (path canonicalization, POSIX
+      # modes, git hooks) and run in the linux/macos matrix jobs; the
+      # PowerShell install test below still verifies that the plugin package
+      # and dependencies install and load on Windows.
 
       - name: Run PowerShell install test
         run: npm run test:install:windows
