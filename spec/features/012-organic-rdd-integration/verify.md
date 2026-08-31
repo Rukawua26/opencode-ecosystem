@@ -115,3 +115,11 @@ permisos de hooks). Se retira ese paso del job Windows (queda comentado en el
 workflow) y Windows sigue validando instalacion, Vitest y carga del plugin en
 PowerShell. Soportar RDD completo en Windows queda fuera de alcance mientras
 el runtime de trabajo sea Linux/macOS.
+
+### Cierre final CI (53ab4c6)
+
+- CI - Tests: TODOS los jobs verdes (ubuntu, macOS 22, Windows, install-validation, preflight).
+- CodeQL: verde sin findings bloqueantes.
+- Windows: instalador PowerShell verificado en CI, incluido el smoke de
+  importacion del plugin RDD (se corrigio `import()` con `pathToFileURL`).
+- Estados: opencode-ecosystem `main` verde; repositorios limpios.
