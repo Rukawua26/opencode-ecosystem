@@ -662,7 +662,7 @@ if (-not $SkipMemory) { Assert-Path (Join-Path $OpenCodeBinDir "memory-adapter.c
 # Verify Organic RDD plugin actually loads with its runtime dependency
 if (Test-Path (Join-Path $OpenCodeDir "node_modules\@opencode-ai\plugin\package.json")) {
     $checks++
-    $RddImport = 'const m = await import(process.argv[1]); const p = await m.default(); process.exit(p.tool && p.tool.review_gate ? 0 : 1);'
+    $RddImport = 'const { pathToFileURL } = await import("node:url"); const m = await import(pathToFileURL(process.argv[1]).href); const p = await m.default(); process.exit(p.tool && p.tool.review_gate ? 0 : 1);'
     & node --input-type=module -e $RddImport (Join-Path $OpenCodeDir "plugins\organic-rdd.js") 2>$null
     if ($LASTEXITCODE -eq 0) { $passed++; Write-Host "[OK] Organic RDD plugin import" -ForegroundColor Green }
     else { Write-Warn "[FAIL] Organic RDD plugin import" }
