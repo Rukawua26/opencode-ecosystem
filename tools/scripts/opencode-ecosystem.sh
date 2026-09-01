@@ -90,13 +90,20 @@ esac
 tree_files() { # dir -> relative file paths (recursive), skip .git, node_modules
   local dir="$1"
   [[ -d "$dir" ]] || return 0
-  (cd "$dir" && find . -type f ! -path './.git/*' ! -path '*/node_modules/*' ! -name '.DS_Store') \
-    | sed 's|^\./||' | sort
+  local tmpf
+  tmpf=$(mktemp)
+  (cd "$dir" && find . -type f ! -path './.git/*' ! -path '*/node_modules/*' ! -name '.DS_Store' 2>/dev/null \
+    | sed 's|^\./||' | sort > "$tmpf") || true
+  cat "$tmpf"
+  rm -f "$tmpf"
 }
 
 category_report() { # name srcDir dstDir [onlyDeployed]
   local name="$1" src="$2" dst="$3" only="${4:-}" f rel missing=0 modified=0 extra=0
   local -a extraFiles=()
+  local tmpf1 tmpf2
+  tmpf1=$(mktemp) && tree_files "$src" > "$tmpf1"
+  tmpf2=$(mktemp) && tree_files "$dst" > "$tmpf2"
   while IFS= read -r f; do
     rel="${f#./}"
     if [[ "$only" == "1" ]]; then
@@ -107,7 +114,7 @@ category_report() { # name srcDir dstDir [onlyDeployed]
     else
       missing=$((missing+1))
     fi
-  done < <(tree_files "$src")
+  done < "$tmpf1"
   while IFS= read -r f; do
     rel="${f#./}"
     if [[ "$only" == "1" ]]; then
@@ -119,7 +126,8 @@ category_report() { # name srcDir dstDir [onlyDeployed]
     if [[ ! -e "$src/$rel" ]]; then
       extra=$((extra+1)); extraFiles+=("$rel")
     fi
-  done < <(tree_files "$dst")
+  done < "$tmpf2"
+  rm -f "$tmpf1" "$tmpf2"
   printf '%s\t%s\t%s\t%s\t%s\n' "$name" "$missing" "$modified" "$extra" "${extraFiles[*]:-}"
 }
 
@@ -311,12 +319,15 @@ cmd_capture() {
     "config/lib|$OPENCODE_DIR/lib"
     "skills|$SKILLS_DIR"
   )
-  local src dst f rel changed=0
+  local entry src dst f rel changed=0
   log "capture: public managed files runtime -> repo (whitelist)"
   for entry in "${pairs[@]}"; do
     IFS='|' read -r src dst <<< "$entry"
+    local tmpf
+    tmpf=$(mktemp)
+    tree_files "$dst" > "$tmpf"
     while IFS= read -r f; do
-      rel="$f"
+      rel="${f#./}"
       if [[ -e "$REPO_DIR/$src/$rel" ]]; then
         cmp -s "$dst/$rel" "$REPO_DIR/$src/$rel" && continue
       fi
@@ -328,7 +339,8 @@ cmd_capture() {
         echo "  [ok] captured $src/$rel"
       fi
       changed=$((changed+1))
-    done < <(tree_files "$dst")
+    done < "$tmpf"
+    rm -f "$tmpf"
   done
   if [[ "$apply" != true ]]; then
     log "Use --apply to write. Then review and 'publish'."
