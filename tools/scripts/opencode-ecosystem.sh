@@ -91,7 +91,7 @@ tree_files() { # dir -> relative file paths (recursive), skip .git, node_modules
   local dir="$1"
   [[ -d "$dir" ]] || return 0
   local tmpf
-  tmpf=$(mktemp)
+  tmpf=$(mktemp "${TMPDIR:-/tmp}/opencode.XXXXXX")
   (cd "$dir" && find . -type f ! -path './.git/*' ! -path '*/node_modules/*' ! -name '.DS_Store' 2>/dev/null \
     | sed 's|^\./||' | sort > "$tmpf") || true
   cat "$tmpf"
@@ -102,8 +102,8 @@ category_report() { # name srcDir dstDir [onlyDeployed]
   local name="$1" src="$2" dst="$3" only="${4:-}" f rel missing=0 modified=0 extra=0
   local -a extraFiles=()
   local tmpf1 tmpf2
-  tmpf1=$(mktemp) && tree_files "$src" > "$tmpf1"
-  tmpf2=$(mktemp) && tree_files "$dst" > "$tmpf2"
+  tmpf1=$(mktemp "${TMPDIR:-/tmp}/opencode.XXXXXX") && tree_files "$src" > "$tmpf1"
+  tmpf2=$(mktemp "${TMPDIR:-/tmp}/opencode.XXXXXX") && tree_files "$dst" > "$tmpf2"
   while IFS= read -r f; do
     rel="${f#./}"
     if [[ "$only" == "1" ]]; then
@@ -135,7 +135,7 @@ category_report() { # name srcDir dstDir [onlyDeployed]
 
 cmd_status() {
   local json=false
-  for a in "${CMD_ARGS[@]}"; do [[ "$a" == "--json" ]] && json=true; done
+  for a in "${CMD_ARGS[@]:-}"; do [[ "$a" == "--json" ]] && json=true; done
 
   local branch ahead behind clean repo_line
   if git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -189,7 +189,8 @@ cmd_status() {
     mcp_report="mcp	$mm	$mmod	$mextra	${mextraFiles[*]:-}"
   fi
   # tools (only the deployed .js subset)
-  local tools_report="$(category_report tools "$REPO_DIR/tools/scripts" "$OPENCODE_DIR/tools" 1)"
+  local tools_report
+  tools_report="$(category_report tools "$REPO_DIR/tools/scripts" "$OPENCODE_DIR/tools" 1)"
   # profiles (recursive tree of profile configs)
   local prof_report="profiles	0	0	0	"
   if [[ -d "$REPO_DIR/config/profiles" ]]; then
@@ -246,7 +247,7 @@ cmd_status() {
 
 cmd_sync() {
   local apply=false verbose=false
-  for a in "${CMD_ARGS[@]}"; do
+  for a in "${CMD_ARGS[@]:-}"; do
     case "$a" in
       --apply) apply=true ;;
       --verbose|-v) verbose=true ;;
@@ -270,7 +271,7 @@ cmd_sync() {
 
 cmd_config_apply() {
   local apply=false
-  for a in "${CMD_ARGS[@]}"; do [[ "$a" == "--apply" ]] && apply=true; done
+  for a in "${CMD_ARGS[@]:-}"; do [[ "$a" == "--apply" ]] && apply=true; done
   local -a targets=("$OPENCODE_DIR/opencode.jsonc")
   while IFS= read -r pdir; do
     [[ -f "$REPO_DIR/config/profiles/$pdir/opencode.jsonc" ]] || continue
@@ -310,7 +311,7 @@ cmd_config_apply() {
 
 cmd_capture() {
   local apply=false
-  for a in "${CMD_ARGS[@]}"; do [[ "$a" == "--apply" ]] && apply=true; done
+  for a in "${CMD_ARGS[@]:-}"; do [[ "$a" == "--apply" ]] && apply=true; done
   local -a pairs=(
     "config/agents|$OPENCODE_DIR/agents"
     "config/commands|$OPENCODE_DIR/commands"
@@ -324,7 +325,7 @@ cmd_capture() {
   for entry in "${pairs[@]}"; do
     IFS='|' read -r src dst <<< "$entry"
     local tmpf
-    tmpf=$(mktemp)
+    tmpf=$(mktemp "${TMPDIR:-/tmp}/opencode.XXXXXX")
     tree_files "$dst" > "$tmpf"
     while IFS= read -r f; do
       rel="${f#./}"
@@ -364,7 +365,7 @@ secret_scan() { # file -> exit 1 if secret found
 
 cmd_publish() {
   local yes=false wait_ci=false message=""
-  for a in "${CMD_ARGS[@]}"; do
+  for a in "${CMD_ARGS[@]:-}"; do
     case "$a" in
       --yes) yes=true ;;
       --wait-ci) wait_ci=true ;;
@@ -374,7 +375,7 @@ cmd_publish() {
   done
   # second pass for --message MSG form
   local prev=""
-  for a in "${CMD_ARGS[@]}"; do
+  for a in "${CMD_ARGS[@]:-}"; do
     if [[ "$prev" == "--message" ]]; then message="$a"; fi
     prev="$a"
   done

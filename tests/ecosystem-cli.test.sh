@@ -59,7 +59,7 @@ pass "status flags modified and missing managed files"
 
 # 3) capture --dry-run does not write; --apply writes into the repo
   printf 'new-cmd\n' > "$FAKE_HOME/.config/opencode/commands/two.md"
-  CAPTURE_DRY="$(bash "$CLI" capture --repo "$FAKE_REPO" 2>&1)" || { echo "[DEBUG-FAIL] capture exited nonzero, output follows:"; echo "$CAPTURE_DRY"; exit 1; }
+  CAPTURE_DRY="$(bash "$CLI" capture --repo "$FAKE_REPO" 2>/dev/null)"
   echo "$CAPTURE_DRY" | grep -q "two.md" || fail "capture dry-run did not list two.md"
 [[ -f "$FAKE_REPO/config/commands/two.md" ]] && fail "capture --dry-run wrote into repo"
 bash "$CLI" capture --apply --repo "$FAKE_REPO" >/dev/null 2>&1
