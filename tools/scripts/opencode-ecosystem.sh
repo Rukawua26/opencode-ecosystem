@@ -156,10 +156,14 @@ cmd_status() {
     "skills|skills|$SKILLS_DIR"
   )
   local name src dst
-  declare -A RESULT
+  local -a order=(agents commands plugins plugins.disabled lib mcp tools profiles skills)
+  local -a results=()
+  local i idx
+  for ((i = 0; i < ${#order[@]}; i++)); do results[i]=""; done
   for entry in "${cats[@]}"; do
     IFS='|' read -r name src dst <<< "$entry"
-    RESULT[$name]="$(category_report "$name" "$REPO_DIR/$src" "$dst")"
+    for ((i = 0; i < ${#order[@]}; i++)); do [[ "${order[$i]}" == "$name" ]] && idx=$i; done
+    results[$idx]="$(category_report "$name" "$REPO_DIR/$src" "$dst")"
   done
 
   # mcp (source files only, node_modules/package-lock ignored)
@@ -176,11 +180,8 @@ cmd_status() {
     done < <(tree_files "$REPO_DIR/config/mcp")
     mcp_report="mcp	$mm	$mmod	$mextra	${mextraFiles[*]:-}"
   fi
-  RESULT[mcp]="$mcp_report"
-
   # tools (only the deployed .js subset)
-  RESULT[tools]="$(category_report tools "$REPO_DIR/tools/scripts" "$OPENCODE_DIR/tools" 1)"
-
+  local tools_report="$(category_report tools "$REPO_DIR/tools/scripts" "$OPENCODE_DIR/tools" 1)"
   # profiles (recursive tree of profile configs)
   local prof_report="profiles	0	0	0	"
   if [[ -d "$REPO_DIR/config/profiles" ]]; then
@@ -194,7 +195,11 @@ cmd_status() {
     done < <(tree_files "$REPO_DIR/config/profiles")
     prof_report="profiles	$pmiss	$pmod	0	"
   fi
-  RESULT[profiles]="$prof_report"
+  for entry in "mcp|$mcp_report" "tools|$tools_report" "profiles|$prof_report"; do
+    name="${entry%%|*}"; val="${entry#*|}"
+    for ((i = 0; i < ${#order[@]}; i++)); do [[ "${order[$i]}" == "$name" ]] && idx=$i; done
+    results[$idx]="$val"
+  done
 
   # protected opencode.jsonc (informational)
   local cfg_drift="clean"
@@ -204,17 +209,15 @@ cmd_status() {
   fi
 
   if [[ "$json" == true ]]; then
-    local order=(agents commands plugins plugins.disabled lib mcp tools profiles skills)
     printf '{'
     printf '"repo":"%s","doctor_ok":"%s","opencode_jsonc":"%s","categories":{' "$repo_line" "$doctor_ok" "$cfg_drift"
-    local first=1 n miss mod extra extraFiles
-    for n in "${order[@]}"; do
-      [[ -n "${RESULT[$n]:-}" ]] || continue
-      IFS=$'\t' read -r _ miss mod extra extraFiles <<< "${RESULT[$n]}"
+    local first=1 miss mod extra extraFiles
+    for ((i = 0; i < ${#order[@]}; i++)); do
+      IFS=$'\t' read -r _ miss mod extra extraFiles <<< "${results[$i]}"
       [[ "$first" -eq 1 ]] || printf ','
       first=0
       printf '"%s":{"missing":%s,"modified":%s,"extra":%s,"extraFiles":[%s]}' \
-        "$n" "$miss" "$mod" "$extra" \
+        "${order[$i]}" "$miss" "$mod" "$extra" \
         "$(for ef in $extraFiles; do printf '"%s",' "$ef"; done | sed 's/,$//')"
     done
     printf '}}\n'
@@ -224,14 +227,9 @@ cmd_status() {
   log "Status (source of truth: $REPO_DIR)"
   echo "  repo:      $repo_line"
   echo "  doctor:    ok=$doctor_ok"
-  for entry in "${cats[@]}"; do
-    IFS='|' read -r name src dst <<< "$entry"
-    read -r _ miss mod extra extraFiles <<< "${RESULT[$name]}"
-    echo "  $name: missing=$miss modified=$mod extra=$extra ${extraFiles:+[$extraFiles]}"
-  done
-  for name in mcp tools profiles; do
-    read -r _ miss mod extra extraFiles <<< "${RESULT[$name]}"
-    echo "  $name: missing=$miss modified=$mod extra=$extra ${extraFiles:+[$extraFiles]}"
+  for ((i = 0; i < ${#order[@]}; i++)); do
+    read -r _ miss mod extra extraFiles <<< "${results[$i]}"
+    echo "  ${order[$i]}: missing=$miss modified=$mod extra=$extra ${extraFiles:+[$extraFiles]}"
   done
   echo "  opencode.jsonc: $cfg_drift"
 }
@@ -269,7 +267,7 @@ cmd_config_apply() {
   while IFS= read -r pdir; do
     [[ -f "$REPO_DIR/config/profiles/$pdir/opencode.jsonc" ]] || continue
     targets+=("$OPENCODE_DIR/profiles/$pdir/opencode.jsonc")
-  done < <(cd "$REPO_DIR/config/profiles" && find . -maxdepth 1 -mindepth 1 -type d -printf '%f\n' 2>/dev/null | sort)
+  done < <(cd "$REPO_DIR/config/profiles" && find . -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sed 's|^\./||' | sort)
 
   log "config-apply: protected config replacement"
   for t in "${targets[@]}"; do
@@ -374,8 +372,8 @@ cmd_publish() {
     exit 1
   fi
 
-  local -a changed
-  mapfile -t changed < <(git -C "$REPO_DIR" status --porcelain | awk '{print $2}')
+  local -a changed=()
+  while IFS= read -r f; do changed+=("$f"); done < <(git -C "$REPO_DIR" status --porcelain | awk '{print $2}')
   if [[ "${#changed[@]}" -eq 0 ]]; then
     log "Nothing to publish."
     exit 0
