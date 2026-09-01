@@ -631,6 +631,11 @@ copy_config() {
     make_executable "$OPENCODE_BIN_DIR/opencode-skills"
     info "opencode-skills installed globally at $OPENCODE_BIN_DIR/opencode-skills"
   fi
+  if [[ -f "$repo_dir/tools/scripts/opencode-ecosystem.sh" ]]; then
+    copy_if_ok "$repo_dir/tools/scripts/opencode-ecosystem.sh" "$OPENCODE_BIN_DIR/opencode-ecosystem"
+    make_executable "$OPENCODE_BIN_DIR/opencode-ecosystem"
+    info "opencode-ecosystem installed globally at $OPENCODE_BIN_DIR/opencode-ecosystem"
+  fi
 }
 
 # Install memory adapter
@@ -693,6 +698,7 @@ verify_install() {
   check "$OPENCODE_BIN_DIR/opencode-light"
   check "$OPENCODE_DIR/tools/skills.js"
   check "$OPENCODE_BIN_DIR/opencode-skills"
+  check "$OPENCODE_BIN_DIR/opencode-ecosystem"
   [[ -d "$OPENCODE_DIR/agents" ]] && { checks=$((checks+1)); passed=$((passed+1)); } || warn "Missing agents dir"
   [[ -d "$OPENCODE_DIR/plugins" ]] && { checks=$((checks+1)); passed=$((passed+1)); } || warn "Missing plugins dir"
   [[ -d "$OPENCODE_DIR/mcp" ]] && { checks=$((checks+1)); passed=$((passed+1)); } || warn "Missing mcp dir"

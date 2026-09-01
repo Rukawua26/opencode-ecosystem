@@ -96,6 +96,12 @@ assert_exists "$HOME/.config/opencode/plugins/organic-rdd.js"
 assert_exists "$HOME/.config/opencode/lib/organic-rdd.js"
 assert_exists "$HOME/.config/opencode/commands/review-start.md"
 assert_exists "$HOME/.config/opencode/commands/review-gate.md"
+assert_exists "$HOME/.config/opencode/commands/spec.md"
+assert_exists "$HOME/.opencode/bin/opencode-ecosystem"
+if ! "$HOME/.opencode/bin/opencode-ecosystem" help >/dev/null 2>&1; then
+  echo "[FAIL] opencode-ecosystem CLI does not run"
+  exit 1
+fi
 assert_exists "$HOME/.config/opencode/package.json"
 assert_exists "$HOME/.config/opencode/node_modules/@opencode-ai/plugin/package.json"
 

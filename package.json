@@ -23,6 +23,7 @@
     "test:install": "bash tests/install.test.sh",
     "test:install:windows": "pwsh -NoProfile -File tests/install.test.ps1",
     "test:hooks": "bash tests/hooks.test.sh",
+    "test:ecosystem-cli": "bash tests/ecosystem-cli.test.sh",
     "test:release": "bash tests/release-tag.test.sh && bash tests/release-workflow.test.sh && node --test tests/workflow-static-analysis.test.mjs",
     "test:router": "node --test config/mcp/local-model-router.test.js",
     "eval:local-structure": "node tools/evals/local-model-structure.js",

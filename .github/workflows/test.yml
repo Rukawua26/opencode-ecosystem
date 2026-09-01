@@ -147,6 +147,9 @@ jobs:
       - name: Run hook safety test
         run: npm run test:hooks
 
+      - name: Run ecosystem CLI test
+        run: npm run test:ecosystem-cli
+
       - name: Run release tag contract test
         if: matrix.os == 'ubuntu-latest'
         run: npm run test:release

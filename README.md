@@ -276,12 +276,60 @@ opencode-skills --search security
 # Metricas de los ultimos siete dias
 opencode-metrics 7
 
+# Control de sincronizacion y publicacion (ecosystem = fuente de verdad)
+opencode-ecosystem status              # drift read-only entre repo y runtime
+opencode-ecosystem status --json
+opencode-ecosystem sync --dry-run      # ver que aplicaria install.sh --sync
+opencode-ecosystem sync --apply        # aplicar actualizacion + doctor post-sync
+opencode-ecosystem config-apply        # reemplazo explicito de opencode.jsonc (dry-run)
+opencode-ecosystem config-apply --apply
+opencode-ecosystem capture --dry-run   # runtime->repo, solo whitelist publica
+opencode-ecosystem capture --apply
+opencode-ecosystem publish --yes       # tests + lint + check-docs + secretos + commit + push
+
 # Tests principales del repositorio
 npm test
 npm run test:router
 npm run test:coverage
 npm run test:install
+npm run test:ecosystem-cli
 ```
+
+## Flujo Oficial (Ecosystem Como Fuente De Verdad)
+
+La direccion canonica es `ecosystem -> runtime -> OpenCode`. Los cambios de
+configuracion se editan en el repositorio, se publican con `publish` y se
+aplican con `sync`:
+
+```bash
+# 1. Editar archivos gestionados en el repositorio
+# 2. Validar y publicar en GitHub (revisa secretos, tests, lint y check-docs)
+opencode-ecosystem publish --yes --message "feat: ..."
+
+# 3. Actualizar la instalacion activa (dry-run primero)
+opencode-ecosystem sync --dry-run
+opencode-ecosystem sync --apply
+
+# 4. Reiniciar OpenCode si cambian plugins o configuracion de arranque
+```
+
+Recuperar un cambio manual hecho directamente en `~/.config/opencode`
+(excepcion controlada, solo archivos publicos gestionados):
+
+```bash
+opencode-ecosystem capture --dry-run
+opencode-ecosystem capture --apply   # luego revisar diff y publish
+```
+
+Nunca se sincronizan ni publican automaticamente: `.env`, claves, memoria
+SQLite, receipts, logs, backups, `node_modules` ni plugins personales.
+`opencode.jsonc` y los perfiles estan protegidos; se reemplazan solo con
+`config-apply --apply`, que siempre respalda primero.
+
+Deteccion periodica opcional (sin watcher): cron diario de
+`opencode-ecosystem status --json`; el doctor tambien avisa de drift.
+
+El doctor valida el manifiesto, JSONC principal, perfiles activos, entradas
 
 El doctor valida el manifiesto, JSONC principal, perfiles activos, entradas
 faltantes y rutas/symlinks inseguros. Nunca muestra valores de credenciales.
