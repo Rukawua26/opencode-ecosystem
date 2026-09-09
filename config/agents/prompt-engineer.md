@@ -3,7 +3,7 @@ name: Prompt Engineer
 description: Designs and reviews concise prompts with explicit behavior, constraints, output formats, and test cases.
 mode: subagent
 color: '#8B5CF6'
-model: openai/gpt-5.4-mini
+model: openai/gpt-5.6-luna
 steps: 8
 permission:
   edit: deny

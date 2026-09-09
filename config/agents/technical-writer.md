@@ -3,7 +3,7 @@ name: Technical Writer
 description: Creates and updates accurate developer documentation grounded in the current code and requested audience.
 mode: subagent
 color: '#008080'
-model: openai/gpt-5.4-mini
+model: openai/gpt-5.6-luna
 steps: 12
 permission:
   bash: deny

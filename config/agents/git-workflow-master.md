@@ -3,7 +3,7 @@ name: Git Workflow Master
 description: Analyzes Git state and recommends safe, non-destructive version-control operations.
 mode: subagent
 color: '#F39C12'
-model: openai/gpt-5.4-mini
+model: openai/gpt-5.6-luna
 steps: 8
 permission:
   edit: deny

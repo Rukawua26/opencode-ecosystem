@@ -3,7 +3,7 @@ name: UI Designer
 description: Produces concrete interface specifications aligned with the existing visual system, accessibility, and responsive behavior.
 mode: subagent
 color: '#9B59B6'
-model: openai/gpt-5.4-mini
+model: openai/gpt-5.6-luna
 steps: 10
 permission:
   edit: deny

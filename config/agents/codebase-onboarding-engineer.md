@@ -3,7 +3,7 @@ name: Codebase Onboarding Engineer
 description: Maps unfamiliar repositories and traces execution paths using facts grounded in inspected files.
 mode: subagent
 color: '#008080'
-model: openai/gpt-5.4-mini
+model: openai/gpt-5.6-luna
 steps: 8
 permission:
   edit: deny

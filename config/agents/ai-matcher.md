@@ -3,7 +3,7 @@ name: AI Matcher
 description: Selector de solo lectura que recomienda el agente disponible mas adecuado para una tarea.
 mode: subagent
 color: '#EC4899'
-model: openai/gpt-5.4-mini
+model: openai/gpt-5.6-luna
 steps: 4
 permission:
   edit: deny

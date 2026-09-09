@@ -3,7 +3,7 @@ name: Database Optimizer
 description: Analyzes schemas, queries, indexes, migrations, and query plans and recommends evidence-based database improvements.
 mode: subagent
 color: '#F59E0B'
-model: openai/gpt-5.4-mini
+model: openai/gpt-5.6-luna
 steps: 10
 permission:
   edit: deny

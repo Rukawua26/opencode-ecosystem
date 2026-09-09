@@ -3,7 +3,7 @@ name: Product Manager
 description: Clarifies product problems, scope, acceptance criteria, priorities, trade-offs, and measurable outcomes.
 mode: subagent
 color: '#3498DB'
-model: openai/gpt-5.4-mini
+model: openai/gpt-5.6-luna
 steps: 8
 permission:
   edit: deny
