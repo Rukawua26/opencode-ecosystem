@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# opencode-ecosystem — publish/sync/status/capture (lite). Fuente de verdad: ~/opencode-ecosystem.
+# Nunca sincroniza: .env, observations.log, topics/, logs, backups, plugins personales.
+set -u
+ECO="$HOME/opencode-ecosystem"
+CFG="$HOME/.config/opencode"
+MANAGED="$CFG/.ecosystem-managed-files"
+
+managed_list() {
+  echo "opencode/opencode.jsonc"
+  echo "opencode/dcp.jsonc"
+  echo "opencode/cron-jobs.json"
+  for f in "$ECO"/skills/*/SKILL.md; do
+    rel="opencode/skills/$(basename "$(dirname "$f")")/SKILL.md"; echo "$rel"
+  done
+  for f in "$ECO"/scripts/*.sh "$ECO"/memory/*.sh "$ECO"/memory/MEMORY.md; do
+    [ -e "$f" ] || continue
+    case "$f" in
+      */scripts/*) echo "opencode/scripts/$(basename "$f")" ;;
+      */memory/*) echo "opencode/memory/$(basename "$f")" ;;
+    esac
+  done
+}
+
+cmd_status() {
+  local drift=0
+  diff -q "$ECO/configs/opencode.jsonc" "$CFG/opencode.jsonc" >/dev/null 2>&1 || { echo "[drift] opencode.jsonc"; drift=1; }
+  diff -q "$ECO/configs/dcp.jsonc" "$CFG/dcp.jsonc" >/dev/null 2>&1 || { echo "[drift] dcp.jsonc"; drift=1; }
+  diff -rq "$ECO/skills" "$CFG/skills" >/dev/null 2>&1 || { echo "[drift] skills/"; drift=1; }
+  diff -rq "$ECO/scripts" "$CFG/scripts" >/dev/null 2>&1 || { echo "[drift] scripts/"; drift=1; }
+  [ "$drift" = "0" ] && echo "[ok] sin drift"
+  return "$drift"
+}
+
+backup_dest() { # $1 = destino en CFG
+  local d="$1"
+  if [ -e "$d" ] && [ ! -L "$d" ]; then
+    cp -a "$d" "$d.bak-$(date +%F)" && echo "[backup] $d"
+  fi
+}
+
+cmd_sync() { # sync --apply : ECO -> CFG con backup; jsonc solo con config-apply --apply
+  local apply="${1:-}"
+  if [ "$apply" != "--apply" ]; then echo "uso: $0 sync --apply"; return 2; fi
+  python3 "$ECO/validate-skills.py" "$ECO/skills" || return 1
+  mkdir -p "$CFG/scripts" "$CFG/skills" "$CFG/memory/topics" "$CFG/commands"
+  backup_dest "$CFG/opencode.jsonc"; cp "$ECO/configs/opencode.jsonc" "$CFG/opencode.jsonc"
+  backup_dest "$CFG/dcp.jsonc"; cp "$ECO/configs/dcp.jsonc" "$CFG/dcp.jsonc"
+  backup_dest "$CFG/cron-jobs.json"; cp "$ECO/configs/cron-jobs.json" "$CFG/cron-jobs.json"
+  cp -r "$ECO/skills/." "$CFG/skills/"
+  cp "$ECO"/scripts/*.sh "$CFG/scripts/"; chmod +x "$CFG/scripts/"*.sh
+  for s in kairos.sh autodream.sh MEMORY.md; do
+    [ -e "$CFG/memory/$s" ] || cp "$ECO/memory/$s" "$CFG/memory/$s"
+  done
+  chmod +x "$CFG/memory/"*.sh 2>/dev/null || true
+  managed_list > "$MANAGED"
+  echo "[ok] sync aplicado"
+}
+
+cmd_publish() { # publish --yes : CFG -> ECO (solo gestionados)
+  local yes="${1:-}"
+  if [ "$yes" != "--yes" ]; then echo "uso: $0 publish --yes"; return 2; fi
+  python3 "$ECO/validate-skills.py" "$CFG/skills" || return 1
+  cp "$CFG/opencode.jsonc" "$ECO/configs/opencode.jsonc"
+  cp "$CFG/dcp.jsonc" "$ECO/configs/dcp.jsonc" 2>/dev/null || true
+  cp "$CFG/cron-jobs.json" "$ECO/configs/cron-jobs.json" 2>/dev/null || true
+  rm -rf "$ECO/skills" && cp -r "$CFG/skills" "$ECO/skills"
+  cp "$CFG"/scripts/*.sh "$ECO/scripts/" 2>/dev/null || true
+  echo "[ok] publish aplicado (sin .env/memoria/logs)"
+}
+
+cmd_capture() { # capture --apply : recuperación manual controlada CFG->ECO incluyendo memoria template (no logs vivos)
+  local apply="${1:-}"
+  if [ "$apply" != "--apply" ]; then echo "uso: $0 capture --apply"; return 2; fi
+  cmd_publish --yes
+}
+
+cmd_uninstall() { # uninstall [--apply] : inverso selectivo por manifiesto, con backup previo
+  local apply="${1:-preview}"
+  local list src f n=0
+  if [ -f "$MANAGED" ]; then list=$(cat "$MANAGED"); else list=$(managed_list); fi
+  if [ "$apply" = "--apply" ]; then
+    local bk="$CFG/.pre-uninstall-$(date +%F-%H%M)"
+    mkdir -p "$bk"
+  fi
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    src="$CFG/${f#opencode/}"
+    [ -e "$src" ] || continue
+    if [ "$apply" = "--apply" ]; then
+      mkdir -p "$bk/$(dirname "$f")"
+      cp -a "$src" "$bk/$f" 2>/dev/null || true
+      rm -f "$src"; echo "[rm] $src (backup en $bk)"
+    else
+      echo "[pdte] $src"
+    fi
+    n=$((n + 1))
+  done <<< "$list"
+  echo "gestionados: $n (modo: $apply)"
+  echo "retenidos: .env, memoria viva, logs, backups y plugins personales (no son gestionados por el ecosistema)"
+}
+
+case "${1:-status}" in
+  status) cmd_status ;;
+  sync) cmd_sync "${2:-}" ;;
+  publish) cmd_publish "${2:-}" ;;
+  capture) cmd_capture "${2:-}" ;;
+  uninstall) cmd_uninstall "${2:-preview}" ;;
+  *) echo "uso: $0 {status|sync --apply|publish --yes|capture --apply|uninstall [--apply]}"; exit 2 ;;
+esac

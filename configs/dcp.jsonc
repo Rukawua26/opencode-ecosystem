@@ -1,0 +1,28 @@
+{
+  // DCP lite para 8GB RAM (upstream pedía 80k; bajado a 32-40k)
+  "enabled": true,
+  "pruneNotification": "minimal",
+  "pruneNotificationType": "chat",
+  "commands": {
+    "enabled": true,
+    "protectedTools": ["task", "skill", "todowrite", "memory_observor", "memory_index_reader"]
+  },
+  "turnProtection": { "enabled": true, "turns": 4 },
+  "compress": {
+    "mode": "range",
+    "permission": "allow",
+    "showCompression": false,
+    "summaryBuffer": true,
+    "maxContextLimit": 40000,
+    "minContextLimit": 32000,
+    "nudgeFrequency": 3,
+    "iterationNudgeThreshold": 10,
+    "nudgeForce": "strong",
+    "protectedTools": ["task", "skill", "memory_observor"],
+    "protectUserMessages": false
+  },
+  "strategies": {
+    "deduplication": { "enabled": true },
+    "purgeErrors": { "enabled": true, "turns": 3 }
+  }
+}

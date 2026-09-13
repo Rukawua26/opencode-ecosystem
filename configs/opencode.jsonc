@@ -1,0 +1,74 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  // 001-ecosystem-lite: config mínima válida. Sin MCP locales hasta que existan los binarios.
+  // 004-A: `opencode models --verbose` (2026-09-11) no lista provider ollama: los 1-3B
+  // no están cableados. Si se cablea, filtrar solo toolcall=true (patron gentle-ai).
+  "snapshot": true,
+  "autoupdate": false,
+  // 004-B: nunca se comparte (votado). Preserva tu valor si lo gestionas por proyecto.
+  "share": "disabled",
+  // 008: fondo barato (títulos/compactación). Cascada completa: ~/docs/runbooks/runbook-cascada-modelos.md
+  "small_model": "opencode/nemotron-3-ultra-free",
+  "provider": {
+    "openai": {
+      "models": {
+        "gpt-5.6-sol":   { "variants": { "low": { "reasoningEffort": "low", "textVerbosity": "low" } } },
+        "gpt-5.6-terra": { "variants": { "low": { "reasoningEffort": "low", "textVerbosity": "low" } } },
+        "gpt-5.6-luna":  { "variants": { "low": { "reasoningEffort": "low", "textVerbosity": "low" } } }
+      }
+    }
+  },
+  "compaction": {
+    "auto": true,
+    "prune": true,
+    "reserved": 8000
+  },
+  "watcher": {
+    "ignore": ["node_modules/**", "dist/**", ".git/**", ".venv/**", "target/**"]
+  },
+  // 002-gentle-alignment P2: deny-list seguridad (patron gentle-ai/permissions, solo OpenCode).
+  // Defaults no rompen nada: read/edit siguen allow salvo estas rutas; bash sigue allow salvo ssh-family (ask).
+  "permission": {
+    "read": {
+      "~/.ssh/*": "deny",
+      "~/.ssh/**/*": "deny",
+      "**/*.pem": "deny",
+      "**/*.key": "deny",
+      "~/.aws/credentials": "deny",
+      "~/.config/gh/hosts.yml": "deny",
+      "~/.credentials/*": "deny",
+      "**/secrets/*": "deny",
+      "**/*.p12": "deny",
+      "**/*.pfx": "deny"
+    },
+    "edit": {
+      "~/.ssh/*": "deny",
+      "~/.ssh/**/*": "deny",
+      "**/*.pem": "deny",
+      "**/*.key": "deny",
+      "**/.env*": "deny",
+      "~/.aws/credentials": "deny",
+      "~/.config/gh/hosts.yml": "deny",
+      "~/.credentials/*": "deny",
+      "**/secrets/*": "deny",
+      "**/*.p12": "deny",
+      "**/*.pfx": "deny"
+    },
+    "bash": {
+      "*": "allow",
+      "ssh *": "ask",
+      "scp *": "ask",
+      "sftp *": "ask",
+      "rsync *": "ask"
+    }
+  },
+  // 004-D: Context7 opt-in (docs vivas de libs). enabled:false = 0 tokens hasta activarlo.
+  // Activar: "enabled": true (+ CONTEXT7_API_KEY opcional para rate-limits). Patron gentle-ai.
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": false
+    }
+  }
+}
