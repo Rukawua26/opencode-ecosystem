@@ -20,6 +20,10 @@ managed_list() {
       */memory/*) echo "opencode/memory/$(basename "$f")" ;;
     esac
   done
+  for f in "$ECO"/commands/*.md; do
+    [ -e "$f" ] || continue
+    echo "opencode/commands/$(basename "$f")"
+  done
 }
 
 cmd_status() {
@@ -28,6 +32,9 @@ cmd_status() {
   diff -q "$ECO/configs/dcp.jsonc" "$CFG/dcp.jsonc" >/dev/null 2>&1 || { echo "[drift] dcp.jsonc"; drift=1; }
   diff -rq "$ECO/skills" "$CFG/skills" >/dev/null 2>&1 || { echo "[drift] skills/"; drift=1; }
   diff -rq "$ECO/scripts" "$CFG/scripts" >/dev/null 2>&1 || { echo "[drift] scripts/"; drift=1; }
+  if [ -d "$ECO/commands" ]; then
+    diff -rq "$ECO/commands" "$CFG/commands" >/dev/null 2>&1 || { echo "[drift] commands/"; drift=1; }
+  fi
   [ "$drift" = "0" ] && echo "[ok] sin drift"
   return "$drift"
 }
@@ -49,6 +56,13 @@ cmd_sync() { # sync --apply : ECO -> CFG con backup; jsonc solo con config-apply
   backup_dest "$CFG/cron-jobs.json"; cp "$ECO/configs/cron-jobs.json" "$CFG/cron-jobs.json"
   cp -r "$ECO/skills/." "$CFG/skills/"
   cp "$ECO"/scripts/*.sh "$CFG/scripts/"; chmod +x "$CFG/scripts/"*.sh
+  if [ -d "$ECO/commands" ]; then
+    for f in "$ECO"/commands/*.md; do
+      [ -e "$f" ] || continue
+      backup_dest "$CFG/commands/$(basename "$f")"
+      cp "$f" "$CFG/commands/"
+    done
+  fi
   for s in kairos.sh autodream.sh MEMORY.md; do
     [ -e "$CFG/memory/$s" ] || cp "$ECO/memory/$s" "$CFG/memory/$s"
   done
@@ -66,6 +80,10 @@ cmd_publish() { # publish --yes : CFG -> ECO (solo gestionados)
   cp "$CFG/cron-jobs.json" "$ECO/configs/cron-jobs.json" 2>/dev/null || true
   rm -rf "$ECO/skills" && cp -r "$CFG/skills" "$ECO/skills"
   cp "$CFG"/scripts/*.sh "$ECO/scripts/" 2>/dev/null || true
+  if [ -d "$CFG/commands" ]; then
+    mkdir -p "$ECO/commands"
+    cp "$CFG"/commands/*.md "$ECO/commands/" 2>/dev/null || true
+  fi
   echo "[ok] publish aplicado (sin .env/memoria/logs)"
 }
 

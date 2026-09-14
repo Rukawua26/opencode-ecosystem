@@ -70,5 +70,24 @@
       "url": "https://mcp.context7.com/mcp",
       "enabled": false
     }
+  },
+  // Paridad gentle-ai (mini-enjambre, 2026-09-13): fases pesadas SDD en contexto fresco.
+  // 0 tokens al arranque: los prompts solo se cargan cuando el subagente se invoca.
+  // Los comandos /implement-spec y /verify-spec delegan aqui. Reversible: quitar bloque + sync.
+  "agent": {
+    "sdd-implement": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Ejecutor SDD: implementa una tarea atomica de spec/features/*/tasks.md con verificacion",
+      "prompt": "Eres el ejecutor SDD, no el orquestador. Implementa UNICAMENTE la tarea encomendada en el prompt con el codigo minimo necesario, siguiendo spec.md y tasks.md de la feature indicada. Ejecuta la verificacion relevante (tests o linters del proyecto). No delegues ni lances subagentes. Devuelve: status (exito/fallo/bloqueado), resumen breve, archivos tocados, verificacion ejecutada y su resultado, riesgos. Si falta contexto o hay ambiguedad, devuelve status bloqueado con la causa concreta; no infieras.",
+      "permission": { "task": "deny" }
+    },
+    "sdd-verify": {
+      "mode": "subagent",
+      "hidden": true,
+      "description": "Verificador SDD read-only: contrasta la implementacion con spec.md y criterios; nunca corrige",
+      "prompt": "Eres el verificador SDD, read-only. Lee spec.md, plan.md, tasks.md y el diff o implementacion indicados en el prompt. Contrasta la implementacion con los criterios de aceptacion. Puerta de precision: reporta solo hallazgos reales defendibles con evidencia; en duda, silencio. Devuelve hallazgos con severidad CRITICAL/WARNING/SUGGESTION, ruta:linea y evidencia, o 'Sin hallazgos.' Nunca modifiques archivos ni lances subagentes.",
+      "permission": { "edit": "deny", "write": "deny", "task": "deny" }
+    }
   }
 }
