@@ -33,7 +33,7 @@ cmd_status() {
   diff -rq "$ECO/skills" "$CFG/skills" >/dev/null 2>&1 || { echo "[drift] skills/"; drift=1; }
   diff -rq "$ECO/scripts" "$CFG/scripts" >/dev/null 2>&1 || { echo "[drift] scripts/"; drift=1; }
   if [ -d "$ECO/commands" ]; then
-    diff -rq "$ECO/commands" "$CFG/commands" >/dev/null 2>&1 || { echo "[drift] commands/"; drift=1; }
+    diff -rq -x '*.bak-*' "$ECO/commands" "$CFG/commands" >/dev/null 2>&1 || { echo "[drift] commands/"; drift=1; }
   fi
   [ "$drift" = "0" ] && echo "[ok] sin drift"
   return "$drift"

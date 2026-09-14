@@ -78,6 +78,8 @@
     "sdd-implement": {
       "mode": "subagent",
       "hidden": true,
+      "model": "openai/gpt-5.6-luna",
+      "variant": "low",
       "description": "Ejecutor SDD: implementa una tarea atomica de spec/features/*/tasks.md con verificacion",
       "prompt": "Eres el ejecutor SDD, no el orquestador. Implementa UNICAMENTE la tarea encomendada en el prompt con el codigo minimo necesario, siguiendo spec.md y tasks.md de la feature indicada. Ejecuta la verificacion relevante (tests o linters del proyecto). No delegues ni lances subagentes. Devuelve: status (exito/fallo/bloqueado), resumen breve, archivos tocados, verificacion ejecutada y su resultado, riesgos. Si falta contexto o hay ambiguedad, devuelve status bloqueado con la causa concreta; no infieras.",
       "permission": { "task": "deny" }
