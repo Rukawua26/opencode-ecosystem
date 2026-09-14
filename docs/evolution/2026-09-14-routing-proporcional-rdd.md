@@ -61,6 +61,12 @@ estaba cableado en el comando.
 - Senal de revertir: luna low produce fixes defectuosos recurrentes (se lo atribuye el
   gate), o el verificador hereda un modelo free y pierde precision; rollback por git + sync.
 - Hallazgo menor anotado: `spec/constitution/` referenciada en AGENTS.md no existe.
+  RESUELTO (2026-09-14) con lectura condicional: AGENTS.md linea 12 ahora lee
+  `working-agreement.md` y `tech-stack.md` solo si existen; siempre lee
+  `spec.md`/`plan.md`/`tasks.md`. Texto anterior (rollback manual):
+  "Antes de implementar una feature SDD, leer solo la constitucion minima y la feature
+  solicitada: `spec/constitution/working-agreement.md`, `spec/constitution/tech-stack.md`,
+  `spec/features/<feature>/spec.md`, `plan.md` y `tasks.md`."
 
 ## Fuente
 - Video 2 Gentleman Programming (routing, perfiles, RDD) contrastado con repo `266574b0`.
