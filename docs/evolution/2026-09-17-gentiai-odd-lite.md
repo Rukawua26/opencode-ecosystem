@@ -27,12 +27,14 @@ runtime actual). Evidencia: Compare API `266574b0..eae8fadd5ece` (58 commits), r
   flujo de trabajo; ultraplan-lite es pre-aprobacion, no seguimiento).
 
 ## Despues
-- Skill nueva `organic-workflow-lite` (10a): autorizacion mutacion vs read-only, alcance aprobado
-  antes del primer write, documento unico `<proyecto>/odd/tasks/<feature>.md` (objetivo, alcance,
-  restricciones, tareas con criterio, decisiones, evidencia, progreso), tarea a tarea con routing
-  normal, `[x]` solo con resultado observado, cambios de alcance sin expansion automatica,
-  reanudacion file-first contrastando `git status`/diff, cierre con qa-gate y verificacion
-  proporcional al riesgo (nunca por checkbox). Git siempre con peticion explicita.
+- Skill nueva `organic-workflow-lite` (10a, endurecida en dogfood T1-T3): autorizacion,
+  incertidumbre acotada (research nombrado, 1 pregunta/decision, max 1 challenge de premisa),
+  alcance aprobado antes del primer write, documento unico `<proyecto>/odd/tasks/<feature>.md`
+  (objetivo, alcance, restricciones, TDD modo/fuente/runner, tareas con ID estable y criterio,
+  evidencia con estados passed|failed|skipped|unavailable|pending, progreso), delegacion con
+  documento (el worker lo lee antes de editar), reanudacion con descubrimiento de
+  `odd/tasks/*.md` y reconciliacion contra Git, cierre con qa-gate y verificacion proporcional.
+  Git siempre con peticion explicita.
 - Kernel ODD-lite en AGENTS.md (3 bullets, ~90 tokens): flujo por defecto, trabajo pequeno inline
   vs sustancial via skill, implementar no autoriza delivery.
 - SDD explicito: rama del flujo organico, nunca por tamano/complejidad/riesgo solos.
@@ -64,8 +66,12 @@ runtime actual). Evidencia: Compare API `266574b0..eae8fadd5ece` (58 commits), r
   sistema la notifico como disponible tras sync (sin reinicio).
 - `opencode debug skill` no existe en OpenCode V2 actual (hallazgo corregido en AGENTS.md).
 - `verify.sh` -> verde.
-- Dogfood de escenarios planificado para la primera feature sustancial real (read-only no crea
-  artefactos; pequeno inline; sustancial crea unico doc; mencion "SDD" no lo activa).
+- Dogfood real (iteracion misma tarde): documento `odd/tasks/odd-contract-hardening.md` (T1-T5,
+  IDs estables, TDD off con runners `validate-skills`+`verify.sh`). Tras el hardening: validate
+  10/10, sync+status sin drift, **reanudacion con contexto fresco** (subagente `general` sin
+  historial: leyo el documento, reporto T4/T5 pendientes y reconcilio contra Git sin crear
+  artefactos ni disparar SDD), `verify.sh` verde, `qa-gate` limpio. Pendiente para cerrar:
+  reanudacion desde una sesion nueva del humano + 2 features sustanciales.
 
 ## Periodo prudencial
 - Vigilancia hasta 2026-10-01 (o 2 features sustanciales reales, lo que ocurra antes).

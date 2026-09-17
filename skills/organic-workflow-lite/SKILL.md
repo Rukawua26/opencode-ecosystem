@@ -1,20 +1,28 @@
 ---
 name: organic-workflow-lite
-description: Flujo ODD para implementacion organica sustancial con un documento unico odd/tasks. Usar cuando una implementacion autorizada requiera dos o mas pasos significativos o progreso recuperable, sin activar SDD.
+description: Flujo ODD para implementar, reanudar o consultar trabajo organico sustancial mediante un documento unico odd/tasks. Usar cuando una implementacion autorizada requiera dos o mas pasos significativos o progreso recuperable, sin activar SDD.
 ---
 
 # organic-workflow-lite
 
 1. **Autorizacion**: esta skill aplica solo a trabajo ya autorizado a mutar. Si la peticion es analizar, comparar, auditar o planificar, responde read-only y no crees el documento. Implementar autoriza editar codigo y tests y ejecutar verificacion local; NO autoriza rama nueva, commit, push, PR, merge ni deploy sin peticion explicita.
 
-2. **Alcance aprobado**: explora primero (routing normal de AGENTS.md). Presenta en chat: objetivo, problema, alcance (incluye/excluye), restricciones y tareas con criterio de verificacion. Espera aprobacion humana antes de la primera linea de codigo; el usuario aprueba el alcance, no cada tarea.
+2. **Incertidumbre acotada**: recomienda research solo ante una incertidumbre nombrada (fuentes primarias; distingue hechos verificados, supuestos, contradicciones y huecos). Formula UNA pregunta enfocada solo por una decision real de producto pendiente, y detente a esperar la respuesta. Usa maximo UN challenge read-only e independiente para una premisa de alto impacto sin probar; no abras debates ni loops.
 
-3. **Documento unico**: crea `<proyecto>/odd/tasks/<feature>.md` con secciones: Objetivo; Problema y por que; Alcance; Restricciones; Tareas (`[ ]` con criterio); Decisiones aceptadas; Evidencia; Progreso (estado, ultima tarea, siguiente paso, bloqueos). Un solo documento por feature; no crees spec/plan/design ni espejes el documento en memoria (basta una linea con la ruta).
+3. **Alcance aprobado**: explora primero (routing normal de AGENTS.md). Presenta en chat: objetivo, problema, alcance (incluye/excluye), restricciones y tareas con criterio de verificacion. Espera aprobacion humana antes de la primera linea de codigo; el usuario aprueba el alcance, no cada tarea.
 
-4. **Implementa tarea por tarea**: enruta cada una segun AGENTS.md (1-3 ficheros inline; 4+ delega exploracion; 2+ escrituras no triviales -> writer acotado). TDD solo si el proyecto o el usuario lo piden; si no, checks funcionales. Marca `[x]` unicamente con resultado observado y registra en Evidencia `comando -> salida breve`.
+4. **Documento unico**: crea `<proyecto>/odd/tasks/<feature>.md` con secciones: Objetivo; Problema y por que; Alcance; Restricciones; TDD; Tareas; Decisiones aceptadas; Evidencia; Progreso (estado, ultima tarea, siguiente paso, bloqueos). Un solo documento por feature; no crees spec/plan/design ni espejes el documento en memoria (basta una linea con la ruta).
 
-5. **Cambios de alcance**: los aceptados actualizan las tareas afectadas, conservan las validas y reabren las invalidadas con motivo. Hallazgos solos no expanden alcance; el nuevo negocio requiere autorizacion.
+5. **TDD**: resuelve el modo en orden: politica explicita del proyecto, instruccion del usuario, valor ya guardado en el documento; si no hay ninguno, TDD off con checks funcionales obligatorios. La existencia de tests no lo activa. Guarda en el documento: `Modo: on|off`, `Fuente: proyecto|usuario|default`, `Runner: comando exacto o no disponible`. Si esta on: RED observado antes de implementar, GREEN, REFACTOR.
 
-6. **Reanudacion**: al continuar una feature, lee el documento, contrasta con `git status`/diff y valida que la evidencia previa sigue vigente (en duda, repite el check). Continua la primera tarea pendiente; no reejecutes verificaciones intactas.
+6. **Tareas con ID estable**: numera T1, T2...; nunca renumeres tareas existentes ni reutilices IDs; las tareas nuevas reciben ID nuevo; una tarea reabierta conserva su ID con motivo registrado. Marca `[x]` unicamente con resultado observado.
 
-7. **Cierre**: reporta resultado verificado, checks fallidos o pendientes y siguiente paso. qa-gate al cierre; verificador independiente o lentes 4R solo si el riesgo del cambio lo justifica, nunca por checkbox.
+7. **Delegacion con documento**: el padre lee el documento y pasa al worker la ruta del documento, la tarea exacta, el alcance autorizado y los checks; no todo el historial. El worker lee el documento antes de editar, trabaja solo su tarea, no modifica alcance, no crea subagentes y devuelve archivos tocados, checks ejecutados y resultado.
+
+8. **Evidencia honesta**: por tarea registra `Estado: passed|failed|skipped|unavailable|pending` con comando y salida breve. Nunca inventes evidencia ni escribas "deberia funcionar"; un check no ejecutado es `pending`, no `passed`.
+
+9. **Cambios de alcance**: los aceptados actualizan las tareas afectadas, conservan las validas y reabren las invalidadas con motivo. Hallazgos solos no expanden alcance; el nuevo negocio requiere autorizacion.
+
+10. **Reanudacion y consulta**: al continuar o consultar, lista `<proyecto>/odd/tasks/*.md`; con una sola feature abierta, prosigue con ella; con varias, pregunta cual, nunca inferas por la memoria mas reciente. Lee el documento, contrasta con `git status`/diff y reconcilia: si documento y codigo discrepan, conserva ambos estados, pregunta solo por el conflicto real y repite unicamente los checks cuya evidencia quedo invalidada. Continua la primera tarea pendiente.
+
+11. **Cierre**: reporta resultado verificado, checks `failed|skipped|unavailable|pending` y siguiente paso. qa-gate al cierre; verificador independiente o lentes 4R solo si el riesgo del cambio lo justifica, nunca por checkbox.
