@@ -5,10 +5,16 @@
 - Prefer `repo-map.json` and `summaries/` over full-tree reads.
 - Rebuild context metadata with `python3 ~/tools/agent_context/build_repo_map.py`; use `--check` to detect stale data without writing.
 
+# Flujo Organico Predeterminado (ODD-lite)
+
+- Toda peticion sigue: autorizar, explorar, resolver incertidumbre, clasificar, implementar, verificar, cerrar. Analizar, comparar, auditar o planificar es read-only: nunca muta ni crea artefactos.
+- Trabajo pequeno entendido: inline sin artefactos. Trabajo sustancial (2+ pasos significativos o progreso recuperable): carga la skill `organic-workflow-lite`, presenta alcance y tareas, y tras aprobacion humana usa un unico documento `odd/tasks/<feature>.md`.
+- Implementar autoriza editar codigo y ejecutar verificacion local; nunca rama nueva, commit, push, PR, merge ni deploy sin peticion explicita.
+
 # Spec-Driven Development (SDD)
 
 - Las specs viven dentro de cada proyecto en `spec/`; no usar una carpeta global de specs.
-- Para features nuevas o cambios complejos, crear primero `spec/features/NNN-name/spec.md`, luego `plan.md`, luego `tasks.md`. `plan.md` es opcional en features pequenas o mecanicas; su ausencia en features antiguas ya verificadas no es un hallazgo.
+- SDD es una rama explicita del flujo organico: se activa solo por peticion directa del usuario o propuesta aceptada, nunca por tamano, complejidad o riesgo solos. Al activarse, crear `spec/features/NNN-name/spec.md`, luego `plan.md`, luego `tasks.md`; `plan.md` es opcional en features pequenas o mecanicas y su ausencia en features antiguas ya verificadas no es un hallazgo.
 - Antes de implementar una feature SDD, lee `spec/constitution/working-agreement.md` y `tech-stack.md` solo si existen; lee siempre `spec/features/<feature>/spec.md`, `plan.md` y `tasks.md`.
 - No leer specs de otras features salvo dependencia explícita.
 - La spec es el ancla de verdad: si cambia el alcance, actualizar `spec.md` o `plan.md` antes de tocar código.
@@ -20,10 +26,10 @@
 
 - Yo (humano) defino alcance, apruebo planes y verifico resultados finales.
 - Tu (agente) ejecutas tacticamente: implementas, verificas y registras evidencia.
-- No avances a implementacion sin un plan aprobado.
+- No avances a implementacion sustancial sin un alcance aprobado; los cambios pequenos explicitamente pedidos pueden iterar directo.
 - En features pequenas puedes iterar sin preguntar siempre que respetes criterios de aceptacion.
 - Si una tarea escala a runtime critico o cambia contratos publicos, pausa y pregunta.
-- Tras resolver un flujo no trivial y reutilizable, pregunta si conviene convertirlo en skill; si el humano repite la misma peticion o pregunta 2-3 veces (incluido "es esta la mejor forma o hay otra mejor?"), trata la repeticion como trigger y propone skill usando el flujo de `customize-opencode`; no crees ni modifiques skills sin aprobacion y comprueba antes que no exista una equivalente.
+- Tras resolver un flujo no trivial y reutilizable, pregunta si conviene convertirlo en skill; si el humano repite la misma peticion o pregunta 2-3 veces (incluido "es esta la mejor forma o hay otra mejor?"), trata la repeticion como trigger y propone skill usando el protocolo de skills del ecosistema (editar fuente, validar, sync, doc de evolucion); no crees ni modifiques skills sin aprobacion y comprueba antes que no exista una equivalente.
 
 # Autoauditoría de Problema y Solución (3 Preguntas)
 
@@ -65,12 +71,12 @@
 - Bin: `opencode` en `PATH` (actual: `/usr/bin/opencode`)
 - Config: `~/.config/opencode/opencode.jsonc`
 - Fuente de verdad: `~/opencode-ecosystem`. Tras editarla: `~/opencode-ecosystem/opencode-ecosystem sync --apply`; si editaste `~/.config/opencode` en caliente: `~/opencode-ecosystem/opencode-ecosystem publish --yes`. Ejecuta `status` antes y despues.
-- Al crear o modificar una skill de OpenCode, carga primero la built-in `customize-opencode`, edita `~/opencode-ecosystem/skills` antes que el runtime, valida con `python3 ~/opencode-ecosystem/validate-skills.py ~/opencode-ecosystem/skills`, sincroniza, ejecuta `opencode debug skill` y reinicia OpenCode. Mantén coherencia de estilo con las skills existentes: español, descripción "qué hace + Usar cuando", cuerpo breve, sin acentos en el contenido. **Documenta todo cambio al ecosistema en `~/opencode-ecosystem/docs/evolution/` usando `_TEMPLATE.md`; antes de cambiar conserva una base reversible en Git, el cambio debe ser mejor o igual que lo anterior (no regresion) y la base no se elimina hasta verificar el resultado sin errores durante un periodo prudencial.**
+- Al crear o modificar una skill de OpenCode, edita `~/opencode-ecosystem/skills` antes que el runtime, valida con `python3 ~/opencode-ecosystem/validate-skills.py ~/opencode-ecosystem/skills`, sincroniza y comprueba que la skill aparece en `~/.config/opencode/skills/`; reinicia OpenCode solo si tocaste plugins o config de arranque. Mantén coherencia de estilo con las skills existentes: español, descripción "qué hace + Usar cuando", cuerpo breve, sin acentos en el contenido. **Documenta todo cambio al ecosistema en `~/opencode-ecosystem/docs/evolution/` usando `_TEMPLATE.md`; antes de cambiar conserva una base reversible en Git, el cambio debe ser mejor o igual que lo anterior (no regresion) y la base no se elimina hasta verificar el resultado sin errores durante un periodo prudencial.**
 - Nunca sincronices `.env`, memoria viva, receipts, logs, backups ni personalizaciones ajenas al manifiesto.
 - Tras actualizar OpenCode, ejecuta `~/tools/plugin_doctor.sh`; revisa cualquier cambio frente a la version pineada antes de aceptar los hooks.
 
 ## Runtime Instalado
-- Skills: 9 en `~/.config/opencode/skills/`; carga con `skill` solo la que corresponda.
+- Skills: 10 en `~/.config/opencode/skills/`; carga con `skill` solo la que corresponda.
 - Lentes 4R: `risk-lens` (errores silenciosos/edge cases), `resilience-lens` (red/timeout/fallback), `reliability-lens` (tests flaky/no-determinismo), `readability-lens` (sugerir revision humana, nunca automatiza). Todas informan, ninguna bloquea. Ver `risk-lens` en deploys criticos. Esfuerzo por evidencia del diff, no por tamano: riesgo bajo (docs/config) = solo `qa-gate`; 4R completo solo con consentimiento y aviso de coste (runtime critico, contratos publicos, seguridad).
 - Memoria: Markdown+Bash en `~/.config/opencode/memory/` (`kairos`, `autodream`, `MEMORY.md`); no guardes resultados efimeros como memoria durable.
 - MCP: solo Context7 configurado e inactivo; activalo bajo demanda desde la fuente de verdad. No hay plugins ni agentes personalizados instalados.
