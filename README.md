@@ -33,7 +33,7 @@ Reinicia OpenCode para cargar la skill actualizada.
 
 ## Contenido
 - `configs/`: opencode.jsonc (mínimo válido, sin MCP inexistentes), dcp.jsonc (32-40k), cron-jobs.json
-- `skills/`: 9 curadas lite (5 core + 4 lentes 4R); OpenCode descubre nombre/description y carga el cuerpo bajo demanda con la tool `skill`
+- `skills/`: 10 curadas lite (6 core + 4 lentes 4R); OpenCode descubre nombre/description y carga el cuerpo bajo demanda con la tool `skill`. `organic-workflow-lite` (ODD) solo se carga en trabajo sustancial
 - `memory/`: kairos.sh, autodream.sh, MEMORY.md (plantilla; lo vivo queda en ~/.config)
 - `scripts/`: ram-guard-lite.sh, qa-gate.sh (warn), co-change-analyzer.sh, hygiene.sh (`triggers|prune|reset`, manual, preview por defecto)
 - `verify.sh` (raíz, no se sincroniza): validación única (triggers + debug config + status + doctores)
