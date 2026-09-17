@@ -1,0 +1,18 @@
+# Repo home: whitelist. Nada se rastrea por defecto.
+# Solo este .gitignore, AGENTS.md y la spec SDD.
+# Sin acentos a proposito (estilo del proyecto).
+
+/*
+!/.gitignore
+!/AGENTS.md
+!/proyectos/
+
+/proyectos/*
+!/proyectos/AI-opencode/
+
+/proyectos/AI-opencode/*
+!/proyectos/AI-opencode/spec/
+
+# Repo anidado con historia propia: nunca rastrear desde aqui
+# (ya cubierto por /*, consta para evitar git add por error).
+/opencode-ecosystem/
