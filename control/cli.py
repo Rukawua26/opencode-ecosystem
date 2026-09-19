@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 
-from .db import record_receipt
+from .db import record_receipt, recent_events
 from .runner import run_next, queue_summary
 from .db import add_task, list_tasks
 from . import reconcile as _reconcile
@@ -102,6 +102,62 @@ def cmd_task(args: list[str]) -> int:
     return 0 if t.get("status") == "done" else 1
 
 
+def doctor_dict() -> dict:
+    """Diagnostico sanitizado: nunca incluye prompt, workspace ni comandos."""
+    snap = get_store().refresh()
+    timers = _systemd_timers()
+    report = _reconcile.check(timers=timers, eco_root=ECO_ROOT)
+    h = snap.health
+    errors = [e for e in recent_events(20) if e["status"] in ("fail", "error")][:5]
+    return {
+        "ok": bool(h.ok and report["ok"]),
+        "generated_at": snap.generated_at,
+        "stale_seconds": get_store().stale_seconds(),
+        "health": {
+            "ok": h.ok,
+            "errors": h.errors,
+            "warnings": h.warnings,
+            "opencode_active": h.open_code_active,
+            "timers_active": h.timers_active,
+            "timers_total": h.timers_total,
+        },
+        "queue": queue_summary(),
+        "reconcile": {
+            "ok": report["ok"],
+            "findings": [f'{f["kind"]}: {f["target"]}' for f in report["findings"]],
+        },
+        "recent_errors": [
+            {"ts": e["ts"], "kind": e["kind"], "event": e["event"], "status": e["status"]}
+            for e in errors
+        ],
+    }
+
+
+def cmd_doctor(as_json: bool) -> int:
+    d = doctor_dict()
+    if as_json:
+        print(json.dumps(d, ensure_ascii=False, indent=1))
+        return 0 if d["ok"] else 1
+    print(f"[doctor] ok={d['ok']} snapshot={d['generated_at']} "
+          f"(hace {d['stale_seconds']:.0f}s)")
+    h = d["health"]
+    print(f"  salud: ok={h['ok']} opencode_activo={h['opencode_active']} "
+          f"timers={h['timers_active']}/{h['timers_total']}")
+    for e in h["errors"]:
+        print(f"  ERROR: {e}")
+    for w in h["warnings"]:
+        print(f"  WARN: {w}")
+    print(f"  cola: {d['queue']}")
+    r = d["reconcile"]
+    print(f"  reconciliador: ok={r['ok']}"
+          + ("" if r["ok"] else f" findings={r['findings']}"))
+    if d["recent_errors"]:
+        print("  ultimos errores:")
+        for e in d["recent_errors"]:
+            print(f"    {e['ts']} {e['kind']}/{e['event']} -> {e['status']}")
+    return 0 if d["ok"] else 1
+
+
 def main(argv: list[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     if not args or args[0] == "status":
@@ -114,6 +170,13 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_receipt(args[1:])
     if args[0] == "task":
         return cmd_task(args[1:])
+    if args[0] == "doctor":
+        return cmd_doctor("--json" in args[1:])
+    if args[0] in ("-h", "--help"):
+        print("uso: python3 -m control.cli "
+              "[status|snapshot|receipt|task|doctor|reconcile]\n"
+              "  doctor [--json]  diagnostico sanitizado (sin prompts ni comandos)")
+        return 0
     if args[0] == "reconcile":
         mode_apply = "--apply" in args[1:]
         report = _reconcile.check(timers=_systemd_timers(), eco_root=ECO_ROOT)
@@ -128,7 +191,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  apply: {report['apply']}"
                   + (f" aplicadas={report.get('applied')}" if report.get("applied") else ""))
         return 0 if report["ok"] else 1
-    print("uso: python3 -m control.cli [status|snapshot|receipt|task]",
+    print("uso: python3 -m control.cli "
+          "[status|snapshot|receipt|task|doctor|reconcile]",
           file=sys.stderr)
     return 2
 
