@@ -115,10 +115,25 @@ Alcance aprobado: launcher 1 tarea/vez, sin recuperacion automatica, cola visibl
 - [x] T26 — Piloto real E2E: tarea #1 con modelo default fallo por "Insufficient Balance" (error del proveedor, no del runner) -> dead tras marcar nota; re-encolada con `opencode/nemotron-3-ultra-free` -> tarea #2 `done` rc=0 en 18.48s. Recibos automaticos en `/api/events`: iniciada/completada con duracion. Panel muestra cola correctamente.
 
 ## Progreso
-- Última tarea terminada: T53 (Etapa 8A completa; T47 queda pendiente por calendario ~2026-09-25)
+- Última tarea terminada: T59 (Etapa 8B completa); T47 queda pendiente por calendario ~2026-09-25
 - Estado: en observacion
 - Bloqueos: ninguno
 - Commits: 9381d5e (feature T1-T46), 8fd46fd (evidencia odd-contract), protegido en git 2026-09-18
+
+## Etapa 8B — Pulido seguro del panel (aprobada e implementada 2026-09-19)
+
+Origen: auditoria real con Playwright + Chromium del sistema sobre el panel vivo.
+
+- [x] T54 — Footer corregido: "solo lectura" -> "acciones limitadas y protegidas" (el panel muta desde Etapa 4).
+- [x] T55 — `favicon.ico` 404 eliminado con `<link rel="icon" href="data:,">` (0 bytes, sin archivo nuevo).
+- [x] T56 — Modal accesible: `role=dialog`, `aria-modal`, `aria-labelledby`, cierre con Escape, foco devuelto al disparador.
+- [x] T57 — Sin `alert()` nativo: errores de acciones y validacion via banner `pushError`; el formulario conserva lo escrito.
+- [x] T58 — Smoke E2E opcional `test_playwright_e2e.py` (3 tests: carga+salud+sin errores/404, filtros+modal+Escape, movil 390px sin overflow). Skip automatico si falta playwright/chromium/panel.
+- [x] T59 — Verificacion: 94/94 tests OK; Playwright real confirma footer nuevo, 0 console errors, 0 HTTP 404; `verify.sh` verde; `status` sin drift; qa-gate strict ok.
+
+Decision: `comandos: 0` es correcto y observado — los antiguos comandos SDD fueron sustituidos por el flujo ODD; en `~/.config/opencode/commands/` solo quedan backups `.md.bak-*` que el glob `*.md` ignora correctamente. No se resucita nada.
+
+Evidencia: console_errors=[], http_404=[], footer nuevo verificado en navegador headless (2026-09-19).
 
 ## Etapa 8A — Estabilidad y usabilidad (aprobada 2026-09-18, plan v2 iterado)
 

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>Control del ecosistema OpenCode</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
 <style>
 :root{
   --bg:#0f1115; --bg2:#161a22; --card:#1b2130; --card2:#222a3b;
@@ -200,7 +201,8 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
     <div id="events-empty" class="muted" style="display:none;margin-top:.5rem">sin eventos todavía — se registran al detectar cambios o con <span class="mono">python3 -m control.cli receipt …</span></div>
   </section>
 
-  <div id="hist-modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:20" onclick="closeHist(event)">
+  <div id="hist-modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:20" onclick="closeHist(event)"
+       role="dialog" aria-modal="true" aria-labelledby="hist-title">
     <div style="background:var(--card);max-width:640px;margin:8vh auto;border-radius:.7rem;border:1px solid var(--border);padding:1rem 1.2rem;max-height:70vh;overflow:auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
         <h2 style="margin:0;font-size:1rem" id="hist-title">historial</h2>
@@ -217,7 +219,7 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
   <div id="alerts"></div>
 </main>
 
-<footer>solo lectura · 127.0.0.1:8765 · refresco automático 30s · sin dependencias externas</footer>
+<footer>acciones limitadas y protegidas · 127.0.0.1:8765 · refresco automático 30s · sin dependencias externas</footer>
 
 <script>/*__CSRF__*/
 const KIND_META = {
@@ -467,7 +469,8 @@ async function doAction(url, body){
     return;
   }
   if (!r.ok || j.ok === false){
-    alert((j && (j.error || j.detail)) || ('Error HTTP ' + r.status));
+    pushError((j && (j.error || j.detail)) || ('Error HTTP ' + r.status));
+    return;
   }
   loadData(true);
 }
@@ -481,7 +484,7 @@ function addTask(){
   const a = document.getElementById('new-agent').value;
   const m = document.getElementById('new-model').value;
   const sensitivity = document.getElementById('new-sensitivity').value;
-  if (p.length < 4){ alert('prompt demasiado corto'); return; }
+  if (p.length < 4){ pushError('El prompt es demasiado corto (mínimo 4 caracteres)'); return; }
   const model_policy = m.includes('free') ? 'free-allowed' : 'paid';
   doAction('/api/actions/add-task', {agent:a, prompt:p, model:m, model_policy, sensitivity});
   document.getElementById('new-prompt').value = '';
@@ -515,7 +518,9 @@ async function loadEvents(){
   }
 }
 
+let histTrigger = null;
 async function showHistory(name){
+  histTrigger = document.activeElement;
   document.getElementById('hist-title').textContent = '📜 historial — '+name;
   document.getElementById('hist-modal').style.display = 'block';
   document.getElementById('hist-body').innerHTML = '';
@@ -537,7 +542,12 @@ async function showHistory(name){
 function closeHist(ev){
   if(ev && ev.target.id !== 'hist-modal' && ev.target.tagName !== 'BUTTON') return;
   document.getElementById('hist-modal').style.display = 'none';
+  if (histTrigger && document.contains(histTrigger)) histTrigger.focus();
 }
+document.addEventListener('keydown', e=>{
+  if (e.key === 'Escape' && document.getElementById('hist-modal').style.display !== 'none')
+    closeHist();
+});
 
 document.addEventListener('DOMContentLoaded',()=>{loadData();setInterval(loadData,30000);});
 </script>

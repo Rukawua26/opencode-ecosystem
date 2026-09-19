@@ -45,6 +45,23 @@ class TestFrontendJS(unittest.TestCase):
         self.assertIn('role="button"', html)
         self.assertIn('aria-live="polite"', html)
 
+    def test_sin_alert_nativo(self) -> None:
+        html = INDEX.read_text(encoding="utf-8")
+        script = html.split("<script>", 1)[1].split("</script>", 1)[0]
+        self.assertNotIn("alert(", script)
+
+    def test_favicon_declarado(self) -> None:
+        html = INDEX.read_text(encoding="utf-8")
+        self.assertIn('<link rel="icon" href="data:,">', html)
+
+    def test_modal_accesible(self) -> None:
+        html = INDEX.read_text(encoding="utf-8")
+        self.assertIn('role="dialog"', html)
+        self.assertIn('aria-modal="true"', html)
+        self.assertIn('aria-labelledby="hist-title"', html)
+        self.assertIn("key === 'Escape'", html)
+        self.assertIn("histTrigger", html)
+
 
 if __name__ == "__main__":
     unittest.main()
