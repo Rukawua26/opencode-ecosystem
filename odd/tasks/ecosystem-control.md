@@ -118,6 +118,7 @@ Alcance aprobado: launcher 1 tarea/vez, sin recuperacion automatica, cola visibl
 - Última tarea terminada: T46 (Etapa 7 completa)
 - Estado: en observacion
 - Bloqueos: ninguno
+- Commits: 9381d5e (feature T1-T46), 8fd46fd (evidencia odd-contract), protegido en git 2026-09-18
 - Servicios: `opencode-control.service` (panel, http://127.0.0.1:8765) y `opencode-control-reconcile.timer` (5min) activos via systemd.
 
 ## Etapa 7 — Operacion persistente (aprobada 2026-09-18)
@@ -151,5 +152,5 @@ Watchdog de inconsistencias: tareas `running` que superan timeout+gracia, timers
 - [x] T37 — 6B: SQLite schema v2 registrado en `schema_meta`; contrato completo y migracion idempotente; `claim_next()` usa `BEGIN IMMEDIATE`, owner UUID y lease. Test multiproceso: 2 procesos compiten, exactamente 1 reclama.
 - [x] T38 — 6B: runner usa claim atomico y workspace validado dentro de HOME; clasifica provider_balance/provider_rate/timeout/infra/contract/agent/verification. Error de proveedor vuelve a pending sin consumir intento. Modelo free exige `free-allowed` y queda prohibido para `sensitive`. API publica redacta prompt/workspace/comandos. Payload sensible se purga al terminar; payload normal terminal, tras 30 dias.
 - [x] T39 — 6B: reconciliador prioriza `lease_until`; lease vencido -> hallazgo `lease_vencido` -> dead al aplicar; lease vigente no se toca. Tests cubren ambos casos.
-- [x] T40 — 6C: piloto SDD real aislado en `~/.local/share/opencode-control/pilots/sdd-KBr3qh`: task #4 `sdd-implement` (Luna) creo `pilot-result.txt`; task #5 `sdd-verify` heredada termino rc=0; task #6 valido el nuevo check automatico y emitio evento `verification/check determinista` rc=0. Contenido exacto `CONTROL_PILOT_OK`. Ningun proyecto existente fue tocado.
+- [x] T40 — 6C: piloto SDD real aislado en `~/.local/share/opencode-control/pilots/sdd-KBr3qh`: task #4 `sdd-implement` (Luna) creo `pilot-result.txt`; task #5 `sdd-verify` heredada termino rc=0; task #6 valido el nuevo check automatico y emitio evento `verification/check determinista` rc=0. Contenido exacto `CONTROL_PILOT_OK`. Ningun proyecto existente fue tocado. Commit: 9381d5e.
 - [x] T41 — Cierre 6: 77/77 tests OK; `py_compile` OK; test multiproceso del lease OK; piloto SDD real OK; API tasks redactada; politica free/sensitive y purga probadas; reconciliador sano; `git diff --check` OK; qa-gate strict exit 0; `./opencode-ecosystem status` sin drift; `./verify.sh` verde. Panel reiniciado con codigo actual (pid 178358). Sin commit (no autorizado).
