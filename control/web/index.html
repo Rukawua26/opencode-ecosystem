@@ -87,6 +87,22 @@ th{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mu
 button.chip{font:inherit;font-family:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .table-wrap{overflow-x:auto}
+#map{width:100%;height:auto;display:block;background:var(--bg2);border:1px solid var(--border);border-radius:.6rem}
+.gnode{cursor:pointer}
+.gnode rect{fill:var(--card2);stroke:var(--border);stroke-width:1.2;rx:8}
+.gnode.st-ok rect{stroke:var(--ok)}
+.gnode.st-warn rect{stroke:var(--warn)}
+.gnode.st-err rect{stroke:var(--err)}
+.gnode.st-info rect{stroke:var(--accent)}
+.gnode.sel rect{stroke-width:2.6}
+.gnode text{fill:var(--txt);font-size:12px}
+.gnode .sub{fill:var(--muted);font-size:9.5px}
+.edge{stroke:var(--muted);stroke-width:1.1;opacity:.75}
+.edge.dashed{stroke-dasharray:4 3}
+.edge.hit{stroke:var(--accent);opacity:1;stroke-width:1.6}
+.edge-lbl{fill:var(--muted);font-size:8.5px;opacity:.85}
+.edge-lbl.hit{fill:var(--accent);opacity:1;font-weight:600}
+#map-detail{margin-top:.6rem;font-size:.85rem;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media (max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}}
 footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
@@ -110,6 +126,13 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
 <main>
   <div class="stats" id="stats"></div>
   <div id="errs" role="alert" aria-live="polite"></div>
+
+  <section class="panel">
+    <h2>🗺️ Mapa operativo</h2>
+    <div class="hint">visión global: cómo se conectan las piezas · borde verde=sano, ámbar=aviso, rojo=fallo, azul=informativo · línea continua=observado, discontinua=declarado · haz clic en un nodo</div>
+    <div class="table-wrap"><svg id="map" viewBox="0 0 1010 520" role="img" aria-label="Mapa operativo del ecosistema"></svg></div>
+    <div id="map-detail">selecciona un nodo para ver su detalle</div>
+  </section>
 
   <section class="panel">
     <h2>🧩 Componentes</h2>
@@ -304,6 +327,7 @@ function render(){
   renderComponents();
   renderFlows();
   renderTimers();
+  loadGraph();
 
   const al = [];
   (h.errors||[]).forEach(e=>al.push(`<div class="banner err">⛔ ${esc(e)}</div>`));
@@ -371,6 +395,86 @@ function renderTimers(){
   loadTasks();
   loadReconcile();
 }
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+const NW = 150, NH = 56; // tamaño de nodo
+let GRAPH = null, SEL_NODE = null;
+
+function el(tag, attrs){
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+
+function selectNode(id){
+  SEL_NODE = SEL_NODE === id ? null : id;
+  renderGraph();
+}
+
+function renderGraph(){
+  if (!GRAPH) return;
+  const svg = document.getElementById('map');
+  svg.innerHTML = '';
+  const defs = el('defs', {});
+  defs.innerHTML = `<marker id="arr" viewBox="0 0 10 10" refX="9" refY="5"
+    markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--muted)"/></marker>`;
+  svg.appendChild(defs);
+
+  const byId = {};
+  GRAPH.nodes.forEach(n => { byId[n.id] = n; });
+
+  const hit = e => SEL_NODE && (e.from === SEL_NODE || e.to === SEL_NODE);
+  GRAPH.edges.forEach(e => {
+    const a = byId[e.from], b = byId[e.to];
+    if (!a || !b) return;
+    const x1 = a.x + NW/2, y1 = a.y + NH/2, x2 = b.x + NW/2, y2 = b.y + NH/2;
+    const cls = 'edge' + (e.source === 'declarado' ? ' dashed' : '') + (hit(e) ? ' hit' : '');
+    const ln = el('line', {x1, y1, x2, y2, 'class': cls, 'marker-end': 'url(#arr)'});
+    svg.appendChild(ln);
+    const tx = el('text', {x: (x1+x2)/2, y: (y1+y2)/2 - 4, 'text-anchor': 'middle',
+      'class': 'edge-lbl' + (hit(e) ? ' hit' : '')});
+    tx.textContent = e.label;
+    svg.appendChild(tx);
+  });
+
+  GRAPH.nodes.forEach(n => {
+    const g = el('g', {'class': `gnode st-${n.status}` + (SEL_NODE === n.id ? ' sel' : ''),
+      tabindex: '0', role: 'button', 'aria-label': n.title + ': ' + n.detail});
+    g.appendChild(el('rect', {x: n.x, y: n.y, width: NW, height: NH, rx: 8}));
+    const t1 = el('text', {x: n.x + NW/2, y: n.y + 24, 'text-anchor': 'middle'});
+    t1.textContent = n.title;
+    g.appendChild(t1);
+    const t2 = el('text', {x: n.x + NW/2, y: n.y + 41, 'text-anchor': 'middle', 'class': 'sub'});
+    t2.textContent = n.detail;
+    g.appendChild(t2);
+    g.addEventListener('click', () => selectNode(n.id));
+    g.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); selectNode(n.id); }
+    });
+    svg.appendChild(g);
+  });
+
+  const d = document.getElementById('map-detail');
+  if (!SEL_NODE){
+    d.textContent = 'selecciona un nodo para ver su detalle';
+    return;
+  }
+  const n = byId[SEL_NODE];
+  const rel = GRAPH.edges.filter(e => e.from === SEL_NODE || e.to === SEL_NODE);
+  d.innerHTML = `<b>${esc(n.title)}</b> · ${esc(n.detail)} · estado: ${esc(n.status)} · conexiones: ` +
+    rel.map(e => `${esc(e.from)} → ${esc(e.to)} <span class="tag">${esc(e.source)}</span>`).join(' · ');
+}
+
+async function loadGraph(){
+  try{
+    GRAPH = await fetchJSON('/api/graph?t=' + Date.now());
+    renderGraph();
+  }catch(e){
+    pushError('No se pudo cargar el mapa: ' + e.message);
+  }
+}
+
 
 async function loadReconcile(){
   try{

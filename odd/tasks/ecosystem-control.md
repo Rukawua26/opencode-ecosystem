@@ -115,10 +115,24 @@ Alcance aprobado: launcher 1 tarea/vez, sin recuperacion automatica, cola visibl
 - [x] T26 — Piloto real E2E: tarea #1 con modelo default fallo por "Insufficient Balance" (error del proveedor, no del runner) -> dead tras marcar nota; re-encolada con `opencode/nemotron-3-ultra-free` -> tarea #2 `done` rc=0 en 18.48s. Recibos automaticos en `/api/events`: iniciada/completada con duracion. Panel muestra cola correctamente.
 
 ## Progreso
-- Última tarea terminada: T59 (Etapa 8B completa); T47 queda pendiente por calendario ~2026-09-25
+- Última tarea terminada: T64 (Etapa 9A mapa operativo); T47 queda pendiente por calendario ~2026-09-25
 - Estado: en observacion
 - Bloqueos: ninguno
 - Commits: 9381d5e (feature T1-T46), 8fd46fd (evidencia odd-contract), protegido en git 2026-09-18
+
+## Etapa 9A — Mapa operativo visual (implementada 2026-09-19)
+
+Origen: concepto tipo Archify adaptado al plano de control. SVG inline sin dependencias;
+nodos agrupados (11) en lugar de los 21 componentes individuales (evita grafo spaghetti);
+solo aristas declaradas/observadas; zoom avanzado fuera (viewBox responsive).
+
+- [x] T60 — `control/graph.py`: build_graph(snap) -> {nodes, edges} con coordenadas fijas, estado por nodo, detalle sanitizado; cola defensiva (si queue_summary falla, el grafo no se rompe).
+- [x] T61 — Endpoint `GET /api/graph` en server.py. Requirio reiniciar `opencode-control.service` (el servidor tiene el codigo en memoria; el HTML se lee por peticion pero el routing no).
+- [x] T62 — Frontend: seccion "Mapa operativo" tras las stats; SVG con flechas (marker), leyenda en hint, continua=observado/discontinua=declarado, clic+Enter/Space -> detalle con conexiones y resaltado de aristas.
+- [x] T63 — Tests: 8 de grafo (estructura, estados timers/opencode/cola/runner, cola caida, sanitizado) + 1 estructural frontend + 1 E2E Playwright (nodos, seleccion, detalle).
+- [x] T64 — Verificacion: 104/104 OK, panel validado con captura real (seleccion Reconciliador resalta sus 3 aristas), movil sin overflow, 0 console errors, verify verde, sin drift.
+
+Errores encontrados en la iteracion y corregidos: (a) queue_summary vive en runner.py, no db.py; (b) borre accidentalmente la firma de loadReconcile al insertar JS -> node --check lo cazo; (c) /api/graph 404 hasta reiniciar el servicio; (d) regla "dead>0 -> err" marcaba la cola en rojo siempre por tareas dead historicas T1: cambiada a warn (dead terminal != fallo activo).
 
 ## Etapa 8B — Pulido seguro del panel (aprobada e implementada 2026-09-19)
 

@@ -54,6 +54,12 @@ class TestFrontendJS(unittest.TestCase):
         html = INDEX.read_text(encoding="utf-8")
         self.assertIn('<link rel="icon" href="data:,">', html)
 
+    def test_mapa_presente(self) -> None:
+        html = INDEX.read_text(encoding="utf-8")
+        for marca in ('id="map"', "loadGraph", "/api/graph", "renderGraph",
+                      "Mapa operativo"):
+            self.assertIn(marca, html)
+
     def test_modal_accesible(self) -> None:
         html = INDEX.read_text(encoding="utf-8")
         self.assertIn('role="dialog"', html)

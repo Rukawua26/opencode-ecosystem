@@ -115,6 +115,11 @@ class ControlHandler(BaseHTTPRequestHandler):
                         pass
             self._json({"summary": queue_summary(), "tasks": list_tasks(limit)})
             return
+        if path == "/api/graph":
+            from .graph import build_graph
+            snap = self._get_snapshot(query)
+            self._json(build_graph(snap))
+            return
         if path == "/api/reconcile":
             from . import reconcile
             from .collect import ECO_ROOT

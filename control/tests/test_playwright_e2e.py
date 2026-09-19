@@ -64,6 +64,14 @@ class TestPanelE2E(unittest.TestCase):
         self.assertEqual(self.not_found, [])
         page.close()
 
+    def test_mapa_operativo(self) -> None:
+        page = self._page()
+        self.assertGreaterEqual(page.locator("#map .gnode").count(), 8)
+        page.locator("#map .gnode").first.click()
+        self.assertIn("conexiones", page.locator("#map-detail").inner_text())
+        page.keyboard.press("Enter")  # no debe romper nada tras seleccion
+        page.close()
+
     def test_filtros_e_historial(self) -> None:
         page = self._page()
         total = page.locator(".comp").count()
