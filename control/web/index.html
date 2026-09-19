@@ -82,6 +82,12 @@ th{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mu
 .banner{border-radius:.5rem;padding:.55rem .8rem;font-size:.85rem;margin-top:.8rem}
 .banner.err{background:#e5534b18;border:1px solid #e5534b44;color:var(--err)}
 .banner.warn{background:#e5a80718;border:1px solid #e5a80744;color:var(--warn)}
+#errs .banner{margin:0 0 .5rem 0}
+button.chip{font:inherit;font-family:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.table-wrap{overflow-x:auto}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}}
 footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
 </style>
 </head>
@@ -102,12 +108,14 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
 
 <main>
   <div class="stats" id="stats"></div>
+  <div id="errs" role="alert" aria-live="polite"></div>
 
   <section class="panel">
     <h2>🧩 Componentes</h2>
     <div class="hint">skills, comandos, agentes, scripts, configs — haz clic en un tipo para filtrar</div>
     <div class="chips" id="chips"></div>
-    <input class="search" id="search" placeholder="🔍 buscar por nombre o descripción…" oninput="renderComponents()">
+    <label for="search" class="muted" style="font-size:.78rem">buscar</label>
+    <input class="search" id="search" placeholder="🔍 buscar por nombre o descripción…" oninput="renderComponents()" aria-label="buscar componentes por nombre o descripción">
     <div class="grid" id="comp-grid"></div>
   </section>
 
@@ -120,10 +128,10 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
   <section class="panel">
     <h2>⏱️ Timers systemd</h2>
     <div class="hint">tareas programadas del usuario (whitelist opencode-*)</div>
-    <table>
+    <div class="table-wrap"><table>
       <thead><tr><th>Timer</th><th>Estado</th><th>Resultado</th><th>Última ejecución</th><th>Próxima</th><th></th></tr></thead>
       <tbody id="timers-body"></tbody>
-    </table>
+    </table></div>
   </section>
 
   <section class="panel">
@@ -132,23 +140,46 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
     <div id="queue-summary" style="margin-bottom:.6rem"></div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem;align-items:center">
       <button class="btn" onclick="runNext(this)">▶ ejecutar siguiente</button>
-      <input class="search" id="new-prompt" style="flex:1;min-width:220px;margin:0" placeholder="prompt de nueva tarea…">
-      <select id="new-agent" class="btn" style="padding:.4rem"></select>
-      <select id="new-model" class="btn" style="padding:.4rem">
+      <input class="search" id="new-prompt" style="flex:1;min-width:220px;margin:0" placeholder="prompt de nueva tarea…" aria-label="prompt de nueva tarea">
+      <select id="new-agent" class="btn" style="padding:.4rem" aria-label="agente de la nueva tarea"></select>
+      <select id="new-model" class="btn" style="padding:.4rem" aria-label="modelo de la nueva tarea">
         <option value="openai/gpt-5.6-luna">luna (pago/bajo coste)</option>
         <option value="openai/gpt-5.6-sol">sol (pago)</option>
         <option value="opencode/nemotron-3-ultra-free">nemotron (free/no sensible)</option>
       </select>
-      <select id="new-sensitivity" class="btn" style="padding:.4rem">
+      <select id="new-sensitivity" class="btn" style="padding:.4rem" aria-label="sensibilidad de la nueva tarea">
         <option value="normal">normal</option>
         <option value="sensitive">sensible</option>
       </select>
       <button class="btn" onclick="addTask()">＋ encolar</button>
     </div>
-    <table>
-      <thead><tr><th>#</th><th>Agente</th><th>Estado</th><th>Intentos</th><th>rc</th><th>Nota</th><th></th></tr></thead>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem;align-items:center">
+      <label class="muted" for="f-status" style="font-size:.78rem">filtros:</label>
+      <select id="f-status" class="btn" style="padding:.3rem" onchange="renderTasks()">
+        <option value="">todos los estados</option>
+        <option value="pending">pending</option>
+        <option value="running">running</option>
+        <option value="done">done</option>
+        <option value="failed">failed</option>
+        <option value="dead">dead</option>
+        <option value="cancelled">cancelled</option>
+      </select>
+      <select id="f-agent" class="btn" style="padding:.3rem" onchange="renderTasks()" aria-label="filtrar por agente">
+        <option value="">todos los agentes</option>
+      </select>
+      <select id="f-model" class="btn" style="padding:.3rem" onchange="renderTasks()" aria-label="filtrar por modelo">
+        <option value="">todos los modelos</option>
+      </select>
+      <select id="f-sens" class="btn" style="padding:.3rem" onchange="renderTasks()" aria-label="filtrar por sensibilidad">
+        <option value="">toda sensibilidad</option>
+        <option value="normal">normal</option>
+        <option value="sensitive">sensitive</option>
+      </select>
+    </div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>#</th><th>Agente</th><th>Estado</th><th>Intentos</th><th>rc</th><th>Duración</th><th>Nota</th><th></th></tr></thead>
       <tbody id="tasks-body"></tbody>
-    </table>
+    </table></div>
     <div id="tasks-empty" class="muted" style="display:none;margin-top:.5rem">cola vacía — encola con <span class="mono">python3 -m control.cli task add &lt;agente&gt; "&lt;prompt&gt;"</span></div>
   </section>
 
@@ -161,10 +192,10 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
   <section class="panel">
     <h2>🧾 Actividad reciente</h2>
     <div class="hint">solo cambios reales y recibos — sin prompts ni secretos · SQLite local</div>
-    <table>
-      <thead><tr><th>Cuándo</th><th>Componente</th><th>Evento</th><th>Estado</th><th>Detalle</th></tr></thead>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Cuándo</th><th>Componente</th><th>Evento</th><th>Estado</th><th>Duración</th><th>Detalle</th></tr></thead>
       <tbody id="events-body"></tbody>
-    </table>
+    </table></div>
     <div id="events-empty" class="muted" style="display:none;margin-top:.5rem">sin eventos todavía — se registran al detectar cambios o con <span class="mono">python3 -m control.cli receipt …</span></div>
   </section>
 
@@ -174,7 +205,7 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
         <h2 style="margin:0;font-size:1rem" id="hist-title">historial</h2>
         <button class="btn" onclick="closeHist()">✕</button>
       </div>
-      <table>
+      <div class="table-wrap"><table>
         <thead><tr><th>Cuándo</th><th>Evento</th><th>Estado</th><th>Detalle</th></tr></thead>
         <tbody id="hist-body"></tbody>
       </table>
@@ -204,7 +235,22 @@ let SNAP = null;
 let KIND_FILTER = 'todos';
 
 function esc(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
-async function fetchJSON(u){const r=await fetch(u);if(!r.ok)throw new Error(u+': '+r.status);return r.json();}
+async function fetchJSON(u){const r=await fetch(u);if(!r.ok)throw new Error(u+': HTTP '+r.status);return r.json();}
+
+const _ERRS = [];
+function pushError(msg){
+  if (_ERRS[_ERRS.length-1] === msg) return;
+  _ERRS.push(msg);
+  if (_ERRS.length > 3) _ERRS.shift();
+  document.getElementById('errs').innerHTML = _ERRS.map(m=>
+    `<div class="banner err">⚠️ ${esc(m)}</div>`).join('');
+}
+function clearErrors(){_ERRS.length=0;document.getElementById('errs').innerHTML='';}
+function csrfHint(st){
+  if (st === 403 || st === '403')
+    return 'La sesión del panel expiró (servicio reiniciado). Recarga la página para continuar; no se ha enviado nada.';
+  return '';
+}
 
 async function loadData(force){
   try{
@@ -214,7 +260,10 @@ async function loadData(force){
   }catch(e){
     document.getElementById('meta').textContent = 'error: '+e.message;
     document.getElementById('health-pill').innerHTML = '<span class="pill err"><span class="dot"></span>sin conexión</span>';
+    pushError('No se pudo leer el estado: ' + e.message);
+    return;
   }
+  clearErrors();
 }
 
 function fmtAge(s){
@@ -267,10 +316,10 @@ function kindsPresent(){
 
 function renderChips(){
   const m = kindsPresent();
-  let html = `<span class="chip ${KIND_FILTER==='todos'?'active':''}" onclick="setFilter('todos')">todos <span class="n">${SNAP.components.length}</span></span>`;
+  let html = `<button type="button" class="chip ${KIND_FILTER==='todos'?'active':''}" onclick="setFilter('todos')">todos <span class="n">${SNAP.components.length}</span></button>`;
   [...m.entries()].sort().forEach(([k,n])=>{
     const km = KIND_META[k]||KIND_META.otro;
-    html += `<span class="chip ${KIND_FILTER===k?'active':''}" onclick="setFilter('${k}')">${km.ic} ${km.lbl} <span class="n">${n}</span></span>`;
+    html += `<button type="button" class="chip ${KIND_FILTER===k?'active':''}" onclick="setFilter('${k}')">${km.ic} ${km.lbl} <span class="n">${n}</span></button>`;
   });
   document.getElementById('chips').innerHTML = html;
 }
@@ -286,6 +335,7 @@ function renderComponents(){
   document.getElementById('comp-grid').innerHTML = list.map(c=>{
     const km = KIND_META[c.kind]||KIND_META.otro;
     return `<div class="comp kind-${esc(c.kind)}" style="cursor:pointer" title="${esc(c.path||'')}"
+      tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showHistory('${esc(c.name)}')}"
       onclick="showHistory('${esc(c.name)}')">
       <div class="head"><span class="icn">${km.ic}</span><span class="nm">${esc(c.name)}</span>
         <span class="tag">${esc(c.source)}</span></div>
@@ -337,6 +387,52 @@ async function loadReconcile(){
 }
 
 const TASK_BADGE = {pending:'warn', running:'ok', done:'ok', failed:'err', dead:'err'};
+let ALL_TASKS = [];
+
+function taskDuration(t){
+  if (!t.started_at || !t.finished_at) return '—';
+  const s = (new Date(t.finished_at) - new Date(t.started_at)) / 1000;
+  if (isNaN(s) || s < 0) return '—';
+  return s < 60 ? Math.round(s)+'s' : Math.round(s/60)+'min';
+}
+
+function fillTaskFilters(){
+  const fa = document.getElementById('f-agent'), fm = document.getElementById('f-model');
+  const setOpts = (sel, cur, vals)=>{
+    const uniq = [...new Set(vals.filter(Boolean))].sort();
+    sel.innerHTML = sel.options[0].outerHTML + uniq.map(v=>`<option>${esc(v)}</option>`).join('');
+    if (uniq.includes(cur)) sel.value = cur;
+  };
+  setOpts(fa, fa.value, ALL_TASKS.map(t=>t.agent));
+  setOpts(fm, fm.value, ALL_TASKS.map(t=>t.model));
+}
+
+function renderTasks(){
+  const fs = document.getElementById('f-status').value,
+        fa = document.getElementById('f-agent').value,
+        fm = document.getElementById('f-model').value,
+        fe = document.getElementById('f-sens').value;
+  const rows = ALL_TASKS.filter(t=>
+    (!fs || t.status===fs) && (!fa || t.agent===fa) &&
+    (!fm || (t.model||'')===fm) && (!fe || t.sensitivity===fe));
+  document.getElementById('tasks-body').innerHTML = rows.map(t=>{
+    const canRetry = t.status==='dead', canCancel = t.status==='pending';
+    const act = (canRetry?`<button class="btn" title="reintentar" onclick="doAction('/api/actions/retry',{task_id:${t.id}})">↻</button>`:'')
+              + (canCancel?`<button class="btn" title="cancelar" onclick="doAction('/api/actions/cancel',{task_id:${t.id}})">✖</button>`:'');
+    const parent = t.parent_id ? `<div class="muted" style="font-size:.72rem">↳ de #${t.parent_id}</div>` : '';
+    return `<tr>
+      <td class="mono">#${t.id}${parent}</td>
+      <td class="mono">${esc(t.agent)}${t.model?`<div class="muted">${esc(t.model)}</div>`:''}</td>
+      <td><span class="pill ${TASK_BADGE[t.status]||'warn'}">${esc(t.status)}</span></td>
+      <td class="mono">${t.attempts}</td>
+      <td class="mono muted">${t.result_code == null ? '—' : t.result_code}</td>
+      <td class="mono muted">${taskDuration(t)}</td>
+      <td class="muted">${esc((t.note||'').slice(0,50))}${t.error_kind?`<div class="tag">${esc(t.error_kind)}</div>`:''}</td>
+      <td>${act}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="8" class="muted">sin tareas con esos filtros</td></tr>';
+}
+
  async function loadTasks(){
   try{
     const d = await fetchJSON('/api/tasks?limit=30');
@@ -345,26 +441,17 @@ const TASK_BADGE = {pending:'warn', running:'ok', done:'ok', failed:'err', dead:
       ['pending','running','done','failed','dead'].map(k=>
         `<span class="tag" style="margin-right:.3rem">${k}: <b>${s[k]||0}</b></span>`).join('');
     document.getElementById('tasks-empty').style.display = d.tasks.length ? 'none' : 'block';
-    document.getElementById('tasks-body').innerHTML = d.tasks.map(t=>{
-      const canRetry = t.status==='dead', canCancel = t.status==='pending';
-      const act = (canRetry?`<button class="btn" onclick="doAction('/api/actions/retry',{task_id:${t.id}})">↻</button>`:'')
-                + (canCancel?`<button class="btn" onclick="doAction('/api/actions/cancel',{task_id:${t.id}})">✖</button>`:'');
-      return `<tr>
-        <td class="mono">#${t.id}</td>
-        <td class="mono">${esc(t.agent)}${t.model?`<div class="muted">${esc(t.model)}</div>`:''}</td>
-        <td><span class="pill ${TASK_BADGE[t.status]||'warn'}">${esc(t.status)}</span></td>
-        <td class="mono">${t.attempts}</td>
-        <td class="mono muted">${t.result_code == null ? '—' : t.result_code}</td>
-        <td class="muted">${esc((t.note||'').slice(0,50))}${t.error_kind?`<div class="tag">${esc(t.error_kind)}</div>`:''}</td>
-        <td>${act}</td>
-      </tr>`;
-    }).join('');
+    ALL_TASKS = d.tasks;
+    fillTaskFilters();
+    renderTasks();
     // select de agentes permitidos
     if (!document.getElementById('new-agent').options.length){
       ['qa-gate','sdd-implement','sdd-verify','risk-lens','reliability-lens','context-compressor','build','general','explore']
         .forEach(a=>{const o=document.createElement('option');o.value=o.text=a;document.getElementById('new-agent').appendChild(o);});
     }
-  }catch(e){/* silencioso */}
+  }catch(e){
+    pushError('No se pudo cargar la cola de tareas: ' + e.message);
+  }
 }
 
 async function doAction(url, body){
@@ -374,8 +461,12 @@ async function doAction(url, body){
     body: JSON.stringify(body||{})
   });
   const j = await r.json().catch(()=>({}));
+  if (r.status === 403){
+    pushError(csrfHint(403));
+    return;
+  }
   if (!r.ok || j.ok === false){
-    alert((j && (j.error || j.detail)) || ('HTTP ' + r.status));
+    alert((j && (j.error || j.detail)) || ('Error HTTP ' + r.status));
   }
   loadData(true);
 }
@@ -415,9 +506,12 @@ async function loadEvents(){
       <td class="mono">${esc(e.kind)}</td>
       <td>${esc(e.event)}</td>
       <td>${statusBadge(e.status)}</td>
+      <td class="mono muted">${e.duration_s != null ? esc(String(Math.round(e.duration_s)))+'s' : '—'}</td>
       <td class="muted">${esc((e.detail||'').slice(0,80))}</td>
     </tr>`).join('');
-  }catch(e){/* silencioso: actividad es opcional */}
+  }catch(e){
+    pushError('No se pudo cargar la actividad reciente: ' + e.message);
+  }
 }
 
 async function showHistory(name){

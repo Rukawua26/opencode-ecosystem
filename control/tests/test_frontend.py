@@ -25,6 +25,24 @@ class TestFrontendJS(unittest.TestCase):
         res = subprocess.run([node, "--check", tmp], capture_output=True, text=True)
         self.assertEqual(res.returncode, 0, f"JS roto:\n{res.stderr}")
 
+    def test_csrf_caducado_tiene_mensaje_de_reanudacion(self) -> None:
+        html = INDEX.read_text(encoding="utf-8")
+        self.assertIn("Recarga la página", html)
+        self.assertIn("csrfHint", html)
+
+    def test_filtros_de_cola_presentes(self) -> None:
+        html = INDEX.read_text(encoding="utf-8")
+        for fid in ("f-status", "f-agent", "f-model", "f-sens",
+                    "renderTasks", "taskDuration"):
+            self.assertIn(fid, html)
+
+    def test_accesibilidad_basica(self) -> None:
+        html = INDEX.read_text(encoding="utf-8")
+        self.assertIn("prefers-reduced-motion", html)
+        self.assertIn(":focus-visible", html)
+        self.assertIn('role="button"', html)
+        self.assertIn('aria-live="polite"', html)
+
 
 if __name__ == "__main__":
     unittest.main()
