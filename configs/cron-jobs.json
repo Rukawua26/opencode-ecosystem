@@ -1,6 +1,7 @@
 {
   "jobs": [
     { "name": "ram-guard", "schedule": "*/5 * * * *", "command": "$HOME/.config/opencode/scripts/ram-guard-lite.sh" },
-    { "name": "kairos", "schedule": "*/30 * * * *", "command": "$HOME/.config/opencode/memory/kairos.sh $HOME" }
+    { "name": "kairos", "schedule": "*/30 * * * *", "command": "$HOME/.config/opencode/memory/kairos.sh $HOME" },
+    { "name": "control-reconcile", "schedule": "*/5 * * * *", "command": "cd $HOME/opencode-ecosystem && $HOME/.local/bin/python3 -m control.cli reconcile --apply" }
   ]
 }

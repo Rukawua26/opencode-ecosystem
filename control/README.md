@@ -1,0 +1,154 @@
+# Plano de control del ecosistema OpenCode (Fase 1)
+
+## Qué es
+Panel local read-only que observa tu `opencode-ecosystem` y muestra:
+
+- skills, comandos, agentes, scripts, configs
+- timers systemd (activos, última ejecución, próxima)
+- salud del servicio OpenCode
+- flujos declarados (SDD, ODD, QA-gate)
+
+## Uso
+
+### Recoger snapshot una vez
+```bash
+python3 -m control --once --pretty
+```
+
+### Servir el panel local
+```bash
+python3 -m control --serve
+# abrir http://127.0.0.1:8765
+```
+
+### CLI rápido
+```bash
+python3 -m control.cli status
+python3 -m control.cli snapshot
+# registrar un recibo de ejecucion real (Fase 2)
+python3 -m control.cli receipt sdd-implement --status ok --duration 12.5 --note "tarea T3"
+```
+
+## Modelo de verdad
+```
+Observado  → leído directamente de fs/systemd/`opencode service status`
+Declarado  → listado explícito (flujos SDD/ODD)
+Inferido   → no usado en F1
+Desconocido → sin evidencia
+```
+
+## Qué no hace (todavía)
+- No modifica nada desde el panel. No hay botones de acción, reinicios, ni reintentos.
+- No lanza agentes ni tareas.
+- No abre la API interna de OpenCode (usa CLI `opencode service status`).
+- La API y el panel nunca muestran prompts, workspace ni comandos de verificacion.
+- La cola SQLite guarda temporalmente el prompt necesario para ejecutar; tareas `sensitive`
+  purgan el payload al terminar y las normales lo purgan tras 30 dias.
+- Nunca guarda respuestas completas del modelo, variables de entorno ni credenciales.
+
+## Historial y recibos (Fase 2)
+```
+~/.local/share/opencode-control/control.db   # SQLite (WAL), retencion 30 dias / 20k filas
+```
+- **Eventos automáticos**: cambios de estado detectados entre recolecciones (timer parado, servicio caído, componente añadido/eliminado, resultado cambiado).
+- **Recibos explícitos**: `control.cli receipt` — la forma honesta de saber que algo se ejecutó de verdad.
+- Panel: sección "Actividad reciente" + historial por componente (clic en la tarjeta).
+- Solo se registra lo que cambia (sin ruido por polling).
+
+## Estructura
+```
+control/
+  model.py      — dataclasses Component, TimerInfo, Flow, Snapshot
+  collect.py    — scan fs + systemd + opencode service status
+  state.py      — cache TTL + escritura atómica del snapshot
+  server.py     — http.server, solo 127.0.0.1, read-only
+  cli.py        — status/snapshot rápido
+  main.py       — entrada --once / --serve
+  web/index.html — interfaz sin dependencias
+```
+
+## Donde se guarda
+```
+~/.local/share/opencode-control/snapshot.json
+```
+
+## Servicios systemd (Etapa 7)
+
+```
+~/.config/systemd/user/
+  opencode-control.service            ← panel web (Restart=on-failure)
+  opencode-control-reconcile.timer    ← cada 5 min
+  opencode-control-reconcile.service  ← oneshot: reconcile --apply
+```
+
+Si matas el proceso del panel, systemd lo reinicia automaticamente. El reconciliador corre solo en background y marca `dead` las tareas atascadas sin intervencion.
+
+### Acciones desde el panel
+Vigilante de consistencia. Preview por defecto:
+```bash
+python3 -m control.cli reconcile           # solo detecta, no toca nada
+python3 -m control.cli reconcile --apply   # marca dead tareas huerfanas (cooldown 120s)
+```
+
+Reglas:
+- Task `running` que supera timeout+5min → marca `dead` (huerfana).
+- Timer declarado en `cron-jobs.json` pero ausente/inactivo en systemd → **notifica**, no reinicia (lo haces desde el panel con ↻).
+- **Nunca** relanza trabajo automaticamente. Eso es decision humana.
+- Estado y cooldown persisten en `~/.local/share/opencode-control/reconcile-state.json`.
+- Seccion "🩺 Reconciliador" en el panel muestra el ultimo chequeo.
+- Desde Etapa 7 corre solo via `opencode-control-reconcile.timer` (cada 5 min).
+
+## Acciones desde el panel (Etapa 4)
+Tras la lista de "solo lectura", el panel admite acciones cerradas:
+
+- **↻ actualizar** (arriba): fuerza recoleccion real.
+- **▶ ejecutar siguiente**: lanza la primera tarea `pending` (1 a la vez; si hay otra corriendo, avisa).
+- **＋ encolar**: agente + prompt + modelo opcional, whitelist de agentes.
+- **↻ / ✖** por tarea: reintenta (dead) o cancela (pending).
+- **↻** por timer: reinicia el timer systemd (`confirm()` antes).
+
+Seguridad:
+- Token CSRF por proceso; sin el, 403. Origin debe ser `127.0.0.1:8765`.
+- Sin shell arbitrario; solo las acciones listadas.
+- Cada accion deja evento auditable en `/api/events`.
+
+## Lanzador de tareas (Etapa 3)
+```bash
+# encolar
+python3 -m control.cli task add sdd-implement "implementa X" --model openai/gpt-5.6-luna
+# ver la cola
+python3 -m control.cli task list
+# ejecutar la siguiente (UNA a la vez, timeout 15min, max 2 intentos)
+python3 -m control.cli task run
+```
+
+Contrato completo (Etapa 6):
+```bash
+python3 -m control.cli task add sdd-implement "implementa T1" \
+  --workflow sdd \
+  --workspace "$HOME/proyecto" \
+  --feature 001-feature \
+  --expected-outputs "src/a.py" \
+  --verification-command "pytest -q" \
+  --model openai/gpt-5.6-luna \
+  --model-policy paid \
+  --sensitivity normal
+```
+
+Reglas del lanzador:
+- **1 tarea a la vez** (proceso sincrono).
+- Claim atomico SQLite (`BEGIN IMMEDIATE`) + lease; dos runners no ejecutan la misma tarea.
+- rc=0 → `done`; rc≠0 → reintenta hasta 2 veces → luego `dead`.
+- Un `sdd-implement` ok encadena automaticamente un `sdd-verify`.
+- El verificador hereda workspace, feature, modelo y criterios; tras rc=0 ejecuta el `verification_command` determinista (timeout 120s).
+- El stdout del modelo NUNCA se guarda en el historial (solo rc + duracion + resumen).
+- Fallos del proveedor (saldo/rate limit) no consumen intentos funcionales.
+- Modelos free requieren `free-allowed` y estan prohibidos en tareas `sensitive`.
+- El panel muestra la cola en vivo (seccion "Cola de tareas").
+
+## Limitaciones conocidas
+- Los timers se leen del systemd del usuario actual.
+- Los "agentes" se extraen del `configs/opencode.jsonc` con regex — suficiente para esta etapa.
+- Los flujos no se infieren automaticamente: solo los cuatro declarados.
+- Sin WebSockets; refresco cada 30s.
+- El runner se invoca manualmente (`task run`) o se programara aparte (Etapa 5).
