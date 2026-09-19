@@ -115,10 +115,29 @@ Alcance aprobado: launcher 1 tarea/vez, sin recuperacion automatica, cola visibl
 - [x] T26 — Piloto real E2E: tarea #1 con modelo default fallo por "Insufficient Balance" (error del proveedor, no del runner) -> dead tras marcar nota; re-encolada con `opencode/nemotron-3-ultra-free` -> tarea #2 `done` rc=0 en 18.48s. Recibos automaticos en `/api/events`: iniciada/completada con duracion. Panel muestra cola correctamente.
 
 ## Progreso
-- Última tarea terminada: T46 (Etapa 7 completa)
+- Última tarea terminada: T53 (Etapa 8A completa; T47 queda pendiente por calendario ~2026-09-25)
 - Estado: en observacion
 - Bloqueos: ninguno
 - Commits: 9381d5e (feature T1-T46), 8fd46fd (evidencia odd-contract), protegido en git 2026-09-18
+
+## Etapa 8A — Estabilidad y usabilidad (aprobada 2026-09-18, plan v2 iterado)
+
+Contexto: plan de mejora iterado contra el codigo real. Correcciones al plan original:
+duration se calcula de started_at/finished_at y duration_s ya existentes (sin backend nuevo);
+verification_command NO se expone al navegador (ejecuta comandos locales arbitrarios);
+diagnostico por CLI en vez de endpoint HTTP. Formulario avanzado generico descartado;
+si se demuestra necesidad, Etapa 8B con perfiles predefinidos.
+
+- [ ] T47 — Cerrar periodo de observacion (bloqueado por calendario, ~2026-09-25): servicio+reconciliador+3 timers, tests, verify.sh, drift, revision de actividad de la semana.
+- [x] T48 — Documentacion coherente: README sin claims obsoletos (titulo Fase 1, "sin botones", "no lanza tareas" eliminados), doctor documentado, reconciliador con su propio encabezado, registro Etapa 8A aqui.
+- [x] T49 — Errores visibles y CSRF recuperable: fetchJSON con HTTP status; pushError con banner (max 3, dedup) para snapshot/tareas/eventos; 403 -> "La sesion del panel expiro... Recarga la pagina" sin tocar el formulario; clearErrors al recuperar.
+- [x] T50 — Cola sin backend nuevo: filtros f-status/f-agent/f-model/f-sens (locales, poblando opciones de la propia cola), columna Duracion (started_at/finished_at), duracion_s en actividad, badge parent_id "↳ de #N". Micro-fix: `--help` global y `task --help` verificados (exit 0).
+- [x] T51 — Accesibilidad: chips como <button>, tarjetas con role=button+teclado, aria-labels en formularios, aria-live en errores, :focus-visible, .table-wrap para scroll horizontal, prefers-reduced-motion, stats a 2 col en movil.
+- [x] T52 — `control.cli doctor [--json]`: salud, antiguedad, cola, reconciliador y ultimos errores sin prompt/workspace/comandos. Probado real: ok=True, timers 3/3, reconciliador ok. Tests: 4 casos con mocks (estructura, sanitizado, ok=False, --help).
+- [x] T53 — Verificacion Etapa 8A: 84/84 tests OK (77 + 4 doctor + 3 estructurales frontend); servidor sirve el HTML nuevo sin reinicio (lee disco por peticion); `verify.sh` verde; `status` sin drift; panel vivo 3/3 timers.
+  - Incidencia ajena encontrada y resuelta en ruta: `plugin_doctor` fallaba porque OpenCode se actualizo 2.0.5 -> 2.0.8 y el pin estaba viejo. Hooks auditados (config, event) presentes en el binario, sin hooks muertos ni experimentales -> `plugin_doctor.sh pin` re-pinea a v2.0.8. Fallo pre-existente, no causado por Etapa 8A (reproducido con cambios en stash).
+
+No incluye: endpoint de descarga, verification_command en UI, migraciones DB, dependencias, voz, WebSockets, acceso remoto, reintentos automaticos.
 - Servicios: `opencode-control.service` (panel, http://127.0.0.1:8765) y `opencode-control-reconcile.timer` (5min) activos via systemd.
 
 ## Etapa 7 — Operacion persistente (aprobada 2026-09-18)

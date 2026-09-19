@@ -1,12 +1,14 @@
-# Plano de control del ecosistema OpenCode (Fase 1)
+# Plano de control del ecosistema OpenCode
 
 ## Qué es
-Panel local read-only que observa tu `opencode-ecosystem` y muestra:
+Panel local (127.0.0.1:8765) que observa tu `opencode-ecosystem` y muestra:
 
 - skills, comandos, agentes, scripts, configs
 - timers systemd (activos, última ejecución, próxima)
 - salud del servicio OpenCode
 - flujos declarados (SDD, ODD, QA-gate)
+- cola de tareas del lanzador y actividad auditable
+- acciones cerradas desde el panel (Etapa 4, ver abajo)
 
 ## Uso
 
@@ -25,6 +27,9 @@ python3 -m control --serve
 ```bash
 python3 -m control.cli status
 python3 -m control.cli snapshot
+# diagnostico sanitizado (salud, cola, reconciliador, sin prompts ni comandos)
+python3 -m control.cli doctor
+python3 -m control.cli doctor --json
 # registrar un recibo de ejecucion real (Fase 2)
 python3 -m control.cli receipt sdd-implement --status ok --duration 12.5 --note "tarea T3"
 ```
@@ -37,14 +42,16 @@ Inferido   → no usado en F1
 Desconocido → sin evidencia
 ```
 
-## Qué no hace (todavía)
-- No modifica nada desde el panel. No hay botones de acción, reinicios, ni reintentos.
-- No lanza agentes ni tareas.
+## Qué no hace
+- No acepta comandos arbitrarios desde el navegador: `verification_command` y el
+  contrato completo solo via CLI (`control.cli task add ...`).
 - No abre la API interna de OpenCode (usa CLI `opencode service status`).
 - La API y el panel nunca muestran prompts, workspace ni comandos de verificacion.
 - La cola SQLite guarda temporalmente el prompt necesario para ejecutar; tareas `sensitive`
   purgan el payload al terminar y las normales lo purgan tras 30 dias.
 - Nunca guarda respuestas completas del modelo, variables de entorno ni credenciales.
+- No relanza trabajo automaticamente: ejecutar tareas es decision humana
+  (boton "▶ ejecutar siguiente" o `control.cli task run`).
 
 ## Historial y recibos (Fase 2)
 ```
@@ -83,7 +90,7 @@ control/
 
 Si matas el proceso del panel, systemd lo reinicia automaticamente. El reconciliador corre solo en background y marca `dead` las tareas atascadas sin intervencion.
 
-### Acciones desde el panel
+### Reconciliador (Etapa 5)
 Vigilante de consistencia. Preview por defecto:
 ```bash
 python3 -m control.cli reconcile           # solo detecta, no toca nada
@@ -149,6 +156,7 @@ Reglas del lanzador:
 ## Limitaciones conocidas
 - Los timers se leen del systemd del usuario actual.
 - Los "agentes" se extraen del `configs/opencode.jsonc` con regex — suficiente para esta etapa.
-- Los flujos no se infieren automaticamente: solo los cuatro declarados.
+- Los flujos no se infieren automaticamente: solo los declarados.
 - Sin WebSockets; refresco cada 30s.
-- El runner se invoca manualmente (`task run`) o se programara aparte (Etapa 5).
+- El runner es 1-tarea-a-la-vez: boton del panel o `control.cli task run`; el reconciliador
+  (timer cada 5 min) solo marca atascadas, no las relanza.
