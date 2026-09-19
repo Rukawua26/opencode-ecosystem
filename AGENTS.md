@@ -9,18 +9,9 @@
 
 - Toda peticion sigue: autorizar, explorar, resolver incertidumbre, clasificar, implementar, verificar, cerrar. Analizar, comparar, auditar o planificar es read-only: nunca muta ni crea artefactos.
 - Trabajo pequeno entendido: inline sin artefactos. Trabajo sustancial (2+ pasos significativos o progreso recuperable): carga la skill `organic-workflow-lite`, presenta alcance y tareas, y tras aprobacion humana usa un unico documento `odd/tasks/<feature>.md`.
+- Si el routing pide delegacion, `odd-worker` implementa una tarea atomica y `odd-verifier` la contrasta en contexto fresco. Ambos usan el documento ODD; profundidad maxima 1.
+- Specs antiguas se conservan como historial de solo lectura. El trabajo nuevo y la continuacion activa se registran en ODD; no se crean artefactos SDD propios.
 - Implementar autoriza editar codigo y ejecutar verificacion local; nunca rama nueva, commit, push, PR, merge ni deploy sin peticion explicita.
-
-# Spec-Driven Development (SDD)
-
-- Las specs viven dentro de cada proyecto en `spec/`; no usar una carpeta global de specs.
-- SDD es una rama explicita del flujo organico: se activa solo por peticion directa del usuario o propuesta aceptada, nunca por tamano, complejidad o riesgo solos. Al activarse, crear `spec/features/NNN-name/spec.md`, luego `plan.md`, luego `tasks.md`; `plan.md` es opcional en features pequenas o mecanicas y su ausencia en features antiguas ya verificadas no es un hallazgo.
-- Antes de implementar una feature SDD, lee `spec/constitution/working-agreement.md` y `tech-stack.md` solo si existen; lee siempre `spec/features/<feature>/spec.md`, `plan.md` y `tasks.md`.
-- No leer specs de otras features salvo dependencia explícita.
-- La spec es el ancla de verdad: si cambia el alcance, actualizar `spec.md` o `plan.md` antes de tocar código.
-- Implementar feature por feature y verificar contra criterios de aceptación; registrar resultados en `verify.md` cuando exista.
-- Commands disponibles tras reiniciar OpenCode: `/spec`, `/plan-spec`, `/tasks-spec`, `/implement-spec`, `/verify-spec`, `/spec-status`.
-- `/implement-spec` y `/verify-spec` delegan en los subagentes ocultos `sdd-implement`/`sdd-verify` (contexto fresco, depth 1); no ejecutar esas fases inline si el subagente esta disponible. Para crecer el mini-enjambre, sigue `~/docs/runbooks/runbook-agentes-por-demanda.md` (evidencia-first, nunca preventivo).
 
 # Rol Del Programador
 
@@ -79,7 +70,7 @@
 - Skills: 10 en `~/.config/opencode/skills/`; carga con `skill` solo la que corresponda.
 - Lentes 4R: `risk-lens` (errores silenciosos/edge cases), `resilience-lens` (red/timeout/fallback), `reliability-lens` (tests flaky/no-determinismo), `readability-lens` (sugerir revision humana, nunca automatiza). Todas informan, ninguna bloquea. Ver `risk-lens` en deploys criticos. Esfuerzo por evidencia del diff, no por tamano: riesgo bajo (docs/config) = solo `qa-gate`; 4R completo solo con consentimiento y aviso de coste (runtime critico, contratos publicos, seguridad).
 - Memoria: Markdown+Bash en `~/.config/opencode/memory/` (`kairos`, `autodream`, `MEMORY.md`); no guardes resultados efimeros como memoria durable.
-- MCP: solo Context7 configurado e inactivo; activalo bajo demanda desde la fuente de verdad. No hay plugins ni agentes personalizados instalados.
+- MCP: solo Context7 configurado e inactivo; activalo bajo demanda desde la fuente de verdad. No hay plugins; `odd-worker` y `odd-verifier` son los subagentes personalizados activos.
 - Ollama existe fuera de OpenCode, pero no esta conectado: no invoques routers o tools locales inexistentes.
 - Presupuesto: `python3 ~/tools/agent_context/query_context.py doctor`; higiene: `~/opencode-ecosystem/scripts/hygiene.sh triggers`.
 
@@ -90,7 +81,7 @@
 # Estrategia De Contexto Y Modelos
 
 - Lee el minimo necesario para la tarea actual.
-- Routing de implementacion (patron gentle-ai/trigger-rules, adaptado): 1-3 ficheros o cambio mecanico ya entendido → directo inline sin delegar (effort low); 4+ ficheros, 2+ writes no triviales o research amplia → un explorer/writer acotado, sin artefactos SDD; SDD solo a peticion explicita o propuesta aceptada. El tamaño nunca fuerza SDD por si solo.
+- Routing de implementacion (patron gentle-ai/trigger-rules, adaptado): 1-3 ficheros o cambio mecanico ya entendido → directo inline sin delegar (effort low); 4+ ficheros, 2+ writes no triviales o research amplia → explorer y/o `odd-worker` acotado; `odd-verifier` solo cuando aporta comprobacion independiente. El tamaño no crea artefactos extra: el trabajo sustancial usa un unico documento ODD.
 - Si hay error de cuota/saldo/rate-limit del modelo activo: baja un peldaño de `~/docs/runbooks/runbook-cascada-modelos.md` con `/models` (la sesion conserva el contexto); nunca pegues secretos en modelos free.
 - Si un proveedor/tool devuelve un comando de continuacion (next_transition), ejecutalo verbatim; nunca reconstruyas uno equivalente de memoria (patron gentle-ai v2.7.0).
 - Prefiere summaries y busqueda dirigida sobre archivos completos.
