@@ -65,8 +65,12 @@ La skill organic-workflow-lite (2026-09-17) cubria el flujo basico, pero le falt
   - Comando: lectura de `docs/evolution/2026-09-17-gentiai-odd-lite.md`
   - Resultado: secciones Despues/Verificacion actualizadas con evidencia; estado sigue `en_observacion`
 
+- Reanudacion real (2026-09-17, sesion nueva del humano) — Estado: passed
+  - Comando: descubrimiento por glob + lectura del documento + `git status --short` + carga de la skill en runtime
+  - Resultado: unica feature descubierta; documento y git coherentes (commit 051413b, arbol limpio); skill runtime contiene los items endurecidos (2, 5, 6, 7, 8, 10); cero artefactos creados; sin conflicto documento/codigo
+
 ## Progreso
 - Estado: completada (codigo y docs); en observacion hasta 2026-10-01 o 2 features sustanciales
-- Ultima tarea terminada: T5
-- Siguiente paso: reanudacion desde una sesion nueva del humano + dogfood en features reales
+- Ultima tarea terminada: T5; hito de reanudacion real verificado el 2026-09-17
+- Siguiente paso: dogfood de la skill en features reales (el hito de reanudacion ya paso); cerrar observacion el 2026-10-01 o tras 2 features sustanciales sin regresiones
 - Bloqueos: ninguno
