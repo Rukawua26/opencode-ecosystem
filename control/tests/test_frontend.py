@@ -35,6 +35,8 @@ class TestFrontendJS(unittest.TestCase):
         for fid in ("f-status", "f-agent", "f-model", "f-sens",
                     "renderTasks", "taskDuration"):
             self.assertIn(fid, html)
+        self.assertIn('value="waiting"', html)
+        self.assertIn("waiting:'warn'", html)
 
     def test_accesibilidad_basica(self) -> None:
         html = INDEX.read_text(encoding="utf-8")

@@ -1,6 +1,6 @@
 ---
 name: organic-workflow-lite
-description: Flujo ODD para implementar, reanudar o consultar trabajo organico sustancial mediante un documento unico odd/tasks. Usar cuando una implementacion autorizada requiera dos o mas pasos significativos o progreso recuperable, sin activar SDD.
+description: Flujo ODD para implementar, reanudar o consultar trabajo organico sustancial mediante un documento unico odd/tasks. Usar cuando una implementacion autorizada requiera dos o mas pasos significativos o progreso recuperable.
 ---
 
 # organic-workflow-lite
@@ -17,7 +17,7 @@ description: Flujo ODD para implementar, reanudar o consultar trabajo organico s
 
 6. **Tareas con ID estable**: numera T1, T2...; nunca renumeres tareas existentes ni reutilices IDs; las tareas nuevas reciben ID nuevo; una tarea reabierta conserva su ID con motivo registrado. Marca `[x]` unicamente con resultado observado.
 
-7. **Delegacion con documento**: el padre lee el documento y pasa al worker la ruta del documento, la tarea exacta, el alcance autorizado y los checks; no todo el historial. El worker lee el documento antes de editar, trabaja solo su tarea, no modifica alcance, no crea subagentes y devuelve archivos tocados, checks ejecutados y resultado.
+7. **Delegacion con documento**: el padre pasa a `odd-worker` la ruta del documento, la tarea exacta, el alcance autorizado y los checks; no todo el historial. El worker lee el documento, trabaja solo su tarea, no modifica alcance ni crea subagentes. Termina con `SUMMARY:` y `RESULT: success|blocked|failed`; si falta una decision humana, agrega una sola `QUESTION:`. La verificacion independiente usa `odd-verifier` read-only.
 
 8. **Evidencia honesta**: por tarea registra `Estado: passed|failed|skipped|unavailable|pending` con comando y salida breve. Nunca inventes evidencia ni escribas "deberia funcionar"; un check no ejecutado es `pending`, no `passed`.
 

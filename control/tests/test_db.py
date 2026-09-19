@@ -30,8 +30,8 @@ class TestDb(unittest.TestCase):
         self.assertEqual(rows[0]["status"], "ok")
 
     def test_receipt(self) -> None:
-        db.record_receipt("sdd-implement", "ok", 12.5, "tarea T3", path=self.path)
-        rows = db.events_for("sdd-implement", path=self.path)
+        db.record_receipt("odd-worker", "ok", 12.5, "tarea T3", path=self.path)
+        rows = db.events_for("odd-worker", path=self.path)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["category"], "receipt")
         self.assertAlmostEqual(rows[0]["duration_s"], 12.5)

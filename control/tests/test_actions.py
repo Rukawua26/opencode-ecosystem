@@ -76,7 +76,7 @@ class TestAddTask(ActionsFixture):
 
 
 class TestRetryCancel(ActionsFixture):
-    def test_retry_only_on_dead(self) -> None:
+    def test_retry_dead_or_waiting(self) -> None:
         tid = db.add_task("qa-gate", "p", path=self.dbpath)
         # pending no reintentable
         r = actions.do_retry(tid)
@@ -88,6 +88,20 @@ class TestRetryCancel(ActionsFixture):
         row = [t for t in db.list_tasks(path=self.dbpath) if t["id"] == tid][0]
         self.assertEqual(row["status"], "pending")
         self.assertEqual(row["attempts"], 0)
+        # waiting tambien se reencola tras registrar la decision humana
+        db.update_task(
+            tid, self.dbpath, status="waiting", started_at="antes",
+            finished_at="antes", result_code=0, error_kind="agent",
+            lease_owner="runner", lease_until="despues",
+        )
+        self.assertTrue(actions.do_retry(tid)["ok"])
+        row = [t for t in db.list_tasks(path=self.dbpath, include_private=True)
+               if t["id"] == tid][0]
+        self.assertEqual(row["status"], "pending")
+        self.assertIsNone(row["result_code"])
+        self.assertEqual(row["finished_at"], "")
+        self.assertEqual(row["lease_owner"], "")
+        self.assertEqual(row["error_kind"], "")
 
     def test_cancel_only_pending(self) -> None:
         tid = db.add_task("qa-gate", "p", path=self.dbpath)

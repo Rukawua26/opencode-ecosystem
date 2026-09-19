@@ -6,7 +6,7 @@ Panel local (127.0.0.1:8765) que observa tu `opencode-ecosystem` y muestra:
 - skills, comandos, agentes, scripts, configs
 - timers systemd (activos, última ejecución, próxima)
 - salud del servicio OpenCode
-- flujos declarados (SDD, ODD, QA-gate)
+- flujos declarados (ODD, ODD delegado, QA-gate)
 - cola de tareas del lanzador y actividad auditable
 - acciones cerradas desde el panel (Etapa 4, ver abajo)
 
@@ -31,13 +31,13 @@ python3 -m control.cli snapshot
 python3 -m control.cli doctor
 python3 -m control.cli doctor --json
 # registrar un recibo de ejecucion real (Fase 2)
-python3 -m control.cli receipt sdd-implement --status ok --duration 12.5 --note "tarea T3"
+python3 -m control.cli receipt odd-worker --status ok --duration 12.5 --note "tarea T3"
 ```
 
 ## Modelo de verdad
 ```
 Observado  → leído directamente de fs/systemd/`opencode service status`
-Declarado  → listado explícito (flujos SDD/ODD)
+Declarado  → listado explícito (flujos ODD)
 Inferido   → no usado en F1
 Desconocido → sin evidencia
 ```
@@ -111,7 +111,7 @@ Tras la lista de "solo lectura", el panel admite acciones cerradas:
 - **↻ actualizar** (arriba): fuerza recoleccion real.
 - **▶ ejecutar siguiente**: lanza la primera tarea `pending` (1 a la vez; si hay otra corriendo, avisa).
 - **＋ encolar**: agente + prompt + modelo opcional, whitelist de agentes.
-- **↻ / ✖** por tarea: reintenta (dead) o cancela (pending).
+- **↻ / ✖** por tarea: reintenta (`dead` o `waiting`) o cancela (`pending`).
 - **↻** por timer: reinicia el timer systemd (`confirm()` antes).
 
 Seguridad:
@@ -122,7 +122,7 @@ Seguridad:
 ## Lanzador de tareas (Etapa 3)
 ```bash
 # encolar
-python3 -m control.cli task add sdd-implement "implementa X" --model openai/gpt-5.6-luna
+python3 -m control.cli task add odd-worker "implementa X" --model openai/gpt-5.6-luna
 # ver la cola
 python3 -m control.cli task list
 # ejecutar la siguiente (UNA a la vez, timeout 15min, max 2 intentos)
@@ -131,8 +131,8 @@ python3 -m control.cli task run
 
 Contrato completo (Etapa 6):
 ```bash
-python3 -m control.cli task add sdd-implement "implementa T1" \
-  --workflow sdd \
+python3 -m control.cli task add odd-worker "implementa T1 de odd/tasks/001-feature.md" \
+  --workflow odd \
   --workspace "$HOME/proyecto" \
   --feature 001-feature \
   --expected-outputs "src/a.py" \
@@ -145,8 +145,9 @@ python3 -m control.cli task add sdd-implement "implementa T1" \
 Reglas del lanzador:
 - **1 tarea a la vez** (proceso sincrono).
 - Claim atomico SQLite (`BEGIN IMMEDIATE`) + lease; dos runners no ejecutan la misma tarea.
-- rc=0 → `done`; rc≠0 → reintenta hasta 2 veces → luego `dead`.
-- Un `sdd-implement` ok encadena automaticamente un `sdd-verify`.
+- rc=0 + `RESULT: success` → `done`; rc≠0 o contrato ODD invalido → reintenta hasta 2 veces → luego `dead`.
+- `RESULT: blocked` → `waiting` sin consumir intento; tras registrar la decision en ODD se reintenta manualmente.
+- Un `odd-worker` ok encadena automaticamente un `odd-verifier`.
 - El verificador hereda workspace, feature, modelo y criterios; tras rc=0 ejecuta el `verification_command` determinista (timeout 120s).
 - El stdout del modelo NUNCA se guarda en el historial (solo rc + duracion + resumen).
 - Fallos del proveedor (saldo/rate limit) no consumen intentos funcionales.

@@ -19,16 +19,18 @@ class RunnerFixture(unittest.TestCase):
     def tearDown(self) -> None:
         self.td.cleanup()
 
-    def _ok(self, agent: str, prompt: str, model: str = "", workspace: str = "") -> tuple[int, float, str, str]:
-        return (0, 1.0, "", "")
+    def _ok(self, agent: str, prompt: str, model: str = "", workspace: str = "") -> dict[str, object]:
+        return {"code": 0, "duration": 1.0, "note": "", "error_kind": "",
+                "result": "success", "summary": "", "question": ""}
 
-    def _fail(self, agent: str, prompt: str, model: str = "", workspace: str = "") -> tuple[int, float, str, str]:
-        return (1, 2.0, "boom", "agent")
+    def _fail(self, agent: str, prompt: str, model: str = "", workspace: str = "") -> dict[str, object]:
+        return {"code": 1, "duration": 2.0, "note": "boom", "error_kind": "agent",
+                "result": "", "summary": "", "question": ""}
 
 
 class TestQueueOps(RunnerFixture):
     def test_add_and_list(self) -> None:
-        tid = db.add_task("sdd-implement", "haz X", path=self.path)
+        tid = db.add_task("odd-worker", "haz X", path=self.path)
         rows = db.list_tasks(path=self.path)
         self.assertEqual(rows[0]["id"], tid)
         self.assertEqual(rows[0]["status"], "pending")
@@ -57,12 +59,13 @@ class TestRunner(RunnerFixture):
                             for r in rows))
 
     def test_success_implementer_chains_verifier(self) -> None:
-        db.add_task("sdd-implement", "implementa", path=self.path)
+        db.add_task("odd-worker", "implementa", workflow="odd", feature="demo", path=self.path)
         with mock.patch.object(runner, "_run_agent", side_effect=self._ok):
             runner.run_next(self.path)
         pending = db.next_pending(self.path)
         self.assertIsNotNone(pending)
-        self.assertEqual(pending["agent"], "sdd-verify")
+        self.assertEqual(pending["agent"], "odd-verifier")
+        self.assertEqual(pending["workflow"], "odd")
 
     def test_failure_retries_then_dead(self) -> None:
         tid = db.add_task("qa-gate", "revisa", path=self.path)
@@ -84,13 +87,16 @@ class TestRunner(RunnerFixture):
 
     def test_timeout_causes_failure(self) -> None:
         db.add_task("a", "p", path=self.path)
-        with mock.patch.object(runner, "_run_agent", return_value=(124, 900.0, "timeout", "timeout")):
+        with mock.patch.object(runner, "_run_agent", return_value={
+            "code": 124, "duration": 900.0, "note": "timeout", "error_kind": "timeout",
+            "result": "", "summary": "", "question": "",
+        }):
             t = runner.run_next(self.path)
         self.assertEqual(t["status"], "pending")  # primer intento, reintenta
 
     def test_no_model_output_stored(self) -> None:
         db.add_task("a", "p", path=self.path)
-        with mock.patch.object(runner, "_run_agent", return_value=(0, 1.0, "", "")):
+        with mock.patch.object(runner, "_run_agent", side_effect=self._ok):
             runner.run_next(self.path)
         for r in db.recent_events(50, path=self.path):
             self.assertLessEqual(len(r["detail"]), 300)
@@ -106,9 +112,9 @@ class TestRunner(RunnerFixture):
 
     def test_verifier_requires_deterministic_check(self) -> None:
         db.add_task(
-            "sdd-verify", "verifica", verification_command="false", path=self.path
+            "odd-verifier", "verifica", verification_command="false", path=self.path
         )
-        with mock.patch.object(runner, "_run_agent", return_value=(0, 0.1, "", "")):
+        with mock.patch.object(runner, "_run_agent", side_effect=self._ok):
             result = runner.run_next(self.path)
         self.assertEqual(result["status"], "pending")
         row = db.list_tasks(path=self.path)[0]
@@ -116,13 +122,55 @@ class TestRunner(RunnerFixture):
 
     def test_verifier_check_success_marks_done(self) -> None:
         db.add_task(
-            "sdd-verify", "verifica", verification_command="true", path=self.path
+            "odd-verifier", "verifica", verification_command="true", path=self.path
         )
-        with mock.patch.object(runner, "_run_agent", return_value=(0, 0.1, "", "")):
+        with mock.patch.object(runner, "_run_agent", side_effect=self._ok):
             result = runner.run_next(self.path)
         self.assertEqual(result["status"], "done")
-        events = db.events_for("sdd-verify", path=self.path)
+        events = db.events_for("odd-verifier", path=self.path)
         self.assertTrue(any(e["category"] == "verification" for e in events))
+
+    def test_blocked_waits_without_consuming_attempt(self) -> None:
+        tid = db.add_task("odd-worker", "decide", path=self.path)
+        blocked = {"code": 0, "duration": 0.2, "note": "", "error_kind": "",
+                   "result": "blocked", "summary": "falta criterio",
+                   "question": "A o B?"}
+        with mock.patch.object(runner, "_run_agent", return_value=blocked):
+            result = runner.run_next(self.path)
+        row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
+        self.assertEqual(result["status"], "waiting")
+        self.assertEqual(row["attempts"], 0)
+        self.assertEqual(row["note"], "A o B?")
+
+    def test_declared_failure_uses_normal_retry(self) -> None:
+        tid = db.add_task("odd-worker", "haz X", path=self.path)
+        failed = {"code": 0, "duration": 0.2, "note": "", "error_kind": "",
+                  "result": "failed", "summary": "test rojo", "question": ""}
+        with mock.patch.object(runner, "_run_agent", return_value=failed):
+            result = runner.run_next(self.path)
+        row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
+        self.assertEqual(result["status"], "pending")
+        self.assertEqual(row["error_kind"], "agent")
+        self.assertEqual(row["note"], "test rojo")
+
+    def test_odd_agent_without_result_fails_contract(self) -> None:
+        tid = db.add_task("odd-worker", "haz X", path=self.path)
+        missing = {"code": 0, "duration": 0.1, "note": "", "error_kind": "",
+                   "result": "", "summary": "", "question": ""}
+        with mock.patch.object(runner, "_run_agent", return_value=missing):
+            result = runner.run_next(self.path)
+        row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
+        self.assertEqual(result["status"], "pending")
+        self.assertEqual(row["error_kind"], "contract")
+        self.assertIn("RESULT", row["note"])
+
+    def test_result_parser_keeps_last_bounded_value(self) -> None:
+        parsed = runner._parse_result_lines(
+            "SUMMARY: viejo\nQUESTION: " + "x" * 220 + "\nSUMMARY: nuevo\nRESULT: BLOCKED"
+        )
+        self.assertEqual(parsed["result"], "BLOCKED")
+        self.assertEqual(parsed["summary"], "nuevo")
+        self.assertEqual(len(parsed["question"]), 200)
 
 
 if __name__ == "__main__":

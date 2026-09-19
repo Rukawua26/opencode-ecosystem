@@ -20,7 +20,8 @@ from .db import (
 TIMEOUT_S = 900          # 15 min por tarea
 VERIFY_TIMEOUT_S = 120   # checks deterministas cortos
 MAX_ATTEMPTS = 2         # luego -> dead
-_VERIFY_AGENT = "sdd-verify"
+_WORKER_AGENT = "odd-worker"
+_VERIFY_AGENT = "odd-verifier"
 
 
 # patrones -> error_kind. El texto se usa SOLO para clasificar, nunca se guarda.
@@ -52,10 +53,22 @@ def _workspace_path(workspace: str) -> Path | None:
     return path
 
 
+def _parse_result_lines(stdout: str) -> dict[str, str]:
+    """Extrae el contrato acotado RESULT/SUMMARY/QUESTION."""
+    parsed = {"result": "", "summary": "", "question": ""}
+    for line in stdout.splitlines():
+        clean = line.strip()
+        for key in parsed:
+            prefix = f"{key}:"
+            if clean.lower().startswith(prefix):
+                parsed[key] = clean[len(prefix):].strip()[:200]
+    return parsed
+
+
 def _run_agent(
     agent: str, prompt: str, model: str = "", workspace: str = ""
-) -> tuple[int, float, str, str]:
-    """Ejecuta `opencode run`. Devuelve (exit, duracion, resumen, error_kind)."""
+) -> dict[str, object]:
+    """Ejecuta `opencode run` sin persistir stdout completo."""
     started = time.monotonic()
     cmd = ["opencode", "run", prompt, "--agent", agent]
     if model:
@@ -73,13 +86,23 @@ def _run_agent(
         # stdout/stderr se usan SOLO en memoria para clasificar; nunca persisten.
         transient_output = (proc.stderr or "") + "\n" + (proc.stdout or "")
         kind = "" if proc.returncode == 0 else _classify_error(transient_output, "")
-        return proc.returncode, duration, "", kind
+        return {
+            "code": proc.returncode,
+            "duration": duration,
+            "note": "",
+            "error_kind": kind,
+            **_parse_result_lines(proc.stdout or ""),
+        }
     except subprocess.TimeoutExpired:
-        return 124, round(time.monotonic() - started, 2), "timeout 900s", "timeout"
+        return {"code": 124, "duration": round(time.monotonic() - started, 2),
+                "note": "timeout 900s", "error_kind": "timeout",
+                "result": "", "summary": "", "question": ""}
     except FileNotFoundError:
-        return 127, 0.0, "opencode no encontrado", "infra"
+        return {"code": 127, "duration": 0.0, "note": "opencode no encontrado",
+                "error_kind": "infra", "result": "", "summary": "", "question": ""}
     except ValueError as exc:
-        return 2, 0.0, str(exc), "contract"
+        return {"code": 2, "duration": 0.0, "note": str(exc),
+                "error_kind": "contract", "result": "", "summary": "", "question": ""}
 
 
 def _run_verification(command: str, workspace: str) -> tuple[int, str]:
@@ -115,9 +138,16 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
     attempts = task["attempts"]
     record_event(agent, "task", "iniciada", "", f"task #{tid} intento {attempts}", path=path)
 
-    code, duration, note, error_kind = _run_agent(
+    outcome = _run_agent(
         agent, task["prompt"], task.get("model", ""), task.get("workspace", "")
     )
+    code = int(outcome["code"])
+    duration = float(outcome["duration"])
+    note = str(outcome["note"])
+    error_kind = str(outcome["error_kind"])
+    result = str(outcome["result"]).lower()
+    summary = str(outcome["summary"])
+    question = str(outcome["question"])
     if code == 0 and agent == _VERIFY_AGENT and task.get("verification_command"):
         verify_code, verify_note = _run_verification(
             task["verification_command"], task.get("workspace", "")
@@ -131,16 +161,33 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
             )
     finished = datetime.now(timezone.utc).isoformat(timespec="seconds")
 
-    if code == 0:
-        update_task(tid, path, status="done", finished_at=finished, result_code=code,
+    if code == 0 and agent in (_WORKER_AGENT, _VERIFY_AGENT) and result not in {
+        "success", "blocked", "failed"
+    }:
+        code, note, error_kind = 2, "contrato RESULT ausente o invalido", "contract"
+    if code == 0 and result == "failed":
+        code, note, error_kind = 1, summary or "RESULT: failed", "agent"
+
+    if code == 0 and result == "blocked":
+        note = question or summary or "bloqueada sin pregunta"
+        update_task(tid, path, status="waiting", finished_at=finished, result_code=code,
+                    note=note[:200], attempts=max(0, attempts - 1),
                     lease_owner="", lease_until="", error_kind="")
+        record_event(agent, "task", "bloqueada (necesita decision)", "warn",
+                     f"task #{tid} {note[:160]}", duration_s=duration, path=path)
+        task["status"] = "waiting"
+    elif code == 0:
+        update_task(tid, path, status="done", finished_at=finished, result_code=code,
+                    note=summary[:200], lease_owner="", lease_until="", error_kind="")
         record_event(agent, "task", "completada", "ok",
                      f"task #{tid} en {duration}s", duration_s=duration, path=path)
-        if agent == "sdd-implement":
+        if agent == _WORKER_AGENT:
+            feature = task.get("feature") or ""
             verifier_prompt = (
                 f"Verifica en modo read-only la tarea #{tid}. "
                 f"Workspace: {task.get('workspace') or '(actual)'}. "
-                f"Feature: {task.get('feature') or '(no declarada)'}. "
+                f"Feature: {feature or '(no declarada)'}. "
+                f"Documento ODD: odd/tasks/{feature}.md. "
                 f"Tarea original: {task['prompt']}. "
                 f"Salidas esperadas: {task.get('expected_outputs') or '(no declaradas)'}. "
                 f"Verificacion esperada: {task.get('verification_command') or '(no declarada)'}. "
@@ -152,7 +199,7 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
                 note=f"encadenada de task #{tid}",
                 model=task.get("model", ""),
                 parent_id=tid,
-                workflow=task.get("workflow", "sdd"),
+                workflow=task.get("workflow", "odd"),
                 workspace=task.get("workspace", ""),
                 feature=task.get("feature", ""),
                 expected_outputs=task.get("expected_outputs", ""),
@@ -192,7 +239,8 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
 
 def queue_summary(path: Path | None = None) -> dict:
     """Conteo por estado para el panel."""
-    counts = {"pending": 0, "running": 0, "done": 0, "failed": 0, "dead": 0}
+    counts = {"pending": 0, "waiting": 0, "running": 0, "done": 0,
+              "failed": 0, "dead": 0}
     for t in list_tasks(200, path):
         counts[t["status"]] = counts.get(t["status"], 0) + 1
     return counts

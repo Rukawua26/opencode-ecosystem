@@ -66,9 +66,9 @@ class TestModelColumn(unittest.TestCase):
             stderr = ""
 
         with mock.patch.object(runner.subprocess, "run", return_value=P()):
-            rc, _, _, kind = runner._run_agent("build", "hola")
-        self.assertEqual(rc, 1)
-        self.assertEqual(kind, "provider_balance")
+            outcome = runner._run_agent("build", "hola")
+        self.assertEqual(outcome["code"], 1)
+        self.assertEqual(outcome["error_kind"], "provider_balance")
 
     def test_workspace_is_passed_as_cwd(self) -> None:
         class P:

@@ -26,7 +26,7 @@ ALLOWED_AGENTS = frozenset({
     "qa-gate", "risk-lens", "resilience-lens", "reliability-lens",
     "readability-lens", "context-compressor", "code-forge-fix-lite",
     "git-atomic-committer", "organic-workflow-lite", "ultraplan-lite",
-    "sdd-implement", "sdd-verify",
+    "odd-worker", "odd-verifier",
     "build", "plan", "general", "explore",
 })
 ALLOWED_MODELS = frozenset({
@@ -79,14 +79,25 @@ def do_run_next() -> dict[str, Any]:
 
 
 def do_retry(task_id: int) -> dict[str, Any]:
-    """Reencola una tarea dead/failed. Solo para tareas terminas."""
+    """Reencola una tarea dead o waiting tras intervencion humana."""
     rows = {t["id"]: t for t in list_tasks(500)}
     t = rows.get(task_id)
     if not t:
         return {"ok": False, "error": "tarea no encontrada"}
-    if t["status"] != "dead":
+    if t["status"] not in ("dead", "waiting"):
         return {"ok": False, "error": f"estado '{t['status']}' no reintentable"}
-    update_task(task_id, status="pending", attempts=0, note=t["note"] + " | reintentada")
+    update_task(
+        task_id,
+        status="pending",
+        attempts=0,
+        started_at="",
+        finished_at="",
+        result_code=None,
+        note=t["note"] + " | reintentada",
+        lease_owner="",
+        lease_until="",
+        error_kind="",
+    )
     _log("retry", "ok", f"task #{task_id} reencolada")
     return {"ok": True}
 

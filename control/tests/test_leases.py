@@ -48,8 +48,8 @@ class TestContractV2(LeaseFixture):
 
     def test_contract_roundtrip(self) -> None:
         tid = db.add_task(
-            "sdd-implement", "tarea", model="openai/gpt-5.6-luna",
-            workflow="sdd", workspace=str(Path.home()), feature="001-x",
+            "odd-worker", "tarea", model="openai/gpt-5.6-luna",
+            workflow="odd", workspace=str(Path.home()), feature="001-x",
             expected_outputs="x.txt", verification_command="test -f x.txt",
             model_policy="paid", sensitivity="normal", path=self.path,
         )
@@ -57,7 +57,7 @@ class TestContractV2(LeaseFixture):
             t for t in db.list_tasks(path=self.path, include_private=True)
             if t["id"] == tid
         )
-        self.assertEqual(row["workflow"], "sdd")
+        self.assertEqual(row["workflow"], "odd")
         self.assertEqual(row["expected_outputs"], "x.txt")
 
     def test_free_model_requires_explicit_policy(self) -> None:
@@ -113,7 +113,11 @@ class TestRunnerPolicy(LeaseFixture):
     def test_provider_error_does_not_consume_attempt(self) -> None:
         tid = db.add_task("build", "tarea", path=self.path)
         with mock.patch.object(
-            runner, "_run_agent", return_value=(1, 0.1, "", "provider_balance")
+            runner, "_run_agent", return_value={
+                "code": 1, "duration": 0.1, "note": "",
+                "error_kind": "provider_balance", "result": "",
+                "summary": "", "question": "",
+            }
         ):
             result = runner.run_next(self.path)
         row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
@@ -124,15 +128,18 @@ class TestRunnerPolicy(LeaseFixture):
 
     def test_verifier_inherits_contract(self) -> None:
         tid = db.add_task(
-            "sdd-implement", "crea x", model="openai/gpt-5.6-luna",
-            workflow="sdd", workspace=str(Path.home()), feature="001-x",
+            "odd-worker", "crea x", model="openai/gpt-5.6-luna",
+            workflow="odd", workspace=str(Path.home()), feature="001-x",
             expected_outputs="x.txt", verification_command="test -f x.txt",
             path=self.path,
         )
-        with mock.patch.object(runner, "_run_agent", return_value=(0, 0.1, "", "")):
+        with mock.patch.object(runner, "_run_agent", return_value={
+            "code": 0, "duration": 0.1, "note": "", "error_kind": "",
+            "result": "success", "summary": "", "question": "",
+        }):
             runner.run_next(self.path)
         verifier = db.next_pending(self.path)
-        self.assertEqual(verifier["agent"], "sdd-verify")
+        self.assertEqual(verifier["agent"], "odd-verifier")
         self.assertEqual(verifier["parent_id"], tid)
         self.assertEqual(verifier["model"], "openai/gpt-5.6-luna")
         self.assertEqual(verifier["workspace"], str(Path.home()))
@@ -142,7 +149,10 @@ class TestRunnerPolicy(LeaseFixture):
         tid = db.add_task(
             "build", "dato sensible", sensitivity="sensitive", path=self.path
         )
-        with mock.patch.object(runner, "_run_agent", return_value=(0, 0.1, "", "")):
+        with mock.patch.object(runner, "_run_agent", return_value={
+            "code": 0, "duration": 0.1, "note": "", "error_kind": "",
+            "result": "success", "summary": "", "question": "",
+        }):
             runner.run_next(self.path)
         row = next(
             t for t in db.list_tasks(path=self.path, include_private=True)

@@ -305,16 +305,10 @@ def _build_flows() -> list[Flow]:
     """Flujos declarados de alto nivel (manuales, no inferidos)."""
     return [
         Flow(
-            name="sdd",
-            title="SDD (spec-driven development)",
-            description="spec → plan-spec → tasks-spec → implement-spec → verify-spec",
-            steps=[
-                "spec",
-                "plan-spec",
-                "tasks-spec",
-                "implement-spec",
-                "verify-spec",
-            ],
+            name="odd-delegado",
+            title="ODD delegado (worker → verifier)",
+            description="odd/tasks/<feature>.md → odd-worker → odd-verifier",
+            steps=["odd-worker", "odd-verifier"],
             source=Source.DECLARADO.value,
         ),
         Flow(
