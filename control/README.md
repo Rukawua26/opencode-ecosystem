@@ -173,6 +173,16 @@ Reglas del lanzador:
 - Modelos free requieren `free-allowed` y estan prohibidos en tareas `sensitive`.
 - El panel muestra la cola en vivo (seccion "Cola de tareas").
 
+## Worktree manual (opcional)
+Procedimiento aprobado:
+```bash
+git worktree add --detach <ruta-dentro-de-HOME> HEAD
+python3 -m control.cli task add odd-worker "implementa X" --workspace <ruta>
+```
+- El runner solo acepta workspaces dentro de `HOME`.
+- Haz una revision humana del diff antes de integrar cambios.
+- Ejecuta `git worktree remove <ruta>` solo cuando este limpio; nunca uses `--force`.
+
 ## Limitaciones conocidas
 - Los timers se leen del systemd del usuario actual.
 - Los "agentes" se extraen del `configs/opencode.jsonc` con regex — suficiente para esta etapa.

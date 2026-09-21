@@ -46,15 +46,15 @@ Excluye:
 - [x] T2 Regla de busqueda de reutilizacion en odd-worker.
 - [x] T3 Check de reutilizacion/No romper en odd-verifier.
 - [x] T4 AGENTS.md especifico del ecosistema.
-- [ ] T5 Piloto: worktree manual + worker + verifier + integracion decidida.
+- [x] T5 Piloto: worktree manual + worker + verifier + integracion decidida.
 
 ## Criterios de aceptacion
 
-- [ ] Skills validas y sin drift tras sync.
-- [ ] Tests del control-plane verdes.
-- [ ] Piloto: el worker documenta la reutilizacion investigada.
-- [ ] El verifier contrasta sin falsos positivos.
-- [ ] Worktree manual eliminado sin `--force` y checkout principal intacto.
+- [x] Skills validas y sin drift tras sync.
+- [x] Tests del control-plane verdes.
+- [x] Piloto: el worker documenta la reutilizacion investigada.
+- [x] El verifier contrasta sin falsos positivos.
+- [x] Worktree manual eliminado sin `--force` y checkout principal intacto.
 
 ## Decisiones aceptadas
 
@@ -75,12 +75,20 @@ Excluye:
 - T1-T4: Estado: passed. `validate-skills` 10/10, sync sin drift, 108/108 tests.
   Nota: una sesion paralela revirtio la primera aplicacion via `publish --yes`;
   reaplicado y commitado en esta sesion (prioridad confirmada por el humano).
-- T5: pending.
+- T5: Estado: passed. Piloto real con worktree manual: task #11 expuso la
+  restriccion real del runner (workspace debe vivir dentro de HOME; quedo
+  cancelada como dead tras 1 intento). Worktree recreado en
+  /home/miguel/worktrees/piloto-odd desde HEAD fijo. Task #12 (odd-worker)
+  done en 1 intento, modificando SOLO control/README.md dentro de la copia;
+  el checkout principal quedo intacto durante toda la ejecucion. Task #13
+  (odd-verifier, misma ruta) done con 'Sin hallazgos.'. Revision humana:
+  integrado al repo principal. Copia restaurada y eliminada con
+  `git worktree remove` SIN --force; `git worktree list` confirma solo main.
 
 ## Progreso
 
-- Estado: en_curso
-- Ultima tarea: T4
-- Siguiente paso: T5 piloto en worktree manual
-- Bloqueos: piloto T5 requiere base Git limpia; quedan cambios ajenos (Etapa 10A)
-  sin commit en el arbol — decision humana pendiente sobre como proceder.
+- Estado: completo
+- Ultima tarea: T5
+- Siguiente paso: ninguno; automatizacion de worktrees solo si aparece el
+  trigger real (tareas paralelas o riesgo recurrente de contaminacion)
+- Bloqueos: ninguno
