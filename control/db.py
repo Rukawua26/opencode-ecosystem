@@ -303,6 +303,32 @@ def list_tasks(
     return [dict(r) for r in rows]
 
 
+def get_task(task_id: int, path: Path | None = None) -> dict | None:
+    """Obtiene una tarea por id sin exponer su payload privado."""
+    init_db(path)
+    with _lock, _connect(path) as conn:
+        row = conn.execute(
+            f"SELECT {_PUBLIC_TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def latest_child_task(
+    parent_id: int,
+    agent: str,
+    path: Path | None = None,
+) -> dict | None:
+    """Obtiene el hijo mas reciente de un agente sin campos privados."""
+    init_db(path)
+    with _lock, _connect(path) as conn:
+        row = conn.execute(
+            f"SELECT {_PUBLIC_TASK_COLUMNS} FROM tasks "
+            "WHERE parent_id = ? AND agent = ? ORDER BY id DESC LIMIT 1",
+            (parent_id, agent),
+        ).fetchone()
+    return dict(row) if row else None
+
+
 def claim_next(owner: str, lease_s: int, path: Path | None = None) -> dict | None:
     """Reclamo atómico de la primera tarea pending.
 

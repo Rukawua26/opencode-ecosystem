@@ -27,7 +27,7 @@ python3 -m control --serve
 ```bash
 python3 -m control.cli status
 python3 -m control.cli snapshot
-# diagnostico sanitizado (salud, cola, reconciliador, sin prompts ni comandos)
+# diagnostico sanitizado (incluye version/capacidades OpenCode V2)
 python3 -m control.cli doctor
 python3 -m control.cli doctor --json
 # registrar un recibo de ejecucion real (Fase 2)
@@ -146,6 +146,8 @@ python3 -m control.cli task add odd-worker "implementa X" --model openai/gpt-5.6
 python3 -m control.cli task list
 # ejecutar la siguiente (UNA a la vez, timeout 15min, max 2 intentos)
 python3 -m control.cli task run
+# consultar la revision de un worker sin ejecutar ni bloquear por reloj
+python3 -m control.cli task assess <worker-id>
 ```
 
 Contrato completo (Etapa 6):
@@ -167,13 +169,20 @@ Reglas del lanzador:
 - rc=0 + `RESULT: success` → `done`; rc≠0 o contrato ODD invalido → reintenta hasta 2 veces → luego `dead`.
 - Fail-closed ODD: `RESULT: success` exige `SUMMARY:` y `RESULT: blocked` exige `QUESTION:`; salida incompleta = error de contrato, nunca `done`.
 - `RESULT: blocked` → `waiting` sin consumir intento; tras registrar la decision en ODD se reintenta manualmente.
-- `NEXT_TRANSITION: <comando>` (opcional, del worker/verifier) se ejecuta verbatim por bash antes de cerrar; si falla, la tarea no queda `done` (`error_kind=transition`).
+- Una continuacion emitida por el modelo nunca llega a shell: tras validar el contrato ODD, worker/verifier queda `waiting` sin consumir intento y sin persistir el comando.
+- Solo una operacion registrada del control-plane puede publicar una transicion ejecutable exacta. `task assess <worker-id>` es informativo: no ejecuta la transicion ni bloquea por tiempo.
+- `task assess` informa `pending|due|passed|failed`; `review_due` copia `finished_at` del worker como referencia, no es deadline ni SLA. Solo publica `python3 -m control.cli task run` cuando el verifier `pending` es el primero de la cola FIFO.
 - Un `odd-worker` ok encadena automaticamente un `odd-verifier` y registra recibo `receipt`.
 - El verificador hereda workspace, feature, modelo y criterios; tras rc=0 ejecuta el `verification_command` determinista (timeout 120s).
 - El stdout del modelo NUNCA se guarda en el historial (solo rc + duracion + resumen).
 - Fallos del proveedor (saldo/rate limit) no consumen intentos funcionales.
 - Modelos free requieren `free-allowed` y estan prohibidos en tareas `sensitive`.
 - El panel muestra la cola en vivo (seccion "Cola de tareas").
+
+`doctor` ejecuta `opencode --version` bajo demanda, con argv y timeout (sin shell),
+acepta unicamente el formato oficial `opencode vX.Y.Z` y exige major 2. Binario
+ausente, salida no oficial o version incompatible hacen `ok=false`; las capacidades
+`run`, `debug_config` y `service_status` solo se marcan activas para OpenCode V2.
 
 ## Worktree manual (opcional)
 Procedimiento aprobado:

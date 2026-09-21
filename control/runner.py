@@ -152,16 +152,9 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
     summary = str(outcome["summary"])
     question = str(outcome["question"])
     transition = str(outcome.get("next_transition", ""))
-    # next_transition (patron gentle-ai): se ejecuta literal, nunca se reconstruye.
-    if code == 0 and transition:
-        t_code, t_note = _run_verification(transition, task.get("workspace", ""))
-        if t_code != 0:
-            code, note, error_kind = t_code, f"next_transition no ejecutado: {t_note}", "transition"
-        else:
-            summary = f"{summary[:184]} | next_transition: rc=0"
-            record_event(agent, "transition", "next_transition", "ok",
-                         f"task #{tid} ejecutado verbatim", path=path)
-    if code == 0 and agent == _VERIFY_AGENT and task.get("verification_command"):
+    # Esta transicion procede del stdout del modelo: nunca llega al shell.
+    if code == 0 and not transition and agent == _VERIFY_AGENT \
+            and task.get("verification_command"):
         verify_code, verify_note = _run_verification(
             task["verification_command"], task.get("workspace", "")
         )
@@ -186,7 +179,16 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
     if code == 0 and result == "failed":
         code, note, error_kind = 1, summary or "RESULT: failed", "agent"
 
-    if code == 0 and result == "blocked":
+    if code == 0 and agent in (_WORKER_AGENT, _VERIFY_AGENT) and transition:
+        note = "transicion no registrada"
+        update_task(tid, path, status="waiting", finished_at=finished, result_code=code,
+                    note=note, attempts=max(0, attempts - 1),
+                    lease_owner="", lease_until="", error_kind="")
+        record_event(agent, "transition", "no registrada", "warn",
+                     f"task #{tid} requiere operacion del control-plane",
+                     duration_s=duration, path=path)
+        task["status"] = "waiting"
+    elif code == 0 and result == "blocked":
         note = question or summary or "bloqueada sin pregunta"
         update_task(tid, path, status="waiting", finished_at=finished, result_code=code,
                     note=note[:200], attempts=max(0, attempts - 1),

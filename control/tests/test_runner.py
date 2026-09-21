@@ -221,27 +221,50 @@ class TestRunner(RunnerFixture):
         self.assertEqual(pending["agent"], "odd-verifier")
         self.assertEqual(pending["parent_id"], tid)
 
-    def test_next_transition_is_executed_verbatim(self) -> None:
+    def test_model_next_transition_never_reaches_shell(self) -> None:
         tid = db.add_task("odd-worker", "revisa", path=self.path)
         outcome = {"code": 0, "duration": 0.1, "note": "", "error_kind": "",
                    "result": "success", "summary": "hecho", "question": "",
-                   "next_transition": "printf ok"}
-        with mock.patch.object(runner, "_run_agent", return_value=outcome):
+                   "next_transition": "printf secreto-modelo"}
+        with mock.patch.object(runner, "_run_agent", return_value=outcome), \
+                mock.patch.object(runner.subprocess, "run") as run:
             task = runner.run_next(self.path)
         row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
-        self.assertEqual(task["status"], "done")
-        self.assertIn("next_transition: rc=0", row["note"])
+        self.assertEqual(task["status"], "waiting")
+        self.assertEqual(row["attempts"], 0)
+        self.assertEqual(row["note"], "transicion no registrada")
+        self.assertFalse(any(
+            "secreto-modelo" in e["detail"]
+            for e in db.events_for("odd-worker", path=self.path)
+        ))
+        run.assert_not_called()
 
-    def test_next_transition_failure_is_not_done(self) -> None:
+    def test_incomplete_odd_output_with_transition_fails_contract(self) -> None:
         tid = db.add_task("odd-worker", "revisa", path=self.path)
         outcome = {"code": 0, "duration": 0.1, "note": "", "error_kind": "",
-                   "result": "success", "summary": "hecho", "question": "",
-                   "next_transition": "false"}
+                   "result": "", "summary": "", "question": "",
+                   "next_transition": "comando-secreto --token abc"}
         with mock.patch.object(runner, "_run_agent", return_value=outcome):
             task = runner.run_next(self.path)
         row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
         self.assertEqual(task["status"], "pending")
-        self.assertEqual(row["error_kind"], "transition")
+        self.assertEqual(row["attempts"], 1)
+        self.assertEqual(row["error_kind"], "contract")
+        self.assertIn("RESULT", row["note"])
+        self.assertNotIn("comando-secreto", row["note"])
+        events = db.events_for("odd-worker", path=self.path)
+        self.assertFalse(any("comando-secreto" in e["detail"] for e in events))
+
+    def test_generic_agent_ignores_model_transition_without_shell(self) -> None:
+        db.add_task("qa-gate", "revisa", path=self.path)
+        outcome = {"code": 0, "duration": 0.1, "note": "", "error_kind": "",
+                   "result": "success", "summary": "hecho", "question": "",
+                   "next_transition": "printf secreto-modelo"}
+        with mock.patch.object(runner, "_run_agent", return_value=outcome), \
+                mock.patch.object(runner.subprocess, "run") as run:
+            task = runner.run_next(self.path)
+        self.assertEqual(task["status"], "done")
+        run.assert_not_called()
 
     def test_opencode_missing_fails_explicit_as_infra(self) -> None:
         with mock.patch("subprocess.run", side_effect=FileNotFoundError):
