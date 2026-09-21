@@ -29,9 +29,23 @@ _SOURCE_OBS = "observado"
 
 
 def _node(nid: str, title: str, layer: str, status: str, detail: str,
-          x: int, y: int) -> dict[str, Any]:
+          x: int, y: int, source: str = _SOURCE_OBS,
+          evidence: str = "") -> dict[str, Any]:
     return {"id": nid, "title": title, "layer": layer, "status": status,
-            "detail": detail, "x": x, "y": y}
+            "detail": detail, "x": x, "y": y, "source": source,
+            "evidence": evidence}
+
+
+# Mapeo nodo -> kind de eventos para el inspector (solo mapeos directos)
+_NODE_EVENT_KIND = {
+    "timers": "timer",
+    "reconciliador": "reconciliador",
+    "cola": "task",
+    "runner": "task",
+    "agentes": "task",
+    "opencode": "servicio",
+    "panel": "panel",
+}
 
 
 def _edge(src: str, dst: str, label: str, source: str = _SOURCE_DECL
@@ -49,32 +63,41 @@ def build_graph(snap: Snapshot) -> dict[str, Any]:
 
     nodes = [
         _node("fuentes", "Configuración", "fuentes", "info",
-              f"{snap.counts.get('skills', 0)} skills · configs", 90, 60),
+              f"{snap.counts.get('skills', 0)} skills · configs", 90, 60,
+              source=_SOURCE_OBS, evidence="skills/, configs/*.jsonc"),
         _node("timers", "Timers systemd", "automatizacion",
               "ok" if timers_ok else "err",
-              f"{h.timers_active}/{h.timers_total} activos", 90, 190),
+              f"{h.timers_active}/{h.timers_total} activos", 90, 190,
+              source=_SOURCE_OBS, evidence="systemctl --user list-timers"),
         _node("reconciliador", "Reconciliador", "automatizacion",
-              "ok", "marca dead lo atascado", 90, 320),
+              "ok", "marca dead lo atascado", 90, 320,
+              source=_SOURCE_OBS, evidence="control/reconcile.py (timer 5min)"),
         _node("cola", "Cola de tareas", "datos",
               "warn" if dead > 0 else "info",
               f"pend={cola.get('pending', 0)} run={running} dead={dead}",
-              380, 190),
+              380, 190, source=_SOURCE_OBS, evidence="control/db.py tasks"),
         _node("runner", "Runner", "ejecucion",
-              "warn" if running else "ok", "1 tarea a la vez", 380, 320),
+              "warn" if running else "ok", "1 tarea a la vez", 380, 320,
+              source=_SOURCE_OBS, evidence="control/runner.py"),
         _node("agentes", "Agentes", "ejecucion", "info",
-              f"{snap.counts.get('agentes', 0)} declarados", 620, 190),
+              f"{snap.counts.get('agentes', 0)} declarados", 620, 190,
+              source=_SOURCE_OBS, evidence="configs/opencode.jsonc"),
         _node("skills", "Skills", "ejecucion", "info",
-              f"{snap.counts.get('skills', 0)} instaladas", 620, 60),
+              f"{snap.counts.get('skills', 0)} instaladas", 620, 60,
+              source=_SOURCE_OBS, evidence="skills/*/SKILL.md"),
         _node("opencode", "OpenCode", "servicio",
               "ok" if h.open_code_active else "err",
               "servicio " + ("activo" if h.open_code_active else "inactivo"),
-              620, 320),
+              620, 320, source=_SOURCE_OBS, evidence="opencode service status"),
         _node("eventos", "Eventos SQLite", "datos", "info",
-              "recibos y cambios", 380, 450),
+              "recibos y cambios", 380, 450,
+              source=_SOURCE_OBS, evidence="~/.local/share/opencode-control/control.db"),
         _node("snapshot", "Snapshot JSON", "datos", "info",
-              "estado canónico", 850, 60),
+              "estado canónico", 850, 60,
+              source=_SOURCE_OBS, evidence="~/.local/share/opencode-control/snapshot.json"),
         _node("panel", "Panel web", "observabilidad",
-              "ok" if h.ok else "warn", "127.0.0.1:8765", 850, 320),
+              "ok" if h.ok else "warn", "127.0.0.1:8765", 850, 320,
+              source=_SOURCE_OBS, evidence="control/server.py"),
     ]
     edges = [
         _edge("fuentes", "snapshot", "escanea", _SOURCE_OBS),
@@ -91,4 +114,5 @@ def build_graph(snap: Snapshot) -> dict[str, Any]:
         _edge("eventos", "panel", "muestra", _SOURCE_OBS),
     ]
     return {"nodes": nodes, "edges": edges,
-            "node_count": len(nodes), "edge_count": len(edges)}
+            "node_count": len(nodes), "edge_count": len(edges),
+            "node_event_kinds": _NODE_EVENT_KIND}

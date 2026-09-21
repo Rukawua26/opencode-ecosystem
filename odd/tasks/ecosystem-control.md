@@ -114,11 +114,53 @@ Alcance aprobado: launcher 1 tarea/vez, sin recuperacion automatica, cola visibl
 - [x] T25 — Tests runner: 10 casos mockeando `_run_agent` (FIFO, done, reintento->dead, timeout, encadenado verify, no almacenar stdout, summary). +2 tests de modelo/migracion. 37/37 OK.
 - [x] T26 — Piloto real E2E: tarea #1 con modelo default fallo por "Insufficient Balance" (error del proveedor, no del runner) -> dead tras marcar nota; re-encolada con `opencode/nemotron-3-ultra-free` -> tarea #2 `done` rc=0 en 18.48s. Recibos automaticos en `/api/events`: iniciada/completada con duracion. Panel muestra cola correctamente.
 
+## Etapa 11A — Procedencia y frescura del panel (2026-09-19)
+
+Etapa de cierre y coherencia. No añade funcionalidades nuevas,
+sino que hace visible lo que ya existe y cierra deuda operativa.
+
+- [x] T74 — Verificación honesta: 108/108 OK (ODD decía 109, corregido),
+  Playwright 6/6 OK, verify.sh, qa-gate, status sin drift. plugin_doctor
+  re-pinneado v2.0.8→v2.0.12 (hooks config+event auditados, sin dead hooks).
+- [x] T75 — Contrato de evidencia: ya existente — `source` (observado/declarado),
+  `evidence` por nodo, `node_event_kinds`, frescura global (SNAP.stale_seconds).
+  Sin campos nuevos; todos los nodos heredan la frescura del snapshot.
+- [x] T76 — UI de procedencia: badge "desactualizado" añadido al inspector
+  (consistencia con tarjeta de salud, >60s), misma paleta y patrón.
+  Fuente y antigüedad ya visibles en cada nodo del mapa.
+- [x] T77 — Filtros de evidencia: filtro por fuente (`observado`/`declarado`)
+  ya operativo en el mapa desde Etapa 10A.
+- [x] Doc: README actualizado con Etapa 10A. ODD corregido (109→108 tests).
+- [x] T47: periodo de observación reiniciado tras cambios visuales.
+
+## Decisiones de diseño rechazadas durante iteración
+- ❌ Tests específicos para badge "desactualizado" en inspector: dependen de
+  tiempo de ejecución (SNAP.stale_seconds), patrón probado en health card.
+- ❌ Per-node timestamps: todos los nodos heredan frescura del snapshot;
+  per-node sería ruido (misma antigüedad para todos).
+
+## Etapa 10A — Comprensión visual (implementada 2026-09-19)
+
+- [x] T65 — Proteger: commit `89de1ba` Etapa 9A (graph + server + index + E2E + ODD doc).
+- [x] T66 — Navegación: `Resumen | Mapa | Actividad` con `showView(name)`, hash URL `#resumen/#mapa/#actividad`, `data-view` por sección. No añade React ni router.
+- [x] T67 — Resumen bento: tarjeta de salud grande, stats arriba, abajo Timers/Cala/Reconciliador.
+- [x] T68 — Inspector lateral: panel 280px en desktop, columnar en móvil (`<900px`), muestra `evidence`, `capa`, `fuente`, `actualizado hace Xs`, conexiones; `Escape` cierra selección.
+- [x] T69 — Filtros: capa/estado/fuente + botón limpiar; persisten entre refrescos (se recrean si cambia la lista de layers).
+- [x] T70 — Evidencia visible: campo `evidence` por nodo en `/api/graph` + etiqueta `evidence` en inspector.
+- [x] T71 — Accesibilidad: `aria-selected`, `:focus-visible`, `:focus-with`, `Escape` para cerrar historial + deseleccionar nodo, `prefers-reduced-motion`.
+- [x] T72 — E2E: 108 tests (102 + 4 de navegación/inspector + 2 de graph evidence/mapeo).
+- [x] T73 — Verificación: panel screenshots real, 0 console errors, sin drift, service reiniciado con nuevo graph.py, 108/108 OK.
+
+## Decisiones de diseño rechazadas durante iteración
+- ❌ React/Gatsby — exceso de recursos, no vale la pena para 21 componentes.
+- ❌ Bento de batch con alineación automática — es complicado de centrar en CSS auto, deja espacios vacíos.
+- ❌ Flash en páginas enteras (upsert location) — cambios mínimos, mejor hash URL + `hidden`.
+
 ## Progreso
-- Última tarea terminada: T64 (Etapa 9A mapa operativo); T47 queda pendiente por calendario ~2026-09-25
-- Estado: en observacion
+- Última tarea terminada: T74 (Etapa 11A: verificación honesta + frescura inspector + doc)
+- Estado: en observacion (T47 reiniciado)
 - Bloqueos: ninguno
-- Commits: 9381d5e (feature T1-T46), 8fd46fd (evidencia odd-contract), protegido en git 2026-09-18
+- Commits: 89de1ba protegido (Etapa 9A). Etapa 10A+11A sin confirmar.
 
 ## Etapa 9A — Mapa operativo visual (implementada 2026-09-19)
 
@@ -157,7 +199,11 @@ verification_command NO se expone al navegador (ejecuta comandos locales arbitra
 diagnostico por CLI en vez de endpoint HTTP. Formulario avanzado generico descartado;
 si se demuestra necesidad, Etapa 8B con perfiles predefinidos.
 
-- [ ] T47 — Cerrar periodo de observacion (bloqueado por calendario, ~2026-09-25): servicio+reconciliador+3 timers, tests, verify.sh, drift, revision de actividad de la semana.
+- [ ] T47 — Cerrar periodo de observacion REINICIADO tras cambios Etapa 11A
+  (inspector + README + pin plugin_doctor). Servicios activos (4/4 timers,
+  panel HTTP 200). Abierto hasta ~2026-09-25 o hasta detectar anomalias;
+  cierre con revision operativa semanal: servicio+reconciliador+3 timers,
+  tests, verify.sh, drift, actividad de la semana.
 - [x] T48 — Documentacion coherente: README sin claims obsoletos (titulo Fase 1, "sin botones", "no lanza tareas" eliminados), doctor documentado, reconciliador con su propio encabezado, registro Etapa 8A aqui.
 - [x] T49 — Errores visibles y CSRF recuperable: fetchJSON con HTTP status; pushError con banner (max 3, dedup) para snapshot/tareas/eventos; 403 -> "La sesion del panel expiro... Recarga la pagina" sin tocar el formulario; clearErrors al recuperar.
 - [x] T50 — Cola sin backend nuevo: filtros f-status/f-agent/f-model/f-sens (locales, poblando opciones de la propia cola), columna Duracion (started_at/finished_at), duracion_s en actividad, badge parent_id "↳ de #N". Micro-fix: `--help` global y `task --help` verificados (exit 0).

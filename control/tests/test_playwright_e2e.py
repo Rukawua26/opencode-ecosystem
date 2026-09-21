@@ -66,14 +66,51 @@ class TestPanelE2E(unittest.TestCase):
 
     def test_mapa_operativo(self) -> None:
         page = self._page()
+        page.locator('#tab-mapa').click()
         self.assertGreaterEqual(page.locator("#map .gnode").count(), 8)
         page.locator("#map .gnode").first.click()
-        self.assertIn("conexiones", page.locator("#map-detail").inner_text())
+        self.assertIn("evidencia", page.locator("#inspector").inner_text())
         page.keyboard.press("Enter")  # no debe romper nada tras seleccion
+        page.close()
+
+    def test_vistas_y_navegacion(self) -> None:
+        page = self._page()
+        # vista inicial: resumen (stats visibles, mapa oculto)
+        self.assertTrue(page.locator('#stats').is_visible())
+        self.assertFalse(page.locator('#map').is_visible())
+        page.locator('#tab-mapa').click()
+        self.assertTrue(page.locator('#map').is_visible())
+        self.assertFalse(page.locator('#stats').is_visible())
+        self.assertTrue(page.locator('#tab-mapa').get_attribute('aria-selected') == 'true')
+        page.locator('#tab-actividad').click()
+        self.assertTrue(page.locator('#flows').is_visible())
+        self.assertFalse(page.locator('#map').is_visible())
+        page.locator('#tab-resumen').click()
+        self.assertTrue(page.locator('#stats').is_visible())
+        page.close()
+
+    def test_filtros_mapa_e_inspector(self) -> None:
+        page = self._page()
+        page.locator('#tab-mapa').click()
+        total = page.locator('#map .gnode').count()
+        self.assertGreaterEqual(total, 8)
+        page.locator('#mf-layer').select_option('automatizacion')
+        filtered = page.locator('#map .gnode').count()
+        self.assertLess(filtered, total)
+        self.assertIn('/', page.locator('#map-count').inner_text())
+        page.locator('button:has-text("limpiar")').click()
+        self.assertEqual(page.locator('#map .gnode').count(), total)
+        page.locator('#map .gnode').first.click()
+        ins = page.locator('#inspector').inner_text()
+        self.assertIn('evidencia', ins)
+        self.assertIn('capa', ins)
+        page.keyboard.press('Escape')
+        self.assertIn('selecciona un nodo', page.locator('#inspector').inner_text())
         page.close()
 
     def test_filtros_e_historial(self) -> None:
         page = self._page()
+        page.locator('#tab-actividad').click()
         total = page.locator(".comp").count()
         page.locator("button.chip").filter(has_text="skill").first.click()
         skills = page.locator(".comp").count()

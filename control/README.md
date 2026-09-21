@@ -90,6 +90,25 @@ control/
 
 Si matas el proceso del panel, systemd lo reinicia automaticamente. El reconciliador corre solo en background y marca `dead` las tareas atascadas sin intervencion.
 
+## Etapa 10A — Mapa operativo con filtros e inspector visual (2026-09-19)
+
+Panel local con tres vistas (`Resumen` · `Mapa` · `Actividad`), navegacion por hash URL,
+mapa operativo SVG inline (11 nodos agrupados) con filtros por capa/estado/fuente,
+inspector lateral (estado, capa, fuente, evidencia, antiguedad, conexiones, eventos),
+datos observados vs. declarados diferenciados (fuente + tipo de linea),
+accesible (aria, teclado, Escape, responsive) y con pruebas E2E.
+
+Inspiracion conceptual (sin copiar codigo): Public APIs (categorias + evidencia),
+Free Programming Books (busqueda + categorias), freeCodeCamp (vistas separadas),
+Brahma Echo (bento + panel inspector).
+
+Decisiones clave: SVG inline sin librerías, sin React/Mermaid/WebSockets,
+sin acceso remoto, sin undo genérico, sin voz. Solo fuentes
+`observado | declarado | inferido`.
+
+Verificacion: 108/108 tests OK, Playwright real (0 console errors, 0 HTTP 404,
+movil sin overflow), `verify.sh` verde, `status` sin drift, qa-gate strict OK.
+
 ### Reconciliador (Etapa 5)
 Vigilante de consistencia. Preview por defecto:
 ```bash

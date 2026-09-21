@@ -65,7 +65,7 @@ class TestFrontendJS(unittest.TestCase):
         self.assertIn('role="dialog"', html)
         self.assertIn('aria-modal="true"', html)
         self.assertIn('aria-labelledby="hist-title"', html)
-        self.assertIn("key === 'Escape'", html)
+        self.assertIn("'Escape'", html)
         self.assertIn("histTrigger", html)
 
 

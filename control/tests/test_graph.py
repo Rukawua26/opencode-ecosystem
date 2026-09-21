@@ -79,6 +79,21 @@ class TestGraph(unittest.TestCase):
         for campo in ("prompt", "workspace", "verification_command"):
             self.assertNotIn(campo, raw)
 
+    def test_nodos_con_evidencia(self) -> None:
+        g = self._graph()
+        for n in g["nodes"]:
+            self.assertTrue(n["evidence"], f"nodo sin evidencia: {n['id']}")
+            self.assertIn(n["source"], ("observado", "declarado"))
+
+    def test_mapeo_eventos_directo(self) -> None:
+        g = self._graph()
+        kinds = g["node_event_kinds"]
+        self.assertEqual(kinds["timers"], "timer")
+        self.assertEqual(kinds["reconciliador"], "reconciliador")
+        self.assertEqual(kinds["cola"], "task")
+        for nid in kinds:
+            self.assertIn(nid, {n["id"] for n in g["nodes"]})
+
 
 if __name__ == "__main__":
     unittest.main()
