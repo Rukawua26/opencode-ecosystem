@@ -135,7 +135,8 @@ class TestRunnerPolicy(LeaseFixture):
         )
         with mock.patch.object(runner, "_run_agent", return_value={
             "code": 0, "duration": 0.1, "note": "", "error_kind": "",
-            "result": "success", "summary": "", "question": "",
+            "result": "success", "summary": "x creado", "question": "",
+            "next_transition": "",
         }):
             runner.run_next(self.path)
         verifier = db.next_pending(self.path)
@@ -151,7 +152,8 @@ class TestRunnerPolicy(LeaseFixture):
         )
         with mock.patch.object(runner, "_run_agent", return_value={
             "code": 0, "duration": 0.1, "note": "", "error_kind": "",
-            "result": "success", "summary": "", "question": "",
+            "result": "success", "summary": "ok", "question": "",
+            "next_transition": "",
         }):
             runner.run_next(self.path)
         row = next(

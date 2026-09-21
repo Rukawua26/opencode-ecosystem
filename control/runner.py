@@ -13,6 +13,7 @@ from .db import (
     claim_next,
     list_tasks,
     record_event,
+    record_receipt,
     scrub_task_payload,
     update_task,
 )
@@ -54,8 +55,8 @@ def _workspace_path(workspace: str) -> Path | None:
 
 
 def _parse_result_lines(stdout: str) -> dict[str, str]:
-    """Extrae el contrato acotado RESULT/SUMMARY/QUESTION."""
-    parsed = {"result": "", "summary": "", "question": ""}
+    """Extrae el contrato acotado RESULT/SUMMARY/QUESTION/NEXT_TRANSITION."""
+    parsed = {"result": "", "summary": "", "question": "", "next_transition": ""}
     for line in stdout.splitlines():
         clean = line.strip()
         for key in parsed:
@@ -96,13 +97,15 @@ def _run_agent(
     except subprocess.TimeoutExpired:
         return {"code": 124, "duration": round(time.monotonic() - started, 2),
                 "note": "timeout 900s", "error_kind": "timeout",
-                "result": "", "summary": "", "question": ""}
+                "result": "", "summary": "", "question": "", "next_transition": ""}
     except FileNotFoundError:
         return {"code": 127, "duration": 0.0, "note": "opencode no encontrado",
-                "error_kind": "infra", "result": "", "summary": "", "question": ""}
+                "error_kind": "infra", "result": "", "summary": "", "question": "",
+                "next_transition": ""}
     except ValueError as exc:
         return {"code": 2, "duration": 0.0, "note": str(exc),
-                "error_kind": "contract", "result": "", "summary": "", "question": ""}
+                "error_kind": "contract", "result": "", "summary": "", "question": "",
+                "next_transition": ""}
 
 
 def _run_verification(command: str, workspace: str) -> tuple[int, str]:
@@ -148,6 +151,16 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
     result = str(outcome["result"]).lower()
     summary = str(outcome["summary"])
     question = str(outcome["question"])
+    transition = str(outcome.get("next_transition", ""))
+    # next_transition (patron gentle-ai): se ejecuta literal, nunca se reconstruye.
+    if code == 0 and transition:
+        t_code, t_note = _run_verification(transition, task.get("workspace", ""))
+        if t_code != 0:
+            code, note, error_kind = t_code, f"next_transition no ejecutado: {t_note}", "transition"
+        else:
+            summary = f"{summary[:184]} | next_transition: rc=0"
+            record_event(agent, "transition", "next_transition", "ok",
+                         f"task #{tid} ejecutado verbatim", path=path)
     if code == 0 and agent == _VERIFY_AGENT and task.get("verification_command"):
         verify_code, verify_note = _run_verification(
             task["verification_command"], task.get("workspace", "")
@@ -165,6 +178,11 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
         "success", "blocked", "failed"
     }:
         code, note, error_kind = 2, "contrato RESULT ausente o invalido", "contract"
+    if code == 0 and result == "blocked" and not question:
+        code, note, error_kind = 2, "RESULT: blocked sin QUESTION", "contract"
+    if code == 0 and result == "success" and not summary \
+            and agent in (_WORKER_AGENT, _VERIFY_AGENT):
+        code, note, error_kind = 2, "contrato SUMMARY ausente", "contract"
     if code == 0 and result == "failed":
         code, note, error_kind = 1, summary or "RESULT: failed", "agent"
 
@@ -181,6 +199,10 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
                     note=summary[:200], lease_owner="", lease_until="", error_kind="")
         record_event(agent, "task", "completada", "ok",
                      f"task #{tid} en {duration}s", duration_s=duration, path=path)
+        record_receipt(agent, "success", duration,
+                       f"task #{tid} {summary[:120]}"
+                       + (" verifier pending" if agent == _WORKER_AGENT else ""),
+                       path=path)
         if agent == _WORKER_AGENT:
             feature = task.get("feature") or ""
             verifier_prompt = (

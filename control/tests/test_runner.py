@@ -21,11 +21,12 @@ class RunnerFixture(unittest.TestCase):
 
     def _ok(self, agent: str, prompt: str, model: str = "", workspace: str = "") -> dict[str, object]:
         return {"code": 0, "duration": 1.0, "note": "", "error_kind": "",
-                "result": "success", "summary": "", "question": ""}
+                "result": "success", "summary": "ok", "question": "",
+                "next_transition": ""}
 
     def _fail(self, agent: str, prompt: str, model: str = "", workspace: str = "") -> dict[str, object]:
         return {"code": 1, "duration": 2.0, "note": "boom", "error_kind": "agent",
-                "result": "", "summary": "", "question": ""}
+                "result": "", "summary": "", "question": "", "next_transition": ""}
 
 
 class TestQueueOps(RunnerFixture):
@@ -130,6 +131,17 @@ class TestRunner(RunnerFixture):
         events = db.events_for("odd-verifier", path=self.path)
         self.assertTrue(any(e["category"] == "verification" for e in events))
 
+    def test_blocked_without_question_is_contract_error(self) -> None:
+        tid = db.add_task("odd-worker", "decide", path=self.path)
+        blocked = {"code": 0, "duration": 0.2, "note": "", "error_kind": "",
+                   "result": "blocked", "summary": "", "question": ""}
+        with mock.patch.object(runner, "_run_agent", return_value=blocked):
+            result = runner.run_next(self.path)
+        row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
+        self.assertEqual(result["status"], "pending")
+        self.assertEqual(row["error_kind"], "contract")
+        self.assertIn("QUESTION", row["note"])
+
     def test_blocked_waits_without_consuming_attempt(self) -> None:
         tid = db.add_task("odd-worker", "decide", path=self.path)
         blocked = {"code": 0, "duration": 0.2, "note": "", "error_kind": "",
@@ -163,6 +175,79 @@ class TestRunner(RunnerFixture):
         self.assertEqual(result["status"], "pending")
         self.assertEqual(row["error_kind"], "contract")
         self.assertIn("RESULT", row["note"])
+
+    def test_missing_summary_is_fail_closed(self) -> None:
+        tid = db.add_task("odd-worker", "haz X", path=self.path)
+        incomplete = {"code": 0, "duration": 0.1, "note": "", "error_kind": "",
+                      "result": "success", "summary": "", "question": ""}
+        with mock.patch.object(runner, "_run_agent", return_value=incomplete):
+            result = runner.run_next(self.path)
+        row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
+        self.assertEqual(result["status"], "pending")
+        self.assertEqual(row["error_kind"], "contract")
+        self.assertIn("SUMMARY", row["note"])
+
+    def test_require_summary_only_for_odd_agents(self) -> None:
+        db.add_task("qa-gate", "revisa", path=self.path)
+        no_summary = {"code": 0, "duration": 0.1, "note": "", "error_kind": "",
+                      "result": "success", "summary": "", "question": ""}
+        with mock.patch.object(runner, "_run_agent", return_value=no_summary):
+            result = runner.run_next(self.path)
+        self.assertEqual(result["status"], "done")
+
+    def test_done_worker_records_exact_receipt(self) -> None:
+        tid = db.add_task("odd-worker", "haz X", path=self.path)
+        complete = {"code": 0, "duration": 1.2, "note": "", "error_kind": "",
+                    "result": "success", "summary": "implementado T1", "question": ""}
+        with mock.patch.object(runner, "_run_agent", return_value=complete):
+            runner.run_next(self.path)
+        receipts = [
+            r for r in db.events_for("odd-worker", path=self.path)
+            if r["category"] == "receipt"
+        ]
+        self.assertEqual(len(receipts), 1)
+        self.assertEqual(receipts[0]["status"], "success")
+        self.assertIn(f"task #{tid}", receipts[0]["detail"])
+        self.assertIn("verifier pending", receipts[0]["detail"])
+
+    def test_worker_success_always_chains_verifier(self) -> None:
+        tid = db.add_task("odd-worker", "haz X", workflow="odd", path=self.path)
+        complete = {"code": 0, "duration": 0.8, "note": "", "error_kind": "",
+                    "result": "success", "summary": "ok", "question": ""}
+        with mock.patch.object(runner, "_run_agent", return_value=complete):
+            runner.run_next(self.path)
+        pending = db.next_pending(self.path)
+        self.assertIsNotNone(pending)
+        self.assertEqual(pending["agent"], "odd-verifier")
+        self.assertEqual(pending["parent_id"], tid)
+
+    def test_next_transition_is_executed_verbatim(self) -> None:
+        tid = db.add_task("odd-worker", "revisa", path=self.path)
+        outcome = {"code": 0, "duration": 0.1, "note": "", "error_kind": "",
+                   "result": "success", "summary": "hecho", "question": "",
+                   "next_transition": "printf ok"}
+        with mock.patch.object(runner, "_run_agent", return_value=outcome):
+            task = runner.run_next(self.path)
+        row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
+        self.assertEqual(task["status"], "done")
+        self.assertIn("next_transition: rc=0", row["note"])
+
+    def test_next_transition_failure_is_not_done(self) -> None:
+        tid = db.add_task("odd-worker", "revisa", path=self.path)
+        outcome = {"code": 0, "duration": 0.1, "note": "", "error_kind": "",
+                   "result": "success", "summary": "hecho", "question": "",
+                   "next_transition": "false"}
+        with mock.patch.object(runner, "_run_agent", return_value=outcome):
+            task = runner.run_next(self.path)
+        row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
+        self.assertEqual(task["status"], "pending")
+        self.assertEqual(row["error_kind"], "transition")
+
+    def test_opencode_missing_fails_explicit_as_infra(self) -> None:
+        with mock.patch("subprocess.run", side_effect=FileNotFoundError):
+            outcome = runner._run_agent("odd-worker", "haz X")
+        self.assertEqual(outcome["error_kind"], "infra")
+        self.assertIn("opencode no encontrado", outcome["note"])
 
     def test_result_parser_keeps_last_bounded_value(self) -> None:
         parsed = runner._parse_result_lines(

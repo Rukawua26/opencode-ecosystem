@@ -165,8 +165,10 @@ Reglas del lanzador:
 - **1 tarea a la vez** (proceso sincrono).
 - Claim atomico SQLite (`BEGIN IMMEDIATE`) + lease; dos runners no ejecutan la misma tarea.
 - rc=0 + `RESULT: success` → `done`; rc≠0 o contrato ODD invalido → reintenta hasta 2 veces → luego `dead`.
+- Fail-closed ODD: `RESULT: success` exige `SUMMARY:` y `RESULT: blocked` exige `QUESTION:`; salida incompleta = error de contrato, nunca `done`.
 - `RESULT: blocked` → `waiting` sin consumir intento; tras registrar la decision en ODD se reintenta manualmente.
-- Un `odd-worker` ok encadena automaticamente un `odd-verifier`.
+- `NEXT_TRANSITION: <comando>` (opcional, del worker/verifier) se ejecuta verbatim por bash antes de cerrar; si falla, la tarea no queda `done` (`error_kind=transition`).
+- Un `odd-worker` ok encadena automaticamente un `odd-verifier` y registra recibo `receipt`.
 - El verificador hereda workspace, feature, modelo y criterios; tras rc=0 ejecuta el `verification_command` determinista (timeout 120s).
 - El stdout del modelo NUNCA se guarda en el historial (solo rc + duracion + resumen).
 - Fallos del proveedor (saldo/rate limit) no consumen intentos funcionales.
