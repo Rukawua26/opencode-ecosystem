@@ -18,6 +18,8 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
 - `next_transition` separado por procedencia: el texto del modelo nunca llega a shell; solo el control-plane puede emitir una continuacion ejecutable registrada.
 - Diagnostico OpenCode V2 version-aware bajo demanda y `assess` informativo derivado del estado existente.
 - Recibos/evidencia ligera reutilizando eventos existentes.
+- Revision fallida del verifier: pasa a `waiting` para decision humana, sin consumo de intento ni receipt.
+- Rebaseline externa (main `654200afea34`, estable v3.4.0) y E2E OpenCode real offline como patron futuro condicionado.
 - Pruebas evolucion y nota de analisis de origen.
 
 ### Excluye
@@ -27,6 +29,7 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
 - Engram, telemetria VictoriaMetrics, RTK, TUI, Gentle Shell, binario Go.
 - Commits automaticos, ramas, push, PR o release.
 - Nuevos procesos, daemons, dependencias externas o memoria adicional.
+- E2E permanente o con llamadas cloud: solo opt-in offline con proveedor simulado.
 
 ## Restricciones
 
@@ -43,6 +46,7 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
 - `status` sin drift tras sincronizar skills.
 - API/panel sin prompts, workspace ni comandos expuestos.
 - Workflows y configuraciones existentes que no se tocan.
+- Worker y agentes genericos conservan su politica de reintento (max 2 -> dead); solo `odd-verifier` con `RESULT: failed` pasa a `waiting` para decision humana.
 
 ## TDD
 
@@ -62,6 +66,13 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
 - [x] T8 - Añadir `task assess` informativo con `review_state`, `review_due` y continuacion emitida por codigo.
 - [x] T9 - Dogfood de transicion desconocida, assess pending/passed/failed y OpenCode V2 compatible/incompatible.
 - [x] T10 - Actualizar skill, prompts, README y evolution; sincronizar y ejecutar cierre completo.
+- [x] T11 - Alinear la regla global de `next_transition` con la procedencia: solo una operacion registrada del control-plane es ejecutable; el texto del modelo nunca llega a shell.
+- [x] T12 - `odd-verifier` con `RESULT: failed` pasa a `waiting` (error_kind=review) sin quemar intento ni receipt; `assess` informa failed y no emite transicion; retry manual reanuda.
+- [x] T13 - Rebaseline gentle-ai: main `654200afea34` (+37 commits CI/tests), estable v3.4.0; clasificar delta y marcar E2E aislado como patron a tomar.
+- [ ] T14 - Dogfood Fase B: dos features sustanciales reales posteriores a f4cf9c8 con worker/verifier, receipts y assess; registrar intentos, falsos contratos y divergencias (hasta 2026-10-05).
+- [ ] T15 - Puerta de decision tras T14: solo si aparece brecha, rama minima (verifier failed, worker done sin verifier, preflight ODD, task trace) con aprobacion.
+- [x] T16 - E2E opcional OpenCode real offline: spike efimero fuera del repo; persistir `test_odd_e2e` solo si es barato (OPENCODE_E2E=1, sin tokens ni red externa).
+- [ ] T17 - Cierre: docs, gates completos, verifier independiente y periodo prudencial.
 
 ## Criterios de aceptacion
 
@@ -81,6 +92,8 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
 - 2026-09-21: reutilizar recibos y estados existentes en lugar de migrar SQLite.
 - 2026-09-21: no activar RDD, telemetria, Engram ni entrega automatica.
 - 2026-09-21: corregir el contrato anterior: ejecutar shell desde stdout del modelo no es equivalente al `next_transition` autoritativo de gentle-ai y queda prohibido.
+- 2026-09-21: la revision fallida del verifier no se repite automaticamente: pasa a `waiting` con `error_kind=review` para decision humana (evita gastar tokens en reintentos inutiles).
+- 2026-09-21: el E2E solo se persiste si el spike efimero es barato y queda fuera de verify.sh (OPENCODE_E2E=1, opt-in).
 
 ## Reutilizacion investigada
 
@@ -152,10 +165,30 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
   - Resultado: 136/136 OK; doctor real OpenCode `2.0.12`, compatible con `2.x`, tres capacidades activas y `ok: true`; ayuda coherente sin duplicar comandos.
   - Cierre: `./verify.sh` -> `[ok] verify verde`; `./scripts/qa-gate.sh --strict` y `git diff --check` -> exit 0.
   - Periodo prudencial: en observacion hasta 2026-10-05 o 2 features sustanciales delegadas; base reversible Git `2c711e0`, sin commit nuevo.
+- T12 - Estado: passed
+  - RED: `python3 -m unittest control.tests.test_runner control.tests.test_assess` -> 4 fallos (verifier failed -> pending en vez de waiting, failed+transicion sin prioridad de revision, retry manual rechazado, assess waiting-review da pending).
+  - GREEN: `python3 -m unittest control.tests.test_runner control.tests.test_assess` -> 38/38 OK; `python3 -m unittest discover -s control/tests` -> 140/140 OK (incluye test_declared_failure_uses_normal_retry del worker y test_estados_del_verifier con waiting sin error_kind -> pending).
+  - Resultado: `odd-verifier` con `RESULT: failed` pasa a `waiting` con `error_kind=review`, intento restaurado (`attempts=max(0, attempts-1)`), nota acotada `[:200]` sin stdout, evento `review/warn` y sin receipt de exito; la rama va antes de la transicion (failed+transicion clasifica como revision fallida); worker y agentes genericos conservan su politica (reintento, max 2 -> dead); `assess` distingue por procedencia: waiting con `error_kind=review` -> `failed` con reason `revision fallida (espera decision)` y sin next_transition; waiting sin error_kind sigue `pending`; `actions.do_retry` reencola ese waiting a pending.
+  - Cierre: `./verify.sh` -> `[ok] verify verde`; `./scripts/qa-gate.sh --strict` -> exit 0; `git diff --check` -> ok. Sin migracion SQLite, sin dependencias ni procesos nuevos.
+  - Verificacion independiente (odd-verifier, contexto fresco): `Sin hallazgos.` de contrato; 140/140 OK reproducidos; hallazgo cosmico de Progreso corregido en el mismo cierre.
+- T11 - Estado: passed (inline docs, effort low segun routing)
+  - Comando: edicion de `~/AGENTS.md` (regla de continuaciones); revision dirigida de skill/prompts/README/runner ya coherentes tras T7/T10/T12.
+  - Resultado: la regla global distingue procedencia: verbatim solo para operacion registrada del control-plane; texto del modelo nunca llega a shell y deja la tarea en waiting. El sistema recordo el cambio de AGENTS.md sin drift.
+- T13 - Estado: passed (inline docs, effort low segun routing)
+  - Comando: GitHub API `commits/main` + `releases/latest` + `compare/d45bc428f515...654200afea34` (37 commits).
+  - Resultado: baseline actualizada a `654200afea34` (2026-09-21 via GitHub API; estable sigue v3.4.0) en `~/docs/sources/gentle-ai-analysis.md` con delta clasificado: unico patron transferible E2E OpenCode aislado de npm/models.dev/red externa; gate 400-lineas y PR automation sin adoptar.
+- T16 - Estado: passed (opt-in OPENCODE_E2E=1; fuera de verify.sh)
+  - Spike efimero: `/tmp/opencode/e2e-spike/run_spike.py` -> exit=0, 4.2s, 2 llamadas streamed a /v1/chat/completions, texto determinista en stdout, sin egress externo (proxy muerto para todo menos loopback), sin npm bootstrap.
+  - Hallazgo clave: SIN `--standalone` el cliente con env aislado se cuelga (60s, 0 llamadas al mock); CON `--standalone` funciona.
+  - Rework (plan mejorado aprobado): hook descartado de `control/runner.py` (logica de test en produccion; revertido junto con `import os`); el E2E crea un wrapper efimero de `opencode` en `PATH` que anade `--standalone` a `run` y ejecuta el binario real; el lanzador de produccion no cambia.
+  - Validacion: hook 2/2 OK por el worker antes del rework; tras el rework el recorrido real cubre el wrapper (clase TestStandaloneHook eliminada).
+  - Recorrido real: `OPENCODE_E2E=1 python3 -m unittest control.tests.test_odd_e2e -v` -> OK en 2.7s tras el rework (3/3 en 6.6s con el hook previo). Servidor mock ThreadingHTTPServer en loopback (puerto efimero) con patron SSE del spike (streaming si stream:true, JSON si no); env aislado para el hijo via os.environ (HOME/XDG_* /OPENCODE_CONFIG_DIR bajo HOME temporal, MOCK_API_KEY=dummy, OPENCODE_DISABLE_MODELS_FETCH=1, proxy muerto, NO_PROXY loopback); DB temporal con db.init_db; workspace dentro del HOME temporal; worker odd-worker model=mock/test verification_command=true -> done con recibo y verifier unico (parent_id); segundo run_next -> verifier done con check determinista rc=0 y recibo; `cli.assess_task(worker_id, db)` -> review_state passed.
+  - Aserciones finales: solo loopback alcanzo el mock (>= 2 llamadas a /chat/completions), sin payload privado ni secretos en DB (list_tasks include_private=False; sin prompt/workspace/comandos ni "dummy"), un solo verifier, resumen acotado persistido como nota y stdout completo ausente.
+  - Cierre: `python3 -m unittest discover -s control/tests` -> 141/141 OK con test_odd_e2e saltado; `./verify.sh` -> `[ok] verify verde`; `./scripts/qa-gate.sh --strict` exit 0; `git diff --check` ok. Reutilizado el mock SSE y el env de aislamiento del spike; sin migracion SQLite, sin dependencias, sin procesos permanentes; README documenta el uso opt-in.
 
 ## Progreso
 
-- Estado: completada; en observacion hasta 2026-10-05 o 2 features sustanciales delegadas con dogfood real
-- Ultima tarea terminada: T10
-- Siguiente paso: observar que ninguna salida del modelo llegue a shell y que `task assess` refleje fielmente la cola
+- Estado: en_progreso (Fase A T11-T13 y T16 completadas; Fase B dogfood con 2 features reales pendiente hasta 2026-10-05)
+- Ultima tarea terminada: T16
+- Siguiente paso: T14 (dos features sustanciales reales con worker/verifier)
 - Bloqueos: ninguno
