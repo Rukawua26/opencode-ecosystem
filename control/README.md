@@ -184,6 +184,20 @@ acepta unicamente el formato oficial `opencode vX.Y.Z` y exige major 2. Binario
 ausente, salida no oficial o version incompatible hacen `ok=false`; las capacidades
 `run`, `debug_config` y `service_status` solo se marcan activas para OpenCode V2.
 
+## E2E opt-in con OpenCode real (OPENCODE_E2E=1)
+
+El test crea un wrapper efimero de `opencode` en `PATH` que anade
+`--standalone` a `run` (cliente sin bootstrap npm ni fetch de modelos) y
+ejecuta el binario real; el lanzador de produccion no cambia.
+
+El test `control/tests/test_odd_e2e.py` es opt-in (se salta en la suite normal):
+```bash
+OPENCODE_E2E=1 python3 -m unittest control.tests.test_odd_e2e -v
+```
+Usa un proveedor OpenAI-compatible simulado en loopback (sin tokens ni red
+externa: proxy muerto para todo menos 127.0.0.1), HOME/XDG temporales y DB
+efimera. No forma parte de `verify.sh`.
+
 ## Worktree manual (opcional)
 Procedimiento aprobado:
 ```bash
