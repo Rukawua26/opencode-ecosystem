@@ -176,10 +176,20 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
     if code == 0 and result == "success" and not summary \
             and agent in (_WORKER_AGENT, _VERIFY_AGENT):
         code, note, error_kind = 2, "contrato SUMMARY ausente", "contract"
-    if code == 0 and result == "failed":
+    if code == 0 and result == "failed" and agent != _VERIFY_AGENT:
         code, note, error_kind = 1, summary or "RESULT: failed", "agent"
 
-    if code == 0 and agent in (_WORKER_AGENT, _VERIFY_AGENT) and transition:
+    # revision fallida del verifier: decision humana, no reintento automatico.
+    # va antes de la transicion: error_kind=review gana.
+    if code == 0 and agent == _VERIFY_AGENT and result == "failed":
+        note = summary or "revision fallida"
+        update_task(tid, path, status="waiting", finished_at=finished, result_code=code,
+                    note=note[:200], attempts=max(0, attempts - 1),
+                    lease_owner="", lease_until="", error_kind="review")
+        record_event(agent, "review", "fallida (necesita decision)", "warn",
+                     f"task #{tid} {note[:160]}", duration_s=duration, path=path)
+        task["status"] = "waiting"
+    elif code == 0 and agent in (_WORKER_AGENT, _VERIFY_AGENT) and transition:
         note = "transicion no registrada"
         update_task(tid, path, status="waiting", finished_at=finished, result_code=code,
                     note=note, attempts=max(0, attempts - 1),

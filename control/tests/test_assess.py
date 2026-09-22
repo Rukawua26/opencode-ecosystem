@@ -104,6 +104,19 @@ class TestAssessStates(AssessFixture):
                 self.assertEqual(result["next_transition"], "")
                 self.assertEqual(result["reason"], reason)
 
+    def test_verifier_waiting_review_es_failed_sin_transicion(self) -> None:
+        worker_id = self.worker("done", "2026-09-21T10:00:00+00:00")
+        verifier_id = self.verifier(worker_id, "waiting")
+        db.update_task(verifier_id, self.path, error_kind="review")
+
+        result = cli.assess_task(worker_id, self.path)
+
+        self.assertEqual(result["verifier_id"], verifier_id)
+        self.assertEqual(result["review_state"], "failed")
+        self.assertEqual(result["next_transition"], "")
+        self.assertEqual(result["reason"], "revision fallida (espera decision)")
+        self.assertLessEqual(len(result["reason"]), 80)
+
     def test_rechaza_inexistente_y_agente_no_worker(self) -> None:
         with self.assertRaisesRegex(ValueError, "no existe"):
             cli.assess_task(999, self.path)

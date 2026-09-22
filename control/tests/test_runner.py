@@ -165,6 +165,61 @@ class TestRunner(RunnerFixture):
         self.assertEqual(row["error_kind"], "agent")
         self.assertEqual(row["note"], "test rojo")
 
+    def test_verifier_declared_failure_waits_without_consuming_attempt(self) -> None:
+        tid = db.add_task("odd-verifier", "verifica", path=self.path)
+        long_summary = "criterio no cumplido: " + "x" * 250
+        failed = {"code": 0, "duration": 0.2, "note": "", "error_kind": "",
+                  "result": "failed", "summary": long_summary, "question": ""}
+        with mock.patch.object(runner, "_run_agent", return_value=failed):
+            result = runner.run_next(self.path)
+        row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
+        self.assertEqual(result["status"], "waiting")
+        self.assertEqual(row["status"], "waiting")
+        self.assertEqual(row["attempts"], 0)  # intento restaurado
+        self.assertEqual(row["error_kind"], "review")
+        self.assertEqual(row["note"], long_summary[:200])  # nota acotada, sin stdout
+        events = db.events_for("odd-verifier", path=self.path)
+        self.assertTrue(any(e["category"] == "review" and e["status"] == "warn"
+                            for e in events))
+        self.assertEqual(  # sin receipt de exito
+            [r for r in events if r["category"] == "receipt"], [])
+
+    def test_verifier_failed_with_transition_review_wins(self) -> None:
+        tid = db.add_task("odd-verifier", "verifica", path=self.path)
+        outcome = {"code": 0, "duration": 0.1, "note": "", "error_kind": "",
+                   "result": "failed", "summary": "revision en rojo", "question": "",
+                   "next_transition": "printf secreto-modelo"}
+        with mock.patch.object(runner, "_run_agent", return_value=outcome), \
+                mock.patch.object(runner.subprocess, "run") as run:
+            task = runner.run_next(self.path)
+        row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
+        self.assertEqual(task["status"], "waiting")
+        self.assertEqual(row["attempts"], 0)
+        self.assertEqual(row["error_kind"], "review")
+        self.assertEqual(row["note"], "revision en rojo")
+        self.assertFalse(any(  # la revision fallida gana: sin evento de transicion
+            e["category"] == "transition"
+            for e in db.events_for("odd-verifier", path=self.path)
+        ))
+        run.assert_not_called()
+
+    def test_manual_retry_resumes_review_waiting(self) -> None:
+        from control import actions
+        tid = db.add_task("odd-verifier", "verifica", path=self.path)
+        failed = {"code": 0, "duration": 0.2, "note": "", "error_kind": "",
+                  "result": "failed", "summary": "criterio no cumplido", "question": ""}
+        with mock.patch.object(runner, "_run_agent", return_value=failed):
+            runner.run_next(self.path)
+        with mock.patch.object(actions, "record_event", lambda *a, **k: None), \
+                mock.patch.object(actions, "list_tasks",
+                                  lambda n=500: db.list_tasks(n, path=self.path)), \
+                mock.patch.object(actions, "update_task",
+                                  lambda t, **f: db.update_task(t, self.path, **f)):
+            self.assertTrue(actions.do_retry(tid)["ok"])
+        row = next(t for t in db.list_tasks(path=self.path) if t["id"] == tid)
+        self.assertEqual(row["status"], "pending")
+        self.assertEqual(row["error_kind"], "")
+
     def test_odd_agent_without_result_fails_contract(self) -> None:
         tid = db.add_task("odd-worker", "haz X", path=self.path)
         missing = {"code": 0, "duration": 0.1, "note": "", "error_kind": "",

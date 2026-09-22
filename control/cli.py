@@ -122,7 +122,10 @@ def assess_task(task_id: int, path: Path | None = None) -> dict:
         elif verifier_status == "running":
             reason = "verificador en curso"
         elif verifier_status == "waiting":
-            reason = "verificador esperando decision"
+            if str(verifier.get("error_kind") or "") == "review":
+                review_state, reason = "failed", "revision fallida (espera decision)"
+            else:
+                reason = "verificador esperando decision"
         elif verifier_status == "done":
             review_state, reason = "passed", "verificacion aprobada"
         elif verifier_status == "dead":
