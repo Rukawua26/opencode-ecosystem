@@ -1,0 +1,37 @@
+%% Diagrama canonico del ecosistema (copia embebida en README.md).
+%% Editar ambos si cambia la arquitectura.
+flowchart TB
+    subgraph ECO["Fuente de verdad: ~/opencode-ecosystem (Git)"]
+        A1["skills/<br/>10 skills bajo demanda"]
+        A2["scripts/<br/>qa-gate, higiene, ram-guard"]
+        A3["configs/<br/>opencode, dcp, cron-jobs"]
+        A4["control/<br/>plano de control Python stdlib"]
+        A5["odd/tasks/<br/>un documento por feature"]
+    end
+
+    CLI["opencode-ecosystem<br/>status - sync - publish - capture - uninstall"]
+
+    subgraph CFG["Runtime instalado: ~/.config/opencode"]
+        B1["skills/ + scripts/ + memory/"]
+        B2["opencode.jsonc<br/>permisos, agentes, hooks"]
+    end
+
+    OC["OpenCode 2.x<br/>odd-worker luego odd-verifier"]
+
+    subgraph PANEL["Panel local 127.0.0.1:8765"]
+        C1["Resumen - Mapa - Actividad"]
+        C2["Cola SQLite<br/>eventos + recibos, 30 dias"]
+    end
+
+    A1 --> CLI
+    A2 --> CLI
+    A3 --> CLI
+    A5 --> CLI
+    CLI -->|"sync --apply con backup .bak-FECHA"| B1
+    CLI -->|"publish --yes"| A1
+    B1 --> OC
+    B2 --> OC
+    A4 --> PANEL
+    A4 -->|"reconcilia, recibos, traza"| C2
+    PANEL --> C1
+    OC -->|"RESULT success o failed"| C2

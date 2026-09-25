@@ -1,0 +1,12 @@
+%% Estados de una tarea del lanzador. Copia embebida en README.md.
+stateDiagram-v2
+    [*] --> pending: task add
+    pending --> running: claim atomico con lease
+    running --> done: rc 0 mas SUMMARY y RESULT
+    running --> pending: fallo, intento 1 de 2
+    running --> dead: fallo tras 2 intentos
+    running --> waiting: verifier RESULT failed
+    running --> waiting: bloqueado o transicion no registrada
+    waiting --> pending: retry humano
+    done --> [*]
+    dead --> [*]

@@ -1,0 +1,13 @@
+%% Flujo ODD-lite (organico predeterminado). Copia embebida en README.md.
+flowchart LR
+    A["1 Autorizar<br/>el humano aprueba alcance"]
+    B["2 Explorar<br/>routing proporcional"]
+    C["3 Resolver incertidumbre<br/>1 pregunta, 1 research"]
+    D["4 Clasificar<br/>inline vs odd-worker"]
+    E["5 Implementar<br/>odd-worker"]
+    F["6 Verificar<br/>odd-verifier + assess"]
+    G["7 Cerrar<br/>verify, qa-gate, evolution"]
+
+    A --> B --> C --> D --> E --> F --> G
+    F -->|"RESULT: failed"| H["waiting<br/>decision humana"]
+    H -->|"retry manual"| E
