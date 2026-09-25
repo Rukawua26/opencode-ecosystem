@@ -90,6 +90,23 @@ control/
 
 Si matas el proceso del panel, systemd lo reinicia automaticamente. El reconciliador corre solo en background y marca `dead` las tareas atascadas sin intervencion.
 
+## Etapa 12A — Monitor vivo y punto de detención (2026-09-22)
+
+- Tarjeta "⚡ Ejecución en vivo" en Resumen: tarea activa, fase, tiempo en curso
+  y cuenta atrás del lease; sin prompts ni salidas del agente.
+- Traza por tarea (clic o Enter en la fila de la cola): fase actual, motivo de
+  detención traducido (timeout, saldo, rate limit, contrato, verificación,
+  revisión humana, huérfana por lease), timeline de eventos y cadena
+  worker→verifier. Escape cierra.
+- `GET /api/tasks/<id>/trace` — datos ya sanitizados (sin prompt, workspace ni
+  comandos). Checkpoints del runner en la tabla `events` existente.
+- Polling adaptativo: 5s ejecutando, 30s en reposo, 60s con pestaña oculta;
+  contador de 1s local sin peticiones.
+
+Sin SSE/WebSockets, sin migración SQLite, sin stdout persistido.
+Verificacion: 154/154 tests OK (1 skip opt-in ajeno a esta etapa),
+Playwright real, `verify.sh` verde, `status` sin drift, qa-gate strict OK.
+
 ## Etapa 10A — Mapa operativo con filtros e inspector visual (2026-09-19)
 
 Panel local con tres vistas (`Resumen` · `Mapa` · `Actividad`), navegacion por hash URL,

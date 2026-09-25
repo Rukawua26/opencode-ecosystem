@@ -146,7 +146,7 @@ def apply_fixes(report: dict) -> dict:
             if task_meta and task_meta.get("sensitivity") == "sensitive":
                 db.scrub_task_payload(tid)
             db.record_event("reconciliador", "reconcile", "task dead",
-                            "warn", f["detail"])
+                            "warn", f"task #{tid} {f['detail']}")
             applied.append(f["target"])
     if applied or report.get("findings"):
         state["last_apply_ts"] = now

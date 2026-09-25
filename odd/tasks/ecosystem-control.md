@@ -114,6 +114,50 @@ Alcance aprobado: launcher 1 tarea/vez, sin recuperacion automatica, cola visibl
 - [x] T25 — Tests runner: 10 casos mockeando `_run_agent` (FIFO, done, reintento->dead, timeout, encadenado verify, no almacenar stdout, summary). +2 tests de modelo/migracion. 37/37 OK.
 - [x] T26 — Piloto real E2E: tarea #1 con modelo default fallo por "Insufficient Balance" (error del proveedor, no del runner) -> dead tras marcar nota; re-encolada con `opencode/nemotron-3-ultra-free` -> tarea #2 `done` rc=0 en 18.48s. Recibos automaticos en `/api/events`: iniciada/completada con duracion. Panel muestra cola correctamente.
 
+## Etapa 12A — Monitor vivo y punto de detención (implementada 2026-09-22)
+
+Alcance aprobado 2026-09-21. El panel responde ahora "qué proceso corre",
+"cuánto lleva", "dónde se detuvo" y "qué fase fue la última", sin exponer
+prompts, stdout ni comandos.
+
+- [x] T78 — Trazabilidad por tarea: `db.events_for_task(id)` con filtro de
+  frontera exacta (LIKE prefijo + regex, `#1` no captura `#10`); el
+  reconciliador ahora incluye `task #N` en el detail de su evento `task dead`
+  (antes la traza no podía atribuir el marcado de huérfana).
+- [x] T79 — Checkpoint de fase en runner: evento `fase: verificacion
+  determinista` justo antes de ejecutar `verification_command`.
+- [x] T80 — `control/trace.py`: `build_trace(id)` sanitizado (fase, stop_reason
+  humano, elapsed_s, lease, timeline, verifier encadenado vía parent_id);
+  endpoint `GET /api/tasks/<id>/trace` (400 id inválido, 404 no existe).
+- [x] T81 — UI: tarjeta "⚡ Ejecución en vivo" en Resumen (fase, elapsed,
+  tiempo a lease); panel de traza junto a la cola con motivo de detención
+  traducido, timeline y cadena worker→verifier; filas clicables y con
+  teclado (Enter/Space); Escape cierra; polling adaptativo
+  (5s ejecutando · 30s reposo · 60s pestaña oculta) con guardia anti-doble
+  fetch y tick local de 1s.
+- [x] T82 — Tests: 10 de traza (frontera de ids, fases, stop reasons,
+  sanitizado, running con checkpoint, no encontrada) + 1 de runner
+  (checkpoint de verificación) + 1 de frontend (marcas) + 1 E2E (tarjeta
+  en vivo, apertura/cierre de traza con datos reales de la cola).
+- [x] T83 — Verificación: 154/154 OK (1 skip es del test opt-in offline de
+  OpenCode añadido por otra sesión, no de esta etapa), qa-gate strict OK,
+  verify.sh verde, status sin drift. Servicio reiniciado: la ruta nueva
+  necesitaba servidor con `server.py` actualizado (routing en memoria).
+
+Errores encontrados en la iteración y corregidos:
+(a) E2E de traza asintcrono: el assert se ejecutaba antes del fetch → se usa
+    `expect(...).to_contain_text` con timeout; (b) el endpoint daba 404 hasta
+    reiniciar `opencode-control.service` (mismo patrón documentado en T61);
+(c) el detail del evento del reconciliador no identificaba la tarea → ahora
+    lleva `task #N` (sin esto la fase huérfana no se podía atribuir).
+
+Decisiones rechazadas (YAGNI/máquina i5-1235U):
+- ❌ SSE/WebSockets: `ThreadingHTTPServer` lo permitiría, pero el polling
+  adaptativo (5s máximo) ya da la percepción de vivo a menos coste.
+- ❌ Migración SQLite: no hace falta; `events` + columnas públicas bastan.
+- ❌ Heartbeat por tarea: candidato solo si la señal running llega a mentir.
+- ❌ Streaming de tool calls internos: riesgo de exponer datos y complejidad.
+
 ## Etapa 11A — Procedencia y frescura del panel (2026-09-19)
 
 Etapa de cierre y coherencia. No añade funcionalidades nuevas,
@@ -157,10 +201,10 @@ sino que hace visible lo que ya existe y cierra deuda operativa.
 - ❌ Flash en páginas enteras (upsert location) — cambios mínimos, mejor hash URL + `hidden`.
 
 ## Progreso
-- Última tarea terminada: T74 (Etapa 11A: verificación honesta + frescura inspector + doc)
+- Última tarea terminada: T83 (Etapa 12A: monitor vivo + traza de detención)
 - Estado: en observacion (T47 reiniciado)
 - Bloqueos: ninguno
-- Commits: 89de1ba protegido (Etapa 9A). Etapa 10A+11A sin confirmar.
+- Commits: 89de1ba (Etapa 9A). Etapa 10A+11A en b967809. Etapa 12A sin confirmar.
 
 ## Etapa 9A — Mapa operativo visual (implementada 2026-09-19)
 

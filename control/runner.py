@@ -155,6 +155,8 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
     # Esta transicion procede del stdout del modelo: nunca llega al shell.
     if code == 0 and not transition and agent == _VERIFY_AGENT \
             and task.get("verification_command"):
+        record_event(agent, "task", "fase: verificacion determinista", "",
+                     f"task #{tid}", path=path)
         verify_code, verify_note = _run_verification(
             task["verification_command"], task.get("workspace", "")
         )

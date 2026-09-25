@@ -60,6 +60,13 @@ class TestFrontendJS(unittest.TestCase):
                       "Mapa operativo"):
             self.assertIn(marca, html)
 
+    def test_monitor_vivo_y_traza_presentes(self) -> None:
+        html = INDEX.read_text(encoding="utf-8")
+        for marca in ('id="live-body"', 'id="trace-panel"', "showTrace",
+                      "hideTrace", "renderLive", "scheduleTaskPoll",
+                      "/api/tasks/'", "/trace"):
+            self.assertIn(marca, html)
+
     def test_modal_accesible(self) -> None:
         html = INDEX.read_text(encoding="utf-8")
         self.assertIn('role="dialog"', html)

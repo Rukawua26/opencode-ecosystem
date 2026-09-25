@@ -120,6 +120,9 @@ button.chip{font:inherit;font-family:inherit}
 .map-filters{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem;align-items:center}
 .map-filters .count{font-size:.78rem;color:var(--muted);margin-left:auto}
 @media (max-width:900px){.map-layout{flex-direction:column}#inspector{width:100%}}
+.trow{cursor:pointer}
+.trow:hover,.trow:focus-visible{background:#ffffff08;outline:none}
+#trace-panel{margin-top:.8rem;border:1px solid var(--border);border-radius:.6rem;padding:.7rem .9rem;background:var(--card2)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media (max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}}
 footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
@@ -149,6 +152,12 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
 
   <div class="stats" id="stats" data-view="resumen"></div>
   <div id="errs" role="alert" aria-live="polite" data-view="resumen"></div>
+
+  <section class="panel" data-view="resumen" id="live-section">
+    <h2>⚡ Ejecución en vivo</h2>
+    <div class="hint">tarea activa del lanzador: fase, tiempo y dónde se detuvo · sin prompts ni salidas</div>
+    <div id="live-body" class="muted">sin ejecución activa — la cola está en reposo</div>
+  </section>
 
   <section class="panel" data-view="resumen">
     <h2>⏱️ Timers systemd</h2>
@@ -257,6 +266,13 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
       <tbody id="tasks-body"></tbody>
     </table></div>
     <div id="tasks-empty" class="muted" style="display:none;margin-top:.5rem">cola vacía — encola con <span class="mono">python3 -m control.cli task add &lt;agente&gt; "&lt;prompt&gt;"</span></div>
+    <div id="trace-panel" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
+        <strong>🔎 Traza de la tarea</strong>
+        <button class="btn" style="padding:.15rem .5rem" onclick="hideTrace()">cerrar (Esc)</button>
+      </div>
+      <div id="trace-body" class="muted" style="margin-top:.4rem">cargando…</div>
+    </div>
   </section>
 
   <section class="panel" data-view="actividad">
@@ -622,8 +638,75 @@ async function loadReconcile(){
   }
 }
 
-const TASK_BADGE = {pending:'warn', waiting:'warn', running:'ok', done:'ok', failed:'err', dead:'err'};
+ const TASK_BADGE = {pending:'warn', waiting:'warn', running:'ok', done:'ok', failed:'err', dead:'err'};
 let ALL_TASKS = [];
+let LIVE_TASK = null, liveTimer = null, taskTimer = null, loadingTasks = false;
+
+function scheduleTaskPoll(){
+  if (taskTimer) clearInterval(taskTimer);
+  const active = ALL_TASKS.some(t=>t.status==='running'||t.status==='waiting');
+  const ms = document.hidden ? 60000 : (active ? 5000 : 30000);
+  taskTimer = setInterval(loadTasks, ms);
+}
+document.addEventListener('visibilitychange', scheduleTaskPoll);
+
+function renderLive(){
+  const body = document.getElementById('live-body');
+  const t = ALL_TASKS.find(x=>x.status==='running') || ALL_TASKS.find(x=>x.status==='waiting');
+  clearInterval(liveTimer); liveTimer=null; LIVE_TASK=t||null;
+  if (!t){ body.className='muted'; body.textContent='sin ejecución activa — la cola está en reposo'; return; }
+  const running = t.status==='running';
+  const badge = running
+    ? '<span class="pill ok"><span class="dot"></span>ejecutando</span>'
+    : '<span class="pill warn"><span class="dot"></span>esperando decisión</span>';
+  body.className='';
+  body.innerHTML =
+    `<div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+      ${badge} <b class="mono">#${t.id}</b> <span class="mono">${esc(t.agent)}</span>
+      ${t.model?`<span class="tag">${esc(t.model)}</span>`:''}
+      · <span id="live-elapsed" class="mono">…</span>
+      · <span id="live-limit" class="muted"></span>
+      <button class="btn" style="padding:.15rem .5rem" onclick="showTrace(${t.id})">ver traza →</button>
+    </div>
+    ${t.error_kind?`<div class="tag" style="margin-top:.35rem">${esc(t.error_kind)}</div>`:''}`;
+  const tick = ()=>{
+    const el=document.getElementById('live-elapsed'), lm=document.getElementById('live-limit');
+    if(!el) return;
+    const since = running ? t.started_at : (t.finished_at||t.started_at);
+    if (since){
+      const s=(Date.now()-new Date(since))/1000;
+      el.textContent=(running?'ejecutando hace ':'esperando desde hace ')+fmtAge(s);
+    }
+    if (lm && running && t.lease_until){
+      const r=(new Date(t.lease_until)-Date.now())/1000;
+      lm.textContent = r>0 ? 'lease vence en '+fmtAge(r) : '⚠ lease vencido (el reconciliador la marcará dead)';
+    }
+  };
+  tick(); liveTimer=setInterval(tick,1000);
+}
+
+async function showTrace(id){
+  const panel=document.getElementById('trace-panel'), body=document.getElementById('trace-body');
+  panel.hidden=false; body.className='muted'; body.textContent='cargando…';
+  try{
+    const tr=await fetchJSON('/api/tasks/'+id+'/trace');
+    const stop=(tr.stop_reason&&tr.status!=='done')
+      ?`<div style="margin:.4rem 0"><span class="badge warn" style="font-size:.72rem;padding:.15rem .45rem;border-radius:.35rem;background:#e5a80722;color:var(--warn)">${esc(tr.stop_reason)}</span></div>`:'';
+    const chain=tr.verifier
+      ?`<div class="muted" style="margin-top:.3rem">→ verificador #${tr.verifier.id}: <span class="pill ${TASK_BADGE[tr.verifier.status]||'warn'}">${esc(tr.verifier.status)}</span>${tr.verifier.error_kind?` <span class="tag">${esc(tr.verifier.error_kind)}</span>`:''}</div>`:'';
+    const lines=tr.timeline.map(e=>
+      `<div class="mono" style="font-size:.72rem;margin-bottom:.15rem">${esc((e.ts||'').slice(5,19))} · ${esc(e.event)}${e.status?` <span class="tag">${esc(e.status)}</span>`:''}${e.duration_s!=null?` · ${e.duration_s}s`:''}</div>`
+    ).join('');
+    body.className='';
+    body.innerHTML=
+      `<div>fase: <b>${esc(tr.phase)}</b> · estado: <span class="pill ${TASK_BADGE[tr.status]||'warn'}">${esc(tr.status)}</span> · duración: <span class="mono">${tr.elapsed_s!=null?fmtAge(tr.elapsed_s):'—'}</span> · intentos: ${tr.attempts}</div>`
+      + stop + chain
+      + `<div style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">${lines||'<span class="muted">sin eventos registrados</span>'}</div>`;
+  }catch(e){
+    body.className='muted'; body.textContent='no se pudo cargar la traza: '+e.message;
+  }
+}
+function hideTrace(){ document.getElementById('trace-panel').hidden=true; }
 
 function taskDuration(t){
   if (!t.started_at || !t.finished_at) return '—';
@@ -653,10 +736,12 @@ function renderTasks(){
     (!fm || (t.model||'')===fm) && (!fe || t.sensitivity===fe));
   document.getElementById('tasks-body').innerHTML = rows.map(t=>{
     const canRetry = t.status==='dead'||t.status==='waiting', canCancel = t.status==='pending';
-    const act = (canRetry?`<button class="btn" title="reintentar" onclick="doAction('/api/actions/retry',{task_id:${t.id}})">↻</button>`:'')
-              + (canCancel?`<button class="btn" title="cancelar" onclick="doAction('/api/actions/cancel',{task_id:${t.id}})">✖</button>`:'');
+    const act = (canRetry?`<button class="btn" title="reintentar" onclick="event.stopPropagation();doAction('/api/actions/retry',{task_id:${t.id}})">↻</button>`:'')
+              + (canCancel?`<button class="btn" title="cancelar" onclick="event.stopPropagation();doAction('/api/actions/cancel',{task_id:${t.id}})">✖</button>`:'');
     const parent = t.parent_id ? `<div class="muted" style="font-size:.72rem">↳ de #${t.parent_id}</div>` : '';
-    return `<tr>
+    return `<tr class="trow" tabindex="0" role="button" aria-label="ver traza de la tarea ${t.id}"
+      onclick="showTrace(${t.id})"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showTrace(${t.id})}">
       <td class="mono">#${t.id}${parent}</td>
       <td class="mono">${esc(t.agent)}${t.model?`<div class="muted">${esc(t.model)}</div>`:''}</td>
       <td><span class="pill ${TASK_BADGE[t.status]||'warn'}">${esc(t.status)}</span></td>
@@ -670,7 +755,7 @@ function renderTasks(){
 }
 
  async function loadTasks(){
-  try{
+  if (loadingTasks) return; loadingTasks=true; try{
     const d = await fetchJSON('/api/tasks?limit=30');
     const s = d.summary || {};
     document.getElementById('queue-summary').innerHTML =
@@ -680,6 +765,7 @@ function renderTasks(){
     ALL_TASKS = d.tasks;
     fillTaskFilters();
     renderTasks();
+    renderLive();
     // select de agentes permitidos
     if (!document.getElementById('new-agent').options.length){
       ['qa-gate','sdd-implement','sdd-verify','risk-lens','reliability-lens','context-compressor','build','general','explore']
@@ -687,7 +773,7 @@ function renderTasks(){
     }
   }catch(e){
     pushError('No se pudo cargar la cola de tareas: ' + e.message);
-  }
+  } finally { loadingTasks=false; scheduleTaskPoll(); }
 }
 
 async function doAction(url, body){
@@ -783,6 +869,8 @@ document.addEventListener('keydown', e=>{
     closeHist();
     return;
   }
+  const tp = document.getElementById('trace-panel');
+  if (tp && !tp.hidden){ tp.hidden = true; return; }
   if (SEL_NODE){
     SEL_NODE = null;
     renderGraph();

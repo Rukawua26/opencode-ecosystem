@@ -115,6 +115,20 @@ class ControlHandler(BaseHTTPRequestHandler):
                         pass
             self._json({"summary": queue_summary(), "tasks": list_tasks(limit)})
             return
+        if path.startswith("/api/tasks/") and path.endswith("/trace"):
+            from .trace import build_trace
+            try:
+                tid = int(path.split("/")[3])
+            except (IndexError, ValueError):
+                self._json({"error": "id invalido"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            trace = build_trace(tid)
+            if trace is None:
+                self._json({"error": "tarea no encontrada"},
+                           status=HTTPStatus.NOT_FOUND)
+                return
+            self._json(trace)
+            return
         if path == "/api/graph":
             from .graph import build_graph
             snap = self._get_snapshot(query)

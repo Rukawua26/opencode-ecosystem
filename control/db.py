@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 import threading
 from datetime import datetime, timedelta, timezone
@@ -191,6 +192,32 @@ def events_for(kind: str, limit: int = 30, path: Path | None = None) -> list[dic
             (kind, limit),
         ).fetchall()
     return [dict(r) for r in rows]
+
+
+_TASK_REF = re.compile(r"^task #(\d+)(?=\D|$)")
+
+
+def events_for_task(task_id: int, limit: int = 30,
+                    path: Path | None = None) -> list[dict]:
+    """Eventos cuyo detalle referencia exactamente `task #N`.
+
+    El filtro LIKE usa prefijo y el regex descarta colisiones tipo #1 vs #10.
+    """
+    init_db(path)
+    with _lock, _connect(path) as conn:
+        rows = conn.execute(
+            "SELECT ts, kind, category, event, status, detail, duration_s"
+            " FROM events WHERE detail LIKE ? ORDER BY id DESC LIMIT ?",
+            (f"task #{int(task_id)}%", limit * 4),
+        ).fetchall()
+    out: list[dict] = []
+    for row in rows:
+        match = _TASK_REF.match(row["detail"])
+        if match and int(match.group(1)) == task_id:
+            out.append(dict(row))
+        if len(out) >= limit:
+            break
+    return out
 
 
 # ---------- cola de tareas (Etapa 3) ----------

@@ -59,6 +59,19 @@ class TestRunner(RunnerFixture):
         self.assertTrue(any(r["category"] == "task" and r["event"] == "completada"
                             for r in rows))
 
+    def test_checkpoint_fase_verificacion(self) -> None:
+        """El verifier registra la fase antes de correr el check determinista."""
+        db.add_task("odd-worker", "implementa", workflow="odd",
+                    verification_command="true", path=self.path)
+        with mock.patch.object(runner, "_run_agent", side_effect=self._ok), \
+                mock.patch.object(runner, "_run_verification",
+                                  return_value=(0, "")):
+            runner.run_next(self.path)   # worker -> done, encadena verifier
+            runner.run_next(self.path)   # verifier -> checkpoint + verifica
+        events = db.events_for("odd-verifier", path=self.path)
+        self.assertTrue(any(
+            e["event"] == "fase: verificacion determinista" for e in events))
+
     def test_success_implementer_chains_verifier(self) -> None:
         db.add_task("odd-worker", "implementa", workflow="odd", feature="demo", path=self.path)
         with mock.patch.object(runner, "_run_agent", side_effect=self._ok):
