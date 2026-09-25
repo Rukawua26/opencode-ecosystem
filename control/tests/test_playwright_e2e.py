@@ -11,9 +11,10 @@ import socket
 import unittest
 
 try:
-    from playwright.sync_api import sync_playwright
+    from playwright.sync_api import expect, sync_playwright
 except ImportError:  # pragma: no cover - entorno sin playwright
     sync_playwright = None
+    expect = None
 
 URL = "http://127.0.0.1:8765"
 CHROMIUM = "/usr/bin/chromium"
@@ -131,6 +132,28 @@ class TestPanelE2E(unittest.TestCase):
             " > document.documentElement.clientWidth"
         )
         self.assertFalse(overflow)
+        page.close()
+
+    def test_traza_y_ejecucion_en_vivo(self) -> None:
+        page = self._page()
+        self.assertTrue(page.locator('#live-section').is_visible())
+        self.assertIn('ejecución', page.locator('#live-body').inner_text())
+        page.locator('#tab-actividad').click()
+        # Espera condicional (no sleep fijo): la primera carga exitosa llena #queue-summary;
+        # evita skip falso si el fetch de /api/tasks tarda mas de medio segundo.
+        page.wait_for_function(
+            "document.querySelector('#queue-summary').children.length > 0", timeout=5000
+        )
+        rows = page.locator('#tasks-body tr.trow')
+        if rows.count() == 0:
+            page.close()
+            self.skipTest("cola vacia: sin tarea para trazar")
+        rows.first.click()
+        panel = page.locator('#trace-panel')
+        self.assertTrue(panel.is_visible())
+        expect(page.locator('#trace-body')).to_contain_text('fase:', timeout=5000)
+        page.keyboard.press('Escape')
+        self.assertFalse(panel.is_visible())
         page.close()
 
 

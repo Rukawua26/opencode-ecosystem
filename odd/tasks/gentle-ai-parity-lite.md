@@ -72,6 +72,8 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
 - [ ] T14 - Dogfood Fase B: dos features sustanciales reales posteriores a f4cf9c8 con worker/verifier, receipts y assess; registrar intentos, falsos contratos y divergencias (hasta 2026-10-05).
 - [ ] T15 - Puerta de decision tras T14: solo si aparece brecha, rama minima (verifier failed, worker done sin verifier, preflight ODD, task trace) con aprobacion.
 - [x] T16 - E2E opcional OpenCode real offline: spike efimero fuera del repo; persistir `test_odd_e2e` solo si es barato (OPENCODE_E2E=1, sin tokens ni red externa).
+- [x] T18 - Rebaseline gentle-ai a v3.7.0 (`f182ea2018a6`) y auditoria de routing proporcional: AGENTS.md ya cubre el delta; sin cambios necesarios; `general`/`explore` sin pin por falta de evidencia de ahorro.
+- [x] T19 - Corregir el wait fijo de `test_playwright_e2e` con espera condicional (patron upstream `a11a32812479`).
 - [ ] T17 - Cierre: docs, gates completos, verifier independiente y periodo prudencial.
 
 ## Criterios de aceptacion
@@ -94,6 +96,8 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
 - 2026-09-21: corregir el contrato anterior: ejecutar shell desde stdout del modelo no es equivalente al `next_transition` autoritativo de gentle-ai y queda prohibido.
 - 2026-09-21: la revision fallida del verifier no se repite automaticamente: pasa a `waiting` con `error_kind=review` para decision humana (evita gastar tokens en reintentos inutiles).
 - 2026-09-21: el E2E solo se persiste si el spike efimero es barato y queda fuera de verify.sh (OPENCODE_E2E=1, opt-in).
+- 2026-09-24: routing proporcional ya cubierto por `~/AGENTS.md`; no se duplica texto en el kernel ni en skills (ahorro de tokens).
+- 2026-09-24: `general`/`explore` sin pin de modelo global; solo prueba temporal condicionada a evidencia de ahorro medido.
 
 ## Reutilizacion investigada
 
@@ -185,10 +189,19 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
   - Recorrido real: `OPENCODE_E2E=1 python3 -m unittest control.tests.test_odd_e2e -v` -> OK en 2.7s tras el rework (3/3 en 6.6s con el hook previo). Servidor mock ThreadingHTTPServer en loopback (puerto efimero) con patron SSE del spike (streaming si stream:true, JSON si no); env aislado para el hijo via os.environ (HOME/XDG_* /OPENCODE_CONFIG_DIR bajo HOME temporal, MOCK_API_KEY=dummy, OPENCODE_DISABLE_MODELS_FETCH=1, proxy muerto, NO_PROXY loopback); DB temporal con db.init_db; workspace dentro del HOME temporal; worker odd-worker model=mock/test verification_command=true -> done con recibo y verifier unico (parent_id); segundo run_next -> verifier done con check determinista rc=0 y recibo; `cli.assess_task(worker_id, db)` -> review_state passed.
   - Aserciones finales: solo loopback alcanzo el mock (>= 2 llamadas a /chat/completions), sin payload privado ni secretos en DB (list_tasks include_private=False; sin prompt/workspace/comandos ni "dummy"), un solo verifier, resumen acotado persistido como nota y stdout completo ausente.
   - Cierre: `python3 -m unittest discover -s control/tests` -> 141/141 OK con test_odd_e2e saltado; `./verify.sh` -> `[ok] verify verde`; `./scripts/qa-gate.sh --strict` exit 0; `git diff --check` ok. Reutilizado el mock SSE y el env de aislamiento del spike; sin migracion SQLite, sin dependencias, sin procesos permanentes; README documenta el uso opt-in.
+- T18 - Estado: passed (inline docs, effort low segun routing)
+  - Comando: GitHub API `commits/main` + `releases/latest` + `compare/654200afea34...f182ea2018a6` (250 commits, 300 ficheros listados, cap de paginacion); auditoria read-only de `~/AGENTS.md`, `configs/opencode.jsonc`, `opencode debug agents` y DB de control.
+  - Resultado: baseline actualizada a `f182ea2018a6` (2026-09-24 via GitHub API; estable `v3.7.0`) en `~/docs/sources/gentle-ai-analysis.md` con Revision 2026-09-24. Routing proporcional ya cubierto por AGENTS.md (2+ writes no triviales, premisa/evidencia en 3 preguntas, reutilizacion, verificacion al cierre): sin cambios necesarios. `general`/`explore` existen como agentes nativos sin modelo explicito (heredan sesion); sin pin global por falta de evidencia de ahorro. Replay de autoridad (RDD), telemetria, TUI, PR automation y multi-runtime DEJADOS.
+  - Estado observacion T14: 1 feature real delegada post-`f4cf9c8` (task 12/13 worker->verifier 2026-09-21) + 1 incidente (task 11, workspace fuera de HOME, dead); falta 1 mas hasta 2026-10-05. Servicio `opencode-control` iniciado 2026-09-24 08:08, posterior a la ultima edicion de codigo (2026-09-22): runner en memoria al dia, sin reinicio necesario.
+  - Correccion colateral (hallazgo durante implementacion): referencias de baseline obsoletas en `~/docs/_MOC.md` (linea 65) y `~/docs/sources/Sources.md` (linea 25) — decian `eae8fadd5ece`/v3.1.0 (2026-09-17) — actualizadas a `f182ea2018a6`/v3.7.0 (2026-09-24). El resumen TOMAMOS/DEJAMOS se conserva; el historial completo de baselines vive en la nota de analisis.
+- T19 - Estado: passed (micro-fix mecanico 1-3 ficheros -> inline segun routing; correccion autorizada explicitamente)
+  - Comando: edicion de `control/tests/test_playwright_e2e.py`; verificacion del disparo de `loadTasks` en `control/web/index.html` (init via renderTimers + polling `setInterval`; el clic en `#tab-actividad` solo cambia vista, no recarga).
+  - Resultado: `page.wait_for_timeout(500)` sustituido por `wait_for_function("document.querySelector('#queue-summary').children.length > 0", timeout=5000)` (patron upstream `a11a32812479`: condicion observable, no sleep fijo). Elimina el skip falso si el fetch de /api/tasks tarda mas de 500ms en maquina cargada; cola vacia sigue saltando con skipTest; un fallo de carga ahora es error visible (timeout) y no skip silencioso. TDD: micro-fix de espera de timing; RED por carrera no reproducible de forma determinista sin inyectar el reloj; checks funcionales tras el cambio.
+  - Verificacion real: `python3 -m unittest control.tests.test_playwright_e2e -v` -> 7/7 OK en 12.1s, 0 skipped; `test_traza_y_ejecucion_en_vivo ... ok` con la espera condicional (cola con tareas done -> rows existen -> panel de traza verificado en vivo). El fix queda verificado con ejecucion real, no solo por la pasada de suite.
 
 ## Progreso
 
-- Estado: en_progreso (Fase A T11-T13 y T16 completadas; Fase B dogfood con 2 features reales pendiente hasta 2026-10-05)
-- Ultima tarea terminada: T16
-- Siguiente paso: T14 (dos features sustanciales reales con worker/verifier)
+- Estado: en_progreso (Fase A T11-T13/T16 y T18-T19 completadas; T14 dogfood necesita 1 feature sustancial real mas post-f4cf9c8, hasta 2026-10-05)
+- Ultima tarea terminada: T19
+- Siguiente paso: T14 (segunda feature sustancial real con worker/verifier) y T17 (cierre)
 - Bloqueos: ninguno
