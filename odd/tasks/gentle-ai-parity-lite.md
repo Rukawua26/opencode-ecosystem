@@ -69,12 +69,13 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
 - [x] T11 - Alinear la regla global de `next_transition` con la procedencia: solo una operacion registrada del control-plane es ejecutable; el texto del modelo nunca llega a shell.
 - [x] T12 - `odd-verifier` con `RESULT: failed` pasa a `waiting` (error_kind=review) sin quemar intento ni receipt; `assess` informa failed y no emite transicion; retry manual reanuda.
 - [x] T13 - Rebaseline gentle-ai: main `654200afea34` (+37 commits CI/tests), estable v3.4.0; clasificar delta y marcar E2E aislado como patron a tomar.
-- [ ] T14 - Dogfood Fase B: dos features sustanciales reales posteriores a f4cf9c8 con worker/verifier, receipts y assess; registrar intentos, falsos contratos y divergencias (hasta 2026-10-05).
-- [ ] T15 - Puerta de decision tras T14: solo si aparece brecha, rama minima (verifier failed, worker done sin verifier, preflight ODD, task trace) con aprobacion.
+- [x] T14 - Dogfood Fase B: dos features sustanciales reales posteriores a f4cf9c8 con worker/verifier, receipts y assess; registrar intentos, falsos contratos y divergencias (hasta 2026-10-05).
+- [x] T20 - Dogfood Fase B: tarea sustancial real de paridad lite (linea anadida por el orquestador con autorizacion antes de #14; no es salida del worker): detector informativo de riesgos solo en lineas anadidas del diff, con catalogo minimo, tests acotados y sin nuevo proceso/dependencia/migracion.
+- [x] T15 - Puerta de decision tras T14: brechas observadas corregidas sin rama nueva; no se requiere mecanismo RDD adicional.
 - [x] T16 - E2E opcional OpenCode real offline: spike efimero fuera del repo; persistir `test_odd_e2e` solo si es barato (OPENCODE_E2E=1, sin tokens ni red externa).
 - [x] T18 - Rebaseline gentle-ai a v3.7.0 (`f182ea2018a6`) y auditoria de routing proporcional: AGENTS.md ya cubre el delta; sin cambios necesarios; `general`/`explore` sin pin por falta de evidencia de ahorro.
 - [x] T19 - Corregir el wait fijo de `test_playwright_e2e` con espera condicional (patron upstream `a11a32812479`).
-- [ ] T17 - Cierre: docs, gates completos, verifier independiente y periodo prudencial.
+- [x] T17 - Cierre: docs, gates completos, verifier independiente y periodo prudencial.
 
 ## Criterios de aceptacion
 
@@ -198,10 +199,29 @@ Gentle-AI publico v3.2.1-v3.4.0 tras nuestra ultima alineacion. Lo relevante es 
   - Comando: edicion de `control/tests/test_playwright_e2e.py`; verificacion del disparo de `loadTasks` en `control/web/index.html` (init via renderTimers + polling `setInterval`; el clic en `#tab-actividad` solo cambia vista, no recarga).
   - Resultado: `page.wait_for_timeout(500)` sustituido por `wait_for_function("document.querySelector('#queue-summary').children.length > 0", timeout=5000)` (patron upstream `a11a32812479`: condicion observable, no sleep fijo). Elimina el skip falso si el fetch de /api/tasks tarda mas de 500ms en maquina cargada; cola vacia sigue saltando con skipTest; un fallo de carga ahora es error visible (timeout) y no skip silencioso. TDD: micro-fix de espera de timing; RED por carrera no reproducible de forma determinista sin inyectar el reloj; checks funcionales tras el cambio.
   - Verificacion real: `python3 -m unittest control.tests.test_playwright_e2e -v` -> 7/7 OK en 12.1s, 0 skipped; `test_traza_y_ejecucion_en_vivo ... ok` con la espera condicional (cola con tareas done -> rows existen -> panel de traza verificado en vivo). El fix queda verificado con ejecucion real, no solo por la pasada de suite.
+- T20 - Estado: passed (segunda feature sustancial post-`f4cf9c8`, worker->verifier)
+  - Intento inicial: task #14 implemento el detector y quedo `dead` porque su `verification_command` incluia la suite completa mientras la propia tarea seguia activa; el E2E vivo del panel no es determinista en esa condicion. Hallazgo de dogfood: elegir checks acotados para tareas que afectan al runtime observable.
+  - Correcciones del orquestador: el catalogo se limito a `subprocess ... shell=True` (evita ruido en llamadas seguras) y el parser diferencia cabecera exacta `+++ b/path` de contenido anadido que empieza por `++`/`+++`.
+  - Worker legitimo: task #15 -> `done` (rc=0, 1 intento, receipt `success`), summary `Corregido el manejo de lineas anadidas ...`; encadeno verifier #16.
+  - Verifier: task #16 fallo primero a `waiting/error_kind=review` porque el diff incluia la linea T20 anadida por el orquestador; tras notar esa procedencia en el ODD y usar la ruta humana `retry`, #16 -> `done`, summary `Sin hallazgos.`, receipt `success`.
+  - Assess: `task assess 15` -> `review_state=passed`, `next_transition=""`, `reason="verificacion aprobada"`.
+  - Resultado: `scripts/qa-gate.sh` anade señales informativas solo para lineas anadidas de produccion; `control/tests/test_qa_gate.py` cubre anadidas/eliminadas/contexto/comentarios/tests, contenido `++`/`+++`, catalogo minimo y no exposicion de secretos.
+- T14 - Estado: passed
+  - Features reales post-`f4cf9c8`: #12/#13 (documento worktree, 2026-09-21) y #15/#16 (T20, 2026-09-25), ambas con worker->verifier, receipts y assess.
+  - Incidentes registrados: task #14 (check completo durante ejecucion activa; E2E vivo no determinista) y review #16 inicial (linea ODD anadida por orquestador). Ninguno llego a shell ni altero el contrato.
+- T15 - Estado: passed (puerta ejecutada)
+  - Decision: no crear branch de recuperacion ni RDD; las brechas observadas se resolvieron con check acotado y reintento humano del verifier existente. No se detecto falta de preflight, worker-sin-verifier o traza insuficiente.
+- T17 - Estado: passed (cerrado_en_observacion)
+  - Documentacion: documento ODD actualizado, `docs/evolution/2026-09-25-qa-gate-senales-lineas-anadidas.md`, `~/docs/sources/gentle-ai-analysis.md` baseline `6c7f162f4e59`, `_MOC.md` y `Sources.md`.
+  - Runtime: sync aplicado tras cambiar script/skill; `status` posterior `[ok] sin drift`; pin de `plugin_doctor` actualizado a OpenCode `v2.0.16` tras confirmar solo hooks conocidos (`config`, `event`).
+  - Checks: `python3 -m unittest discover -s control/tests` -> 158/158 OK (1 skipped); `python3 -m unittest control.tests.test_playwright_e2e -v` -> 7/7 OK; `python3 validate-skills.py skills` -> 10/10; `./verify.sh` -> `[ok] verify verde`; `./scripts/qa-gate.sh --strict` y `git diff --check` -> exit 0.
+  - Verificacion independiente: verifier #16 retry -> `done`, receipt `success`, summary `Sin hallazgos.`; assess #15 -> `passed`.
+  - Higiene: `hygiene triggers` sigue informando prune/reset; sin accion porque era informativo y no dependia del cambio.
+  - Periodo prudencial: hasta 2026-10-05; revertir si aparecen falsos positivos relevantes o bloqueo indebido.
 
 ## Progreso
 
-- Estado: en_progreso (Fase A T11-T13/T16 y T18-T19 completadas; T14 dogfood necesita 1 feature sustancial real mas post-f4cf9c8, hasta 2026-10-05)
-- Ultima tarea terminada: T19
-- Siguiente paso: T14 (segunda feature sustancial real con worker/verifier) y T17 (cierre)
-- Bloqueos: ninguno
+- Estado: cerrado_en_observacion (hasta 2026-10-05)
+- Ultima tarea terminada: T17
+- Siguiente paso: solo observacion de uso real; no implementar nuevas capacidades de paridad sin una brecha medida
+- Bloqueos: ninguno (plugin_doctor repineado a OpenCode v2.0.16 tras revisar hooks `config` y `event`)
