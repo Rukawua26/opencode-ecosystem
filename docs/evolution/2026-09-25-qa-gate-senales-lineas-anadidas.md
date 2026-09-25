@@ -78,12 +78,20 @@ temporal, tres hallazgos:
 `test_empty_catch_only_blocks_when_it_is_added` fija el contrato: anadir un `catch`
 vacio bloquea, borrarlo no.
 
-## Limite conocido (no corregido)
+## Decisiones del humano sobre los limites
 
-`scripts/qa-gate.sh` se reporta a si mismo: al editar el catalogo, la linea que
-define `CERT_NONE` se marca como `TLS desactivada`. No bloquea (es informativa), y
-exigir una politica de autoexclusion es un cambio de contrato del gate que no se
-puede decidir sin el humano. Queda anotado aqui a proposito.
+1. **Auto-deteccion: se deja como esta.** `scripts/qa-gate.sh` se reporta a si
+   mismo: al editar el catalogo, la linea que define `CERT_NONE` se marca como
+   `TLS desactivada`. No bloquea (es informativa) y funciona como recordatorio de
+   que el fichero contiene los patrones por definicion. No se introduce ninguna
+   autoexclusion.
+2. **Los checks que bloquean no saltan los tests.** `catch` vacio y secretos
+   siguen escaneando `control/tests/`: un secreto en un test es un secreto
+   filtrado. El coste aceptable es que un test del gate tenga que ensamblar el
+   patron en runtime, y no la excepcion de escanear menos.
+
+Ambas son "no cambiar el contrato", asi que no hay codigo que revertir: si una
+revision las revierte, esta seccion es la que dice que fue decision consciente.
 
 ## Verificacion
 
