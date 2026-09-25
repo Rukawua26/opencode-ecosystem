@@ -190,7 +190,8 @@ Las cuatro lentes informan; ninguna bloquea. Edita siempre la fuente en
 ```bash
 python3 ./validate-skills.py ./skills
 ./opencode-ecosystem sync --apply
-opencode debug skill
+./opencode-ecosystem status          # debe terminar en [ok] sin drift
+opencode debug config                # la config resuelta debe listar las fuentes
 ```
 
 Reinicia OpenCode para cargar la skill actualizada y documenta el cambio en

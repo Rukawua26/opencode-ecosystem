@@ -27,7 +27,7 @@ Esperado o medido (tokens, RAM, menos pasos, menos errores).
   versionada, adjunta un fichero `<cambio>.before.md` con el contenido necesario para revertir.
 
 ## Verificacion
-Comandos ejecutados y resultado exacto (`verify.sh`, `validate-skills.py`, `status`, `opencode debug skill`, tests).
+Comandos ejecutados y resultado exacto (`verify.sh`, `validate-skills.py`, `status`, `opencode debug config`, tests).
 
 ## Periodo prudencial
 - Duracion / criterio para declararlo estable.
