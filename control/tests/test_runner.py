@@ -71,6 +71,19 @@ class TestRunner(RunnerFixture):
         events = db.events_for("odd-verifier", path=self.path)
         self.assertTrue(any(
             e["event"] == "fase: verificacion determinista" for e in events))
+        self.assertTrue(any(
+            e["category"] == "phase" and e["event"] == "verificacion determinista terminada"
+            and e["duration_s"] is not None for e in events))
+
+    def test_agente_registra_duracion_sin_salida(self) -> None:
+        db.add_task("qa-gate", "secreto de prueba", path=self.path)
+        with mock.patch.object(runner, "_run_agent", side_effect=self._ok):
+            runner.run_next(self.path)
+        stages = [e for e in db.events_for("qa-gate", path=self.path)
+                  if e["category"] == "phase"]
+        self.assertEqual(len(stages), 1)
+        self.assertEqual(stages[0]["duration_s"], 1.0)
+        self.assertNotIn("secreto de prueba", str(stages))
 
     def test_success_implementer_chains_verifier(self) -> None:
         db.add_task("odd-worker", "implementa", workflow="odd", feature="demo", path=self.path)

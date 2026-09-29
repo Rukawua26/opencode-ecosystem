@@ -194,6 +194,34 @@ def events_for(kind: str, limit: int = 30, path: Path | None = None) -> list[dic
     return [dict(r) for r in rows]
 
 
+def execution_metrics(path: Path | None = None) -> dict:
+    """Agregados observados de tareas terminales y fases del runner (ultimos 30d)."""
+    init_db(path)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=_RETENTION_DAYS)).isoformat()
+    with _lock, _connect(path) as conn:
+        agents = conn.execute(
+            "SELECT agent, status, COUNT(*) AS count, "
+            "ROUND(AVG((julianday(finished_at) - julianday(started_at)) * 86400), 1) "
+            "AS avg_seconds FROM tasks WHERE status IN ('done','dead','waiting') "
+            "AND finished_at >= ? GROUP BY agent, status ORDER BY agent, status",
+            (cutoff,),
+        ).fetchall()
+        phases = conn.execute(
+            "SELECT kind AS agent, event AS phase, status, COUNT(*) AS count, "
+            "ROUND(AVG(duration_s), 1) AS avg_seconds FROM events "
+            "WHERE category='phase' AND duration_s IS NOT NULL AND ts >= ? "
+            "GROUP BY kind, event, status ORDER BY kind, event, status",
+            (cutoff,),
+        ).fetchall()
+        failures = conn.execute(
+            "SELECT error_kind, COUNT(*) AS count FROM tasks WHERE status='dead' "
+            "AND finished_at >= ? GROUP BY error_kind ORDER BY count DESC, error_kind",
+            (cutoff,),
+        ).fetchall()
+    return {"window_days": _RETENTION_DAYS, "source": "runner", "agents": [dict(r) for r in agents],
+            "phases": [dict(r) for r in phases], "dead_errors": [dict(r) for r in failures]}
+
+
 _TASK_REF = re.compile(r"^task #(\d+)(?=\D|$)")
 
 
@@ -336,6 +364,17 @@ def get_task(task_id: int, path: Path | None = None) -> dict | None:
     with _lock, _connect(path) as conn:
         row = conn.execute(
             f"SELECT {_PUBLIC_TASK_COLUMNS} FROM tasks WHERE id = ?", (task_id,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def running_task(path: Path | None = None) -> dict | None:
+    """Tarea activa aunque haya quedado fuera de los N ultimos elementos de la cola."""
+    init_db(path)
+    with _lock, _connect(path) as conn:
+        row = conn.execute(
+            f"SELECT {_PUBLIC_TASK_COLUMNS} FROM tasks WHERE status='running' "
+            "ORDER BY id DESC LIMIT 1"
         ).fetchone()
     return dict(row) if row else None
 

@@ -107,6 +107,25 @@ Sin SSE/WebSockets, sin migración SQLite, sin stdout persistido.
 Verificacion: 154/154 tests OK (1 skip opt-in ajeno a esta etapa),
 Playwright real, `verify.sh` verde, `status` sin drift, qa-gate strict OK.
 
+## Vista En vivo — seguimiento de tareas del runner (2026-09-28)
+
+- Pestaña `En vivo`: tarea activa/esperando decisión, traza detallada y acceso
+  a las cinco tareas recientes; desde Resumen y Actividad se abre la misma traza.
+  `/api/tasks` aporta `active_task` aunque la tarea haya salido del límite de
+  la lista reciente, sin añadir campos privados.
+- El runner registra hitos acotados de agente y verificación determinista en
+  `events`, con duración y estado, sin guardar salida ni comandos. Un reintento
+  no hereda la fase del intento anterior.
+- `GET /api/execution-metrics` agrega los últimos 30 días: resultados terminales
+  `done`, `dead`, `waiting` por agente, duraciones medias por fase observada y
+  causas de tareas `dead`. La duración total de una tarea reintentada corresponde
+  al último intento (campos `started_at`/`finished_at`). El resultado `ok` de la
+  fase agente indica rc=0, no necesariamente contrato ODD válido.
+  `waiting` no es fallo; sin datos no es éxito.
+- Solo abarca tareas iniciadas por la cola (`control.cli task run` o panel):
+  **no** observa otras sesiones interactivas de OpenCode, herramientas internas
+  del modelo ni uso de skills. Polling adaptativo existente, sin SSE/WebSockets.
+
 ## Etapa 10A — Mapa operativo con filtros e inspector visual (2026-09-19)
 
 Panel local con tres vistas (`Resumen` · `Mapa` · `Actividad`), navegacion por hash URL,

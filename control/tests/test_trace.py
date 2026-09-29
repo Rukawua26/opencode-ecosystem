@@ -7,11 +7,14 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
 import unittest
+from urllib.request import urlopen
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
-from control import db, runner, trace
+from control import db, runner, server, trace
 
 
 class TraceFixture(unittest.TestCase):
@@ -59,6 +62,12 @@ class TestPhaseAndStopReason(unittest.TestCase):
               "status": "", "detail": "task #1", "duration_s": None}
         self.assertEqual(trace.compute_phase({"status": "running"}, [ev]),
                          "verificacion determinista")
+
+    def test_reintento_no_hereda_fase_verificacion_anterior(self) -> None:
+        self.assertEqual(trace.compute_phase({"status": "running"}, [
+            {"event": "iniciada"},
+            {"event": "fase: verificacion determinista"},
+        ]), "ejecutando agente")
 
     def test_fase_waiting(self) -> None:
         self.assertEqual(
@@ -123,8 +132,83 @@ class TestBuildTrace(TraceFixture):
         assert tr is not None
         raw = json.dumps(tr)
         for campo in ("prompt", "workspace", "verification_command",
-                      "secreto"):
+                       "secreto"):
             self.assertNotIn(campo, raw)
+
+
+class TestExecutionMetrics(TraceFixture):
+    def test_running_fuera_del_limite_sigue_visible_y_sanitizada(self) -> None:
+        tid = db.add_task("odd-worker", "prompt secreto", path=self.path)
+        db.claim_next("prueba", 60, self.path)
+        for _ in range(35):
+            db.add_task("qa-gate", "otro", path=self.path)
+        self.assertNotIn(tid, [r["id"] for r in db.list_tasks(30, self.path)])
+        active = db.running_task(self.path)
+        self.assertEqual(active["id"], tid)
+        self.assertNotIn("prompt", active)
+
+    def test_resultados_por_agente_y_fases_sin_payload(self) -> None:
+        done = db.add_task("odd-worker", "prompt secreto", path=self.path)
+        dead = db.add_task("odd-worker", "otro secreto", path=self.path)
+        waiting = db.add_task("odd-verifier", "decision", path=self.path)
+        now = datetime.now(timezone.utc)
+        start = (now - timedelta(seconds=10)).isoformat()
+        end = now.isoformat()
+        db.update_task(done, self.path, status="done", started_at=start, finished_at=end)
+        db.update_task(dead, self.path, status="dead", started_at=start, finished_at=end,
+                       error_kind="timeout")
+        db.update_task(waiting, self.path, status="waiting", started_at=start, finished_at=end)
+        db.record_event("odd-worker", "phase", "agente terminado", "ok",
+                        f"task #{done}", duration_s=3.5, path=self.path)
+        data = db.execution_metrics(self.path)
+        self.assertEqual([(r["agent"], r["status"], r["count"]) for r in data["agents"]],
+                         [("odd-verifier", "waiting", 1), ("odd-worker", "dead", 1),
+                          ("odd-worker", "done", 1)])
+        self.assertEqual(data["phases"][0]["avg_seconds"], 3.5)
+        self.assertAlmostEqual(data["agents"][1]["avg_seconds"], 10.0, delta=0.1)
+        self.assertEqual(data["dead_errors"][0]["error_kind"], "timeout")
+        self.assertNotIn("secreto", json.dumps(data))
+
+    def test_sin_datos_no_infiere_exitos(self) -> None:
+        data = db.execution_metrics(self.path)
+        self.assertEqual(data["agents"], [])
+        self.assertEqual(data["phases"], [])
+
+    def test_endpoint_metricas_no_expone_payload(self) -> None:
+        db.add_task("odd-worker", "prompt secreto", path=self.path)
+        with mock.patch.object(db, "DB_PATH", self.path), \
+                server._Server(("127.0.0.1", 0), server.ControlHandler) as httpd:
+            httpd.timeout = 3
+            thread = threading.Thread(target=httpd.handle_request)
+            thread.start()
+            try:
+                with urlopen(f"http://127.0.0.1:{httpd.server_port}/api/execution-metrics",
+                             timeout=3) as response:
+                    data = response.read().decode("utf-8")
+                self.assertIn('"window_days": 30', data)
+                self.assertNotIn("prompt secreto", data)
+            finally:
+                thread.join(timeout=4)
+
+    def test_endpoint_cola_incluye_tarea_activa_fuera_del_limite(self) -> None:
+        tid = db.add_task("odd-worker", "secreto", path=self.path)
+        db.claim_next("prueba", 60, self.path)
+        db.add_task("qa-gate", "publica", path=self.path)
+        with mock.patch.object(db, "DB_PATH", self.path), \
+                server._Server(("127.0.0.1", 0), server.ControlHandler) as httpd:
+            httpd.timeout = 3
+            thread = threading.Thread(target=httpd.handle_request)
+            thread.start()
+            try:
+                with urlopen(f"http://127.0.0.1:{httpd.server_port}/api/tasks?limit=1",
+                             timeout=3) as response:
+                    raw = response.read().decode("utf-8")
+                data = json.loads(raw)
+                self.assertNotEqual(data["tasks"][0]["id"], tid)
+                self.assertEqual(data["active_task"]["id"], tid)
+                self.assertNotIn("secreto", raw)
+            finally:
+                thread.join(timeout=4)
 
 
 if __name__ == "__main__":

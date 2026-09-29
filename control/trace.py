@@ -72,9 +72,11 @@ def compute_phase(task: dict, events: list[dict]) -> str:
     """Fase actual: ultimo checkpoint de la tarea o fase generica del estado."""
     status = str(task.get("status") or "")
     if status == "running":
-        for e in events:  # vienen DESC (mas reciente primero)
+        for e in events:  # vienen DESC; un reintento no hereda la fase antigua
             if e["event"] == _PHASE_VERIFY:
                 return "verificacion determinista"
+            if e["event"] == "iniciada":
+                break
         return "ejecutando agente"
     if status == "waiting":
         if task.get("error_kind") == "review":

@@ -148,6 +148,8 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
     duration = float(outcome["duration"])
     note = str(outcome["note"])
     error_kind = str(outcome["error_kind"])
+    record_event(agent, "phase", "agente terminado", "ok" if code == 0 else "fail",
+                 f"task #{tid}", duration_s=duration, path=path)
     result = str(outcome["result"]).lower()
     summary = str(outcome["summary"])
     question = str(outcome["question"])
@@ -157,9 +159,13 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
             and task.get("verification_command"):
         record_event(agent, "task", "fase: verificacion determinista", "",
                      f"task #{tid}", path=path)
+        verify_started = time.monotonic()
         verify_code, verify_note = _run_verification(
             task["verification_command"], task.get("workspace", "")
         )
+        record_event(agent, "phase", "verificacion determinista terminada",
+                     "ok" if verify_code == 0 else "fail", f"task #{tid}",
+                     duration_s=round(time.monotonic() - verify_started, 2), path=path)
         if verify_code != 0:
             code, note, error_kind = verify_code, verify_note, "verification"
         else:

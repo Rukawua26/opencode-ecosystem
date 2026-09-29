@@ -12,11 +12,18 @@
   --warn:#e5a807; --err:#e5534b; --accent:#4f8cff;
   --c-skill:#4f8cff; --c-comando:#a78bfa; --c-agente:#f472b6;
   --c-script:#34d399; --c-config:#fbbf24; --c-servicio:#38bdf8; --c-otro:#94a3b8;
+  --tagbg:#ffffff12; --hover:#ffffff08;
+}
+:root[data-theme="light"]{
+  --bg:#f2f4f8; --bg2:#fff; --card:#fff; --card2:#f6f8fb;
+  --border:#dde3ec; --txt:#1c2430; --muted:#5d6b80;
+  --tagbg:#0000000f; --hover:#00000009;
 }
 @media (prefers-color-scheme: light){
-  :root{
+  :root:not([data-theme="dark"]){
     --bg:#f2f4f8; --bg2:#fff; --card:#fff; --card2:#f6f8fb;
     --border:#dde3ec; --txt:#1c2430; --muted:#5d6b80;
+    --tagbg:#0000000f; --hover:#00000009;
   }
 }
 *{box-sizing:border-box}
@@ -46,6 +53,8 @@ section.panel{background:var(--card);border:1px solid var(--border);border-radiu
   padding:1rem 1.1rem;margin-bottom:1.1rem}
 section.panel h2{margin:0 0 .15rem 0;font-size:1.02rem;display:flex;align-items:center;gap:.5rem}
 section.panel .hint{color:var(--muted);font-size:.8rem;margin-bottom:.8rem}
+section.panel h3{margin:1.1rem 0 .5rem 0;font-size:.92rem}
+section.panel p.hint{margin:0 0 .2rem 0}
 .chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.8rem}
 .chip{padding:.3rem .75rem;border-radius:999px;border:1px solid var(--border);background:var(--card2);
   cursor:pointer;font-size:.8rem;display:inline-flex;align-items:center;gap:.35rem;color:var(--txt)}
@@ -62,11 +71,17 @@ section.panel .hint{color:var(--muted);font-size:.8rem;margin-bottom:.8rem}
 .comp .nm{font-weight:600;font-size:.92rem}
 .comp .desc{font-size:.8rem;color:var(--muted);margin-top:.3rem;display:-webkit-box;-webkit-line-clamp:2;
   -webkit-box-orient:vertical;overflow:hidden}
+.comp.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.comp:hover{border-color:var(--accent)}
+#comp-detail{margin-top:.8rem;background:var(--card2);border:1px solid var(--border);
+  border-radius:.6rem;padding:.8rem .9rem;font-size:.85rem}
+#comp-detail h3{margin:0 0 .4rem 0;font-size:.95rem;display:flex;align-items:center;gap:.4rem;flex-wrap:wrap}
+#comp-detail .ev{font-size:.72rem;color:var(--muted);margin-top:.5rem;line-height:1.5}
 .kind-skill{border-left-color:var(--c-skill)}.kind-comando{border-left-color:var(--c-comando)}
 .kind-agente{border-left-color:var(--c-agente)}.kind-script{border-left-color:var(--c-script)}
 .kind-config{border-left-color:var(--c-config)}.kind-servicio{border-left-color:var(--c-servicio)}
 .kind-memoria,.kind-timer,.kind-directorio,.kind-otro{border-left-color:var(--c-otro)}
-.tag{font-size:.65rem;padding:.14rem .45rem;border-radius:.35rem;background:#ffffff12;border:1px solid var(--border);color:var(--muted)}
+.tag{font-size:.65rem;padding:.14rem .45rem;border-radius:.35rem;background:var(--tagbg);border:1px solid var(--border);color:var(--muted)}
 .flow{background:var(--card2);border:1px solid var(--border);border-radius:.6rem;padding:.8rem .9rem;margin-bottom:.7rem}
 .flow .fhead{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
 .flow .fname{font-weight:700}
@@ -119,14 +134,24 @@ button.chip{font:inherit;font-family:inherit}
 #inspector .rel li{margin-bottom:.25rem}
 .map-filters{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem;align-items:center}
 .map-filters .count{font-size:.78rem;color:var(--muted);margin-left:auto}
-@media (max-width:900px){.map-layout{flex-direction:column}#inspector{width:100%}}
 .trow{cursor:pointer}
-.trow:hover,.trow:focus-visible{background:#ffffff08;outline:none}
+.trow:hover,.trow:focus-visible{background:var(--hover);outline:none}
 #trace-panel{margin-top:.8rem;border:1px solid var(--border);border-radius:.6rem;padding:.7rem .9rem;background:var(--card2)}
+#trace-why{width:320px;flex-shrink:0;background:var(--bg);border:1px solid var(--border);
+  border-radius:.6rem;padding:.8rem .9rem;font-size:.85rem}
+#trace-why h3{margin:0 0 .4rem 0;font-size:.95rem}
+@media (max-width:900px){.map-layout{flex-direction:column}#inspector,#trace-why{width:100%}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media (max-width:700px){.stats{grid-template-columns:repeat(2,1fr)}}
 footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
 </style>
+<script>
+/* tema antes de pintar: evita el destello del tema por defecto */
+try{
+  const t = localStorage.getItem('panel-theme');
+  if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t);
+}catch(e){ /* storage no disponible: se pinta el tema por defecto */ }
+</script>
 </head>
 <body>
 <header class="top">
@@ -139,15 +164,18 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
   </div>
   <div class="top-right">
     <span id="health-pill"></span>
+    <button type="button" class="btn" id="theme-toggle" onclick="toggleTheme()" title="cambiar de tema" aria-label="cambiar de tema">🌓</button>
     <button class="btn" onclick="loadData(true)" title="fuerza recolección en el servidor">↻ actualizar</button>
   </div>
 </header>
 
 <main>
   <nav class="views" role="tablist" aria-label="vistas del panel">
-    <button type="button" class="vtab" id="tab-resumen" role="tab" aria-selected="true" onclick="showView('resumen')">📊 Resumen</button>
-    <button type="button" class="vtab" id="tab-mapa" role="tab" aria-selected="false" onclick="showView('mapa')">🗺️ Mapa</button>
-    <button type="button" class="vtab" id="tab-actividad" role="tab" aria-selected="false" onclick="showView('actividad')">🧾 Actividad</button>
+    <button type="button" class="vtab" id="tab-resumen" role="tab" aria-selected="true" title="salud del sistema, ejecución en vivo, timers y reconciliador" onclick="showView('resumen')">📊 Resumen</button>
+    <button type="button" class="vtab" id="tab-en-vivo" role="tab" aria-selected="false" title="seguimiento y metricas de tareas del runner" onclick="showView('en-vivo')">⚡ En vivo</button>
+    <button type="button" class="vtab" id="tab-mapa" role="tab" aria-selected="false" title="cómo se conectan las piezas: clic en un nodo para ver su detalle" onclick="showView('mapa')">🗺️ Mapa</button>
+    <button type="button" class="vtab" id="tab-actividad" role="tab" aria-selected="false" title="componentes, flujos declarados, cola de tareas y actividad reciente" onclick="showView('actividad')">🧾 Actividad</button>
+    <button type="button" class="vtab" id="tab-ayuda" role="tab" aria-selected="false" title="glosario: qué mide cada sección, estados de tarea y límites del panel" onclick="showView('ayuda')">❓ Ayuda</button>
   </nav>
 
   <div class="stats" id="stats" data-view="resumen"></div>
@@ -155,8 +183,31 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
 
   <section class="panel" data-view="resumen" id="live-section">
     <h2>⚡ Ejecución en vivo</h2>
-    <div class="hint">tarea activa del lanzador: fase, tiempo y dónde se detuvo · sin prompts ni salidas</div>
-    <div id="live-body" class="muted">sin ejecución activa — la cola está en reposo</div>
+    <div class="hint">solo tareas <span class="mono">running</span>: fase, tiempo en curso y dónde se detuvo · las tareas <span class="mono">waiting</span> se listan aparte como pendientes de decisión, no como proceso vivo · sin prompts ni salidas</div>
+    <div id="live-body" class="muted">sin proceso en ejecución — la cola está en reposo</div>
+  </section>
+
+  <section class="panel" data-view="en-vivo" id="execution-section">
+    <h2>⚡ Seguimiento de ejecución</h2>
+    <div class="hint">solo tareas iniciadas desde la cola del panel/CLI · actualiza cada 5 s con actividad, 30 s en reposo · no observa sesiones interactivas ni pasos internos del modelo</div>
+    <div id="live-body-detail" class="muted">sin proceso en ejecución — la cola está en reposo</div>
+    <div id="execution-pending" class="muted" style="margin-top:.6rem"></div>
+    <div id="execution-recent" class="muted" style="margin-top:.6rem"></div>
+    <div id="trace-panel" hidden>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
+        <strong>🔎 Traza de la tarea</strong>
+        <button class="btn" style="padding:.15rem .5rem" onclick="hideTrace()">cerrar (Esc)</button>
+      </div>
+      <div class="map-layout" style="margin-top:.4rem">
+        <div id="trace-body" class="muted map-main">cargando…</div>
+        <aside id="trace-why" aria-live="polite" hidden></aside>
+      </div>
+    </div>
+  </section>
+  <section class="panel" data-view="en-vivo">
+    <h2>📈 Resultados observados (últimos 30 días)</h2>
+    <div class="hint">por agente: tareas terminadas y duración media de cada fase instrumentada; waiting requiere decisión, no equivale a fallo · estado de fase = código de proceso/check, no valida el contrato · no mide skills ni productividad interna</div>
+    <div id="execution-metrics" class="muted">cargando métricas…</div>
   </section>
 
   <section class="panel" data-view="resumen">
@@ -179,22 +230,23 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
     <div class="hint">visión global: cómo se conectan las piezas · borde verde=sano, ámbar=aviso, rojo=fallo, azul=informativo · línea continua=observado, discontinua=declarado · haz clic en un nodo</div>
     <div class="map-filters">
       <label class="muted" for="mf-layer" style="font-size:.78rem">filtros:</label>
-      <select id="mf-layer" class="btn" style="padding:.3rem" onchange="renderGraph()" aria-label="filtrar mapa por capa">
+      <button type="button" class="btn" style="padding:.15rem .5rem" onclick="showView('ayuda')" title="abre la Ayuda: qué significa cada opción de estos filtros" aria-label="abrir la ayuda sobre las opciones de los filtros del mapa">❓</button>
+      <select id="mf-layer" class="btn" style="padding:.3rem" onchange="renderGraph()" aria-label="filtrar mapa por capa" title="muestra solo los nodos de una capa (fuentes, automatización, datos, ejecución, servicio, observabilidad)">
         <option value="">todas las capas</option>
       </select>
-      <select id="mf-status" class="btn" style="padding:.3rem" onchange="renderGraph()" aria-label="filtrar mapa por estado">
+      <select id="mf-status" class="btn" style="padding:.3rem" onchange="renderGraph()" aria-label="filtrar mapa por estado" title="muestra solo los nodos con ese estado: sano, aviso, fallo o informativo">
         <option value="">todos los estados</option>
         <option value="ok">sano</option>
         <option value="warn">aviso</option>
         <option value="err">fallo</option>
         <option value="info">informativo</option>
       </select>
-      <select id="mf-source" class="btn" style="padding:.3rem" onchange="renderGraph()" aria-label="filtrar mapa por fuente">
+      <select id="mf-source" class="btn" style="padding:.3rem" onchange="renderGraph()" aria-label="filtrar mapa por fuente" title="muestra solo lo observado en el sistema o solo lo declarado explícitamente">
         <option value="">toda fuente</option>
         <option value="observado">observado</option>
         <option value="declarado">declarado</option>
       </select>
-      <button type="button" class="btn" onclick="clearMapFilters()">limpiar</button>
+      <button type="button" class="btn" onclick="clearMapFilters()" title="deja los tres filtros del mapa sin seleccion">limpiar</button>
       <span class="count" id="map-count"></span>
     </div>
     <div class="map-layout">
@@ -205,11 +257,12 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
 
   <section class="panel" data-view="actividad">
     <h2>🧩 Componentes</h2>
-    <div class="hint">skills, comandos, agentes, scripts, configs — haz clic en un tipo para filtrar</div>
+    <div class="hint">skills, comandos, agentes, scripts, configs — los tipos filtran la lista; haz clic en una tarjeta para ver su detalle</div>
     <div class="chips" id="chips"></div>
     <label for="search" class="muted" style="font-size:.78rem">buscar</label>
-    <input class="search" id="search" placeholder="🔍 buscar por nombre o descripción…" oninput="renderComponents()" aria-label="buscar componentes por nombre o descripción">
+    <input class="search" id="search" placeholder="🔍 buscar por nombre o descripción…" oninput="renderComponents()" aria-label="buscar componentes por nombre o descripción" title="filtra las tarjetas por nombre o descripción, combinándose con el filtro de tipo">
     <div class="grid" id="comp-grid"></div>
+    <aside id="comp-detail" aria-live="polite">selecciona una tarjeta para ver su detalle</aside>
   </section>
 
   <section class="panel" data-view="actividad">
@@ -220,26 +273,27 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
 
   <section class="panel" data-view="actividad">
     <h2>📋 Cola de tareas</h2>
-    <div class="hint">lanzador: 1 tarea a la vez · timeout 15min · máx 2 intentos · luego dead-letter</div>
+    <div class="hint">lanzador: 1 tarea a la vez · timeout 15min · máx 2 intentos · luego dead-letter · <button type="button" class="btn" style="padding:.1rem .4rem;font-size:.78rem" onclick="showView('ayuda')" title="abre la Ayuda: opciones de encolar, filtros y mapa" aria-label="abrir la ayuda sobre las opciones de los desplegables">❓ opciones</button></div>
     <div id="queue-summary" style="margin-bottom:.6rem"></div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.7rem;align-items:center">
-      <button class="btn" onclick="runNext(this)">▶ ejecutar siguiente</button>
+      <button class="btn" onclick="runNext(this)" title="ejecuta ahora la primera tarea pending (una a la vez; el lanzador puede estar ocupado)">▶ ejecutar siguiente</button>
       <input class="search" id="new-prompt" style="flex:1;min-width:220px;margin:0" placeholder="prompt de nueva tarea…" aria-label="prompt de nueva tarea">
-      <select id="new-agent" class="btn" style="padding:.4rem" aria-label="agente de la nueva tarea"></select>
-      <select id="new-model" class="btn" style="padding:.4rem" aria-label="modelo de la nueva tarea">
+      <select id="new-agent" class="btn" style="padding:.4rem" aria-label="agente de la nueva tarea" title="agente que hará el trabajo (lista cerrada: solo agentes permitidos por el panel)"></select>
+      <select id="new-model" class="btn" style="padding:.4rem" aria-label="modelo de la nueva tarea" title="modelo de la tarea: luna/sol de pago, nemotron free solo con política free-allowed y nunca en tareas sensibles">
         <option value="openai/gpt-5.6-luna">luna (pago/bajo coste)</option>
         <option value="openai/gpt-5.6-sol">sol (pago)</option>
         <option value="opencode/nemotron-3-ultra-free">nemotron (free/no sensible)</option>
       </select>
-      <select id="new-sensitivity" class="btn" style="padding:.4rem" aria-label="sensibilidad de la nueva tarea">
+      <select id="new-sensitivity" class="btn" style="padding:.4rem" aria-label="sensibilidad de la nueva tarea" title="sensible: el payload de la tarea se purga al terminar y los modelos free quedan prohibidos">
         <option value="normal">normal</option>
         <option value="sensitive">sensible</option>
       </select>
-      <button class="btn" onclick="addTask()">＋ encolar</button>
+      <button class="btn" onclick="addTask()" title="encola la tarea con el prompt escrito; no la ejecuta, solo la añade a la cola">＋ encolar</button>
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem;align-items:center">
       <label class="muted" for="f-status" style="font-size:.78rem">filtros:</label>
-      <select id="f-status" class="btn" style="padding:.3rem" onchange="renderTasks()">
+      <button type="button" class="btn" style="padding:.15rem .5rem" onclick="showView('ayuda')" title="abre la Ayuda: qué significa cada opción de estos filtros" aria-label="abrir la ayuda sobre las opciones de los filtros">❓</button>
+      <select id="f-status" class="btn" style="padding:.3rem" onchange="renderTasks()" title="filtra la cola por estado de tarea (pulsa ❓ Ayuda para el glosario)">
         <option value="">todos los estados</option>
         <option value="pending">pending</option>
         <option value="waiting">waiting</option>
@@ -249,13 +303,13 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
         <option value="dead">dead</option>
         <option value="cancelled">cancelled</option>
       </select>
-      <select id="f-agent" class="btn" style="padding:.3rem" onchange="renderTasks()" aria-label="filtrar por agente">
+      <select id="f-agent" class="btn" style="padding:.3rem" onchange="renderTasks()" aria-label="filtrar por agente" title="muestra solo las tareas del agente elegido">
         <option value="">todos los agentes</option>
       </select>
-      <select id="f-model" class="btn" style="padding:.3rem" onchange="renderTasks()" aria-label="filtrar por modelo">
+      <select id="f-model" class="btn" style="padding:.3rem" onchange="renderTasks()" aria-label="filtrar por modelo" title="muestra solo las tareas ejecutadas con ese modelo">
         <option value="">todos los modelos</option>
       </select>
-      <select id="f-sens" class="btn" style="padding:.3rem" onchange="renderTasks()" aria-label="filtrar por sensibilidad">
+      <select id="f-sens" class="btn" style="padding:.3rem" onchange="renderTasks()" aria-label="filtrar por sensibilidad" title="normal o sensitive: en las sensibles el payload se purga al terminar">
         <option value="">toda sensibilidad</option>
         <option value="normal">normal</option>
         <option value="sensitive">sensitive</option>
@@ -266,13 +320,6 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
       <tbody id="tasks-body"></tbody>
     </table></div>
     <div id="tasks-empty" class="muted" style="display:none;margin-top:.5rem">cola vacía — encola con <span class="mono">python3 -m control.cli task add &lt;agente&gt; "&lt;prompt&gt;"</span></div>
-    <div id="trace-panel" hidden>
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
-        <strong>🔎 Traza de la tarea</strong>
-        <button class="btn" style="padding:.15rem .5rem" onclick="hideTrace()">cerrar (Esc)</button>
-      </div>
-      <div id="trace-body" class="muted" style="margin-top:.4rem">cargando…</div>
-    </div>
   </section>
 
   <section class="panel" data-view="actividad">
@@ -283,6 +330,156 @@ footer{color:var(--muted);font-size:.75rem;text-align:center;padding:1rem}
       <tbody id="events-body"></tbody>
     </table></div>
     <div id="events-empty" class="muted" style="display:none;margin-top:.5rem">sin eventos todavía — se registran al detectar cambios o con <span class="mono">python3 -m control.cli receipt …</span></div>
+  </section>
+
+  <section class="panel" data-view="ayuda">
+    <h2>❓ Ayuda</h2>
+    <div class="hint">glosario estático del panel: qué mide cada sección, qué significa cada estado y qué NO hace. Sin red, sin modelo, sin peticiones: se lee tal cual</div>
+
+    <p class="hint">Qué es este panel: un <b>observador local</b> del repositorio <span class="mono">opencode-ecosystem</span>. Escanea el disco, lee los timers systemd y la cola de tareas, y lo pinta en <span class="mono">http://127.0.0.1:8765</span>. Es de <b>solo lectura</b> salvo las acciones cerradas de la lista inferior, que exigen token CSRF. El estado se refresca solo cada 30&nbsp;s; la cola de tareas se consulta más a menudo (cada 5&nbsp;s si hay una tarea en curso o esperando decisión, 60&nbsp;s con la pestaña oculta). El tema claro/oscuro es manual.</p>
+
+    <h3>Las vistas</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Vista</th><th>Qué muestra</th><th>Para cuándo</th></tr></thead>
+      <tbody>
+        <tr><td><b>📊 Resumen</b></td><td>salud del servicio, contadores, ejecución en vivo, timers systemd y el último chequeo del reconciliador</td><td>«¿está todo bien ahora mismo?»</td></tr>
+        <tr><td><b>⚡ En vivo</b></td><td>proceso activo, pendientes de decisión, traza y métricas de tareas lanzadas por el runner; no incluye sesiones interactivas</td><td>«¿qué se está ejecutando y qué espera una decisión?»</td></tr>
+        <tr><td><b>🗺️ Mapa</b></td><td>nodos y aristas del ecosistema; clic (o Enter) en un nodo abre su detalle; filtros por capa, estado y fuente</td><td>«¿cómo se relacionan las piezas y cuál falla?»</td></tr>
+        <tr><td><b>🧾 Actividad</b></td><td>componentes (skills, comandos, agentes, scripts, configs), flujos declarados, cola de tareas y actividad reciente</td><td>«¿qué hay instalado y qué ha pasado?»</td></tr>
+        <tr><td><b>❓ Ayuda</b></td><td>esta página: glosario, estados, límites y comandos</td><td>cuando una etiqueta o un estado no es obvio</td></tr>
+      </tbody>
+    </table></div>
+    <div class="hint">La vista activa se guarda en la URL (hash <span class="mono">#ayuda</span>) y en <span class="mono">localStorage</span>, así que se recuerda al recargar. Escape cierra el inspector, la traza y el historial.</div>
+
+    <h3>Secciones clave y de dónde sale cada dato</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Sección</th><th>Qué mide</th><th>Fuente</th></tr></thead>
+      <tbody>
+        <tr><td>Resumen · contadores</td><td>skills, comandos, agentes, timers, flujos y si el servicio está arriba</td><td><span class="mono">snapshot.json</span> (recolectado de disco + systemd + <span class="mono">opencode service status</span>)</td></tr>
+        <tr><td>Resumen · ⚡ Ejecución en vivo</td><td>solo la tarea <span class="mono">running</span>: fase, tiempo en curso y cuenta atrás del <i>lease</i>. Si no hay ninguna, dice que no hay proceso en ejecución. Nunca el prompt ni la salida del agente</td><td>SQLite, tabla de tareas</td></tr>
+        <tr><td>En vivo · Pendientes de decisión</td><td>tareas <span class="mono">waiting</span>: terminó y espera una decisión humana, con su tiempo de espera y nota. No se presentan como ejecución activa</td><td>SQLite, tabla de tareas</td></tr>
+        <tr><td>Resumen · ⏱️ Timers systemd</td><td>tareas programadas del usuario (whitelist <span class="mono">opencode-*</span>): estado, última y próxima ejecución</td><td><span class="mono">systemctl --user list-timers</span></td></tr>
+        <tr><td>Resumen · 🩺 Reconciliador</td><td>inconsistencias detectadas: tareas atascadas y timers declarados ausentes</td><td><span class="mono">control/reconcile.py</span> (timer cada 5&nbsp;min, con <i>cooldown</i> de 120&nbsp;s)</td></tr>
+        <tr><td>Mapa</td><td>grafo operativo: 11 nodos agrupados en 6 capas y sus aristas; el inspector muestra estado, capa, fuente, evidencia y eventos</td><td>derivado del snapshot; las fuentes <i>observado</i>/<i>declarado</i> se leen del propio grafo</td></tr>
+        <tr><td>Actividad · Componentes</td><td>fichas de cada componente con su tipo, ruta y eventos; el historial es el modal «📜 ver historial»</td><td>escaneo del disco y de los configs (declarado)</td></tr>
+        <tr><td>Actividad · Flujos declarados</td><td>los flujos conocidos y sus pasos. No se infieren: solo los declarados</td><td>declarado en el propio código</td></tr>
+        <tr><td>Actividad · Cola de tareas</td><td>las últimas tareas con estado, intentos, <span class="mono">rc</span>, duración y nota; la fila abre la traza en En vivo</td><td>SQLite, tabla de tareas</td></tr>
+        <tr><td>En vivo · Métricas</td><td>tareas terminales y fases observadas en 30 días; sin datos no significa éxito</td><td>SQLite, tareas y eventos de fase del runner</td></tr>
+        <tr><td>Actividad · Actividad reciente</td><td>eventos y recibos: solo cambios reales, sin ruido por <i>polling</i></td><td>SQLite, tabla de eventos (retención 30 días / 20 000 filas)</td></tr>
+        <tr><td>Ayuda</td><td>este glosario</td><td>estático en el propio HTML</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Estados de tarea</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Estado</th><th>Qué significa</th><th>Qué hace el lanzador</th></tr></thead>
+      <tbody>
+        <tr><td><span class="mono">pending</span></td><td>en cola, esperando turno</td><td>la reclama con <i>lease</i> atómico y la ejecuta. Tras un fallo vuelve aquí si le quedan intentos (máx. 2); un error de proveedor (saldo o <i>rate limit</i>) también, sin quemar intento</td></tr>
+        <tr><td><span class="mono">running</span></td><td>en ejecución (una sola a la vez)</td><td>la mantiene con <i>lease</i> de timeout + 2&nbsp;min de gracia. Si se agota: <span class="mono">pending</span> o <span class="mono">dead</span> según los intentos</td></tr>
+        <tr><td><span class="mono">waiting</span></td><td>terminó pero necesita <b>decisión humana</b>: revisión fallida del verificador, transición no registrada o <span class="mono">RESULT: blocked</span></td><td>no reintenta solo y no consume intento. El botón ↻ la reencola con los intentos a cero</td></tr>
+        <tr><td><span class="mono">done</span></td><td>completada con éxito: <span class="mono">rc=0</span> y contrato ODD válido</td><td>libera el <i>lease</i>. Si era un <i>odd-worker</i>, encadena un <i>odd-verifier</i> y registra recibo</td></tr>
+        <tr><td><span class="mono">failed</span></td><td>resultado del agente, no estado guardado</td><td>el lanzador nunca escribe este estado: un fallo pasa a <span class="mono">waiting</span> (si es revisión) o se trata como fallo con reintento y, al agotar intentos, <span class="mono">dead</span>. Aparece en el conteo por compatibilidad</td></tr>
+        <tr><td><span class="mono">dead</span></td><td>atascada o agotada: sin ejecución posible</td><td>2 intentos consumidos, o el reconciliador marcó una <span class="mono">running</span> huérfana (lease vencido o más de timeout + 5&nbsp;min), o cancelación manual (✖, que anota «cancelada manualmente»). Requiere ↻ o un <span class="mono">task add</span> nuevo</td></tr>
+        <tr><td><span class="mono">cancelled</span></td><td>filtro de la UI: el lanzador nunca escribe este estado</td><td>la cancelación manual marca <span class="mono">dead</span> con la nota «cancelada manualmente»; el filtro existe para localizar esas filas</td></tr>
+      </tbody>
+    </table></div>
+    <div class="hint">Reglas del lanzador: 1 tarea a la vez, timeout 15&nbsp;min, máx. 2 intentos, claim atómico con <i>lease</i> (dos runners nunca toman la misma), y contrato ODD estricto: sin <span class="mono">RESULT:</span>/<span class="mono">SUMMARY:</span>/<span class="mono">QUESTION:</span> coherente la salida no es <span class="mono">done</span>, es error de contrato.</div>
+
+    <h3>Desplegables y sus opciones</h3>
+    <div class="hint">qué significa cada opción de los desplegables y cuándo usarla. Los desplegables «todos…» no traen lista fija: se rellenan solos con los valores presentes en la cola o en el grafo</div>
+
+    <p class="hint" style="margin-top:.6rem"><b>Encolar tarea</b> (formulario de la cola de tareas):</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Opción</th><th>Qué significa</th><th>Ejemplo de uso</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">qa-gate</td><td>check anti-slop de calidad antes de un commit: secretos, catch vacíos, TODO y logs de depuración</td><td>último control antes de commitar un cambio de código</td></tr>
+        <tr><td class="mono">sdd-implement</td><td>implementa una tarea atómica de <span class="mono">odd/tasks/</span></td><td>ejecutar una feature ya aprobada en su documento ODD</td></tr>
+        <tr><td class="mono">sdd-verify</td><td>verificación read-only en contexto fresco tras un worker</td><td>contrastar lo implementado sin tocar nada</td></tr>
+        <tr><td class="mono">risk-lens</td><td>review de riesgos: errores silenciosos y condiciones de borde</td><td>en deploys críticos o al tocar el manejo de errores</td></tr>
+        <tr><td class="mono">reliability-lens</td><td>review de fiabilidad: tests flaky y no-determinismo</td><td>cuando el cambio toca tests o código con estado o tiempo</td></tr>
+        <tr><td class="mono">context-compressor</td><td>mapea entrypoints, exports y estado global sin leer todo el repo</td><td>repo grande o presión de tokens y RAM</td></tr>
+        <tr><td class="mono">build</td><td>trabajo genérico de prueba</td><td>probar el lanzador sin necesitar un agente especializado</td></tr>
+        <tr><td class="mono">general</td><td>agente genérico</td><td>tareas que no encajan en ningún agente especializado</td></tr>
+        <tr><td class="mono">explore</td><td>exploración acotada que devuelve un resumen</td><td>entender una zona del repo sin leer ficheros completos</td></tr>
+        <tr><td class="mono">luna (pago/bajo coste)</td><td>modelo de pago, el barato por defecto (<span class="mono">openai/gpt-5.6-luna</span>)</td><td>trabajo ordinario donde el coste importa</td></tr>
+        <tr><td class="mono">sol (pago)</td><td>modelo de pago completo (<span class="mono">openai/gpt-5.6-sol</span>)</td><td>arquitectura, seguridad crítica o migraciones grandes</td></tr>
+        <tr><td class="mono">nemotron (free/no sensible)</td><td>modelo free: solo con política <span class="mono">free-allowed</span> y nunca en tareas sensibles (<span class="mono">opencode/nemotron-3-ultra-free</span>)</td><td>cuando el trabajo no toca datos sensibles y no quieres gastar cuota</td></tr>
+        <tr><td class="mono">normal</td><td>sensibilidad por defecto: el payload se retiene (30 días)</td><td>cualquier tarea sin datos confidenciales</td></tr>
+        <tr><td class="mono">sensitive</td><td>el payload de la tarea se purga al terminar y los modelos free quedan prohibidos</td><td>tareas con datos confidenciales</td></tr>
+      </tbody>
+    </table></div>
+
+    <p class="hint" style="margin-top:.6rem"><b>Filtros de cola</b> (encima de la tabla de tareas):</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Opción</th><th>Qué significa</th><th>Ejemplo de uso</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">todos los estados</td><td>sin filtro: los 7 estados están explicados en la <b>tabla de estados de tarea más arriba</b></td><td>dead para localizar agotadas antes de reencolar</td></tr>
+        <tr><td class="mono">todos los agentes</td><td>sin filtro de agente: se rellena con los valores presentes en la cola</td><td>ver solo las tareas de un agente (p. ej. sdd-implement)</td></tr>
+        <tr><td class="mono">todos los modelos</td><td>sin filtro de modelo: se rellena con los modelos ejecutados en la cola</td><td>localizar tareas de un modelo concreto (p. ej. nemotron)</td></tr>
+        <tr><td class="mono">toda sensibilidad</td><td>sin filtro de sensibilidad: normal o sensitive</td><td>sensitive para repasar las tareas cuyo payload se purga</td></tr>
+      </tbody>
+    </table></div>
+
+    <p class="hint" style="margin-top:.6rem"><b>Mapa</b> (filtros del grafo):</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Opción</th><th>Qué significa</th><th>Ejemplo de uso</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">todas las capas</td><td>sin filtro de capa: se rellena con las capas del grafo (fuentes, automatización, datos, ejecución, servicio, observabilidad)</td><td>aislar una capa para ver solo sus nodos</td></tr>
+        <tr><td class="mono">sano / aviso / fallo / informativo</td><td>muestra solo los nodos con ese estado (<span class="mono">ok</span>, <span class="mono">warn</span>, <span class="mono">err</span>, <span class="mono">info</span>)</td><td>fallo para localizar de un vistazo qué pieza cayó</td></tr>
+        <tr><td class="mono">toda fuente</td><td>sin filtro de fuente: <b>observado</b> = leído del sistema; <b>declarado</b> = declarado en el código</td><td>declarado para ver solo flujos y configs declarados</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Etiquetas y colores</h3>
+    <ul>
+      <li><b>observado</b>: leído directamente del sistema (disco, systemd, <span class="mono">opencode service status</span>). En el mapa, línea continua.</li>
+      <li><b>declarado</b>: viene de una lista explícita (flujos ODD, <span class="mono">cron-jobs.json</span>). En el mapa, línea discontinua. <b>Inferido</b> no se usa: sin evidencia, no se muestra.</li>
+      <li><span class="pill ok"><span class="dot"></span>verde</span> sano · <span class="pill warn"><span class="dot"></span>ámbar</span> aviso (requiere atención, no bloquea) · <span class="pill err"><span class="dot"></span>rojo</span> fallo · <span class="pill" style="background:#4f8cff22;color:var(--accent);border:1px solid #4f8cff44"><span class="dot"></span>azul</span> informativo.</li>
+      <li><b>desactualizado</b>: el snapshot tiene más de 60&nbsp;s; el panel sigue enseñándolo, pero marcado.</li>
+      <li>Los <span class="tag">error_kind</span> de una tarea dicen <i>por qué</i> se detuvo, clasificados a partir del error: <span class="mono">timeout</span>, <span class="mono">provider_balance</span>, <span class="mono">provider_rate</span>, <span class="mono">verification</span>, <span class="mono">review</span>, <span class="mono">contract</span>, <span class="mono">infra</span> (cualquier otro se muestra como «fallo del agente»). El texto del error no se guarda: solo el código, la duración y un resumen.</li>
+    </ul>
+
+    <h3>Límites y garantías</h3>
+    <ul>
+      <li><b>No relanza trabajo automáticamente.</b> Ejecutar es decisión humana: el botón «▶ ejecutar siguiente» o <span class="mono">control.cli task run</span>. El reconciliador solo marca <span class="mono">dead</span> lo atascado, nunca ejecuta.</li>
+      <li><b>No expone prompts, workspace, verification_command, expected_outputs ni stdout</b>: ni la API ni el panel. Del modelo solo se guardan <span class="mono">rc</span>, duración y un resumen acotado.</li>
+      <li><b>No acepta comandos arbitrarios</b> desde el navegador: lista cerrada de acciones, sin shell, y una continuación escrita por un modelo nunca llega a ejecutarse.</li>
+      <li><b>CSRF</b>: token aleatorio por proceso en la cabecera <span class="mono">X-CSRF-Token</span> + <span class="mono">Origin</span> válido; sin él, 403. Cada acción deja evento auditable.</li>
+      <li><b>Solo escucha en 127.0.0.1</b> (puerto 8765). No hay acceso remoto.</li>
+      <li><b>Retención</b>: SQLite local en WAL, 30 días / 20 000 filas. Las tareas marcadas <span class="mono">sensitive</span> purgan su payload al terminar; las normales, a los 30 días.</li>
+      <li><b>Sin dependencias</b> ni frameworks, sin WebSockets, sin backend nuevo. La ayuda vive en el propio HTML, por eso no se actualiza con el panel: si cambia el comportamiento, hay que editar este texto.</li>
+    </ul>
+
+    <h3>Acciones cerradas del panel</h3>
+    <ul>
+      <li><b>↻ actualizar</b>: fuerza la recolección real del snapshot.</li>
+      <li><b>▶ ejecutar siguiente</b>: lanza la primera tarea <span class="mono">pending</span> (una a la vez; si el lanzador está ocupado, avisa).</li>
+      <li><b>＋ encolar</b>: agente (lista cerrada), prompt, modelo y sensibilidad.</li>
+      <li><b>↻ / ✖</b> por fila: reintentar (<span class="mono">dead</span> o <span class="mono">waiting</span>) o cancelar (<span class="mono">pending</span> → <span class="mono">dead</span>).</li>
+      <li><b>↻</b> por timer: reinicia el timer systemd, con confirmación.</li>
+    </ul>
+
+    <h3>Por terminal (lo que el panel no hace)</h3>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Comando</th><th>Cuándo usarlo</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">python3 -m control.cli doctor [--json]</td><td>diagnóstico sanitizado (versión y capacidades de OpenCode V2) cuando el panel no explica un fallo de servicio</td></tr>
+        <tr><td class="mono">python3 -m control.cli task add &lt;agente&gt; "&lt;prompt&gt;"</td><td>encolar con el contrato ODD completo (workflow, workspace, feature, expected-outputs, verification-command, política de modelo, sensibilidad): el panel no expone esos campos</td></tr>
+        <tr><td class="mono">python3 -m control.cli task list</td><td>ver la cola con el resumen por estado, sin abrir el navegador</td></tr>
+        <tr><td class="mono">python3 -m control.cli task run</td><td>ejecutar la siguiente tarea <span class="mono">pending</span> desde la terminal</td></tr>
+        <tr><td class="mono">python3 -m control.cli task assess &lt;worker-id&gt;</td><td>informe de la revisión de un <i>odd-worker</i> sin ejecutarla ni bloquear por reloj</td></tr>
+        <tr><td class="mono">python3 -m control.cli receipt &lt;componente&gt; --status ok --duration 12.5 --note "T3"</td><td>registrar que algo se ejecutó de verdad: la forma honesta de saberlo</td></tr>
+        <tr><td class="mono">python3 -m control.cli reconcile</td><td>detectar inconsistencias sin tocar nada (preview)</td></tr>
+        <tr><td class="mono">python3 -m control.cli reconcile --apply</td><td>marcar <span class="mono">dead</span> las tareas huérfanas (<i>cooldown</i> de 120&nbsp;s; el timer lo hace solo cada 5&nbsp;min)</td></tr>
+        <tr><td class="mono">python3 -m control --once --pretty</td><td>recoger el snapshot una vez sin servir el panel</td></tr>
+        <tr><td class="mono">./opencode-ecosystem status</td><td>estado de la fuente de verdad del ecosistema frente al runtime</td></tr>
+        <tr><td class="mono">./opencode-ecosystem sync --apply</td><td>publicar el repositorio al runtime (<span class="mono">~/.config/opencode</span>) con backup previo</td></tr>
+        <tr><td class="mono">./opencode-ecosystem publish --yes</td><td>recoger al repositorio cambios hechos en caliente en el runtime (solo ficheros gestionados)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>Fuente completa</h3>
+    <div class="hint">Esta ayuda es un resumen. La documentación completa vive en el repositorio, fuera del navegador: <span class="mono">control/README.md</span> (qué es, qué no hace, lanzador, acciones, reconciliador, limitaciones) y <span class="mono">odd/tasks/</span> (un documento por feature, con alcance, criterios y evidencia). Si algo de esta página no cuadra con el comportamiento real, manda el código y el README.</div>
   </section>
 
   <div id="hist-modal" style="display:none;position:fixed;inset:0;background:#000a;z-index:20" onclick="closeHist(event)"
@@ -320,6 +517,8 @@ const KIND_META = {
 };
 let SNAP = null;
 let KIND_FILTER = 'todos';
+let SEL_COMP = null;
+let LAST_COMP_LIST = [];
 
 function esc(s){return String(s||'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
 async function fetchJSON(u){const r=await fetch(u);if(!r.ok)throw new Error(u+': HTTP '+r.status);return r.json();}
@@ -341,6 +540,7 @@ function csrfHint(st){
 
 async function loadData(force){
   try{
+    if (force) metricsLoadedAt=0;
     const q = '?t='+Date.now() + (force ? '&refresh=1' : '');
     SNAP = await fetchJSON('/api/snapshot'+q);
     render();
@@ -420,16 +620,81 @@ function renderComponents(){
     if(q && !(c.name+' '+(c.description||'')).toLowerCase().includes(q)) return false;
     return true;
   });
+  LAST_COMP_LIST = list;
   document.getElementById('comp-grid').innerHTML = list.map(c=>{
     const km = KIND_META[c.kind]||KIND_META.otro;
-    return `<div class="comp kind-${esc(c.kind)}" style="cursor:pointer" title="${esc(c.path||'')}"
-      tabindex="0" role="button" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showHistory('${esc(c.name)}')}"
-      onclick="showHistory('${esc(c.name)}')">
+    const sel = SEL_COMP === c.name ? ' sel' : '';
+    const pressed = SEL_COMP === c.name ? 'true' : 'false';
+    return `<div class="comp kind-${esc(c.kind)}${sel}" style="cursor:pointer" title="${esc(c.path||'')}"
+      tabindex="0" role="button" aria-pressed="${pressed}" aria-label="${esc(c.name)}: ver detalle"
+      onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();selectComponent('${esc(c.name)}')}"
+      onclick="selectComponent('${esc(c.name)}')">
       <div class="head"><span class="icn">${km.ic}</span><span class="nm">${esc(c.name)}</span>
         <span class="tag">${esc(c.source)}</span></div>
       <div class="desc">${esc(c.description||'')}</div>
     </div>`;
   }).join('') || '<span class="muted">sin resultados</span>';
+  renderCompDetail();
+}
+
+function selectComponent(name){
+  SEL_COMP = SEL_COMP === name ? null : name;
+  document.querySelectorAll('#comp-grid .comp').forEach(el=>{
+    const nm = el.querySelector('.nm');
+    const on = nm && nm.textContent === SEL_COMP;
+    el.classList.toggle('sel', !!on);
+    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  renderCompDetail();
+}
+
+function clearCompSelection(){
+  SEL_COMP = null;
+  document.querySelectorAll('#comp-grid .comp.sel').forEach(el=>{
+    el.classList.remove('sel');
+    el.setAttribute('aria-pressed', 'false');
+  });
+  renderCompDetail();
+}
+
+function renderCompDetail(){
+  const box = document.getElementById('comp-detail');
+  if (!box) return;
+  if (!SEL_COMP){ box.textContent = 'selecciona una tarjeta para ver su detalle'; return; }
+  const c = SNAP && SNAP.components ? SNAP.components.find(x=>x.name===SEL_COMP) : null;
+  if (!c || !LAST_COMP_LIST.some(x=>x.name===SEL_COMP)){ box.textContent = 'selecciona una tarjeta para ver su detalle'; return; }
+  const km = KIND_META[c.kind]||KIND_META.otro;
+  box.innerHTML = `
+    <h3>${km.ic} ${esc(c.name)} <span class="tag">${esc(c.kind)}</span></h3>
+    <div>${esc(c.description||'sin descripción')}</div>
+    <div class="ev">
+      estado: <span id="comp-state">cargando estado…</span><br>
+      path: ${esc(c.path||'—')}<br>
+      fuente: ${esc(c.source||'—')}${c.tags && c.tags.length ? '<br>etiquetas: '+esc(c.tags.join(', ')) : ''}
+    </div>
+    <div id="comp-events" class="ev" style="margin-top:.6rem">cargando eventos…</div>
+    <div style="margin-top:.6rem"><button type="button" class="btn" onclick="showHistory('${esc(c.name)}')">📜 ver historial</button></div>`;
+  loadCompEvents(c.name);
+}
+
+async function loadCompEvents(name){
+  try{
+    const rows = await fetchJSON('/api/events?kind='+encodeURIComponent(name)+'&limit=5');
+    const ev = document.getElementById('comp-events');
+    if (!ev || SEL_COMP !== name) return;
+    ev.innerHTML = rows.length
+      ? 'eventos recientes:<br>' + rows.map(e=>`${esc(fmtTs(e.ts))} · ${esc(e.event)} ${statusBadge(e.status)}`).join('<br>')
+      : 'sin eventos recientes de este componente';
+    const st = document.getElementById('comp-state');
+    if (st) st.innerHTML = (rows.length && rows[0].status)
+      ? `${statusBadge(rows[0].status)} <span class="muted">· ${esc(rows[0].event||'último evento')}</span>`
+      : 'sin estado';
+  }catch(e){
+    const ev = document.getElementById('comp-events');
+    if (ev && SEL_COMP === name) ev.textContent = 'no se pudieron cargar los eventos';
+    const st = document.getElementById('comp-state');
+    if (st && SEL_COMP === name) st.textContent = 'no se pudo determinar';
+  }
 }
 
 function renderFlows(){
@@ -461,7 +726,7 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 const NW = 150, NH = 56; // tamaño de nodo
 let GRAPH = null, SEL_NODE = null;
 
-const VIEWS = ['resumen', 'mapa', 'actividad'];
+const VIEWS = ['resumen', 'en-vivo', 'mapa', 'actividad', 'ayuda'];
 function showView(name){
   if (!VIEWS.includes(name)) name = 'resumen';
   VIEWS.forEach(v=>{
@@ -471,13 +736,36 @@ function showView(name){
   document.querySelectorAll('[data-view]').forEach(el=>{
     el.hidden = el.dataset.view !== name;
   });
-  try{ history.replaceState(null, '', '#'+name); localStorage.setItem('panel-view', name); }catch(e){}
+  try{ history.replaceState(null, '', '#'+name); localStorage.setItem('panel-view', name); }catch(e){ /* storage no disponible: la vista cambia igual */ }
+  // No se abre traza automatica: una espera antigua no es el proceso actual.
+  if (name === 'en-vivo' && selectedTrace === null && LIVE_TASK) refreshTrace(LIVE_TASK.id);
 }
 function viewFromLocation(){
   const h = (location.hash||'').replace('#','');
   if (VIEWS.includes(h)) return h;
-  try{ const s = localStorage.getItem('panel-view'); if (VIEWS.includes(s)) return s; }catch(e){}
+  try{ const s = localStorage.getItem('panel-view'); if (VIEWS.includes(s)) return s; }catch(e){ /* storage no disponible: vista por defecto */ }
   return 'resumen';
+}
+
+function isDarkTheme(){
+  const a = document.documentElement.getAttribute('data-theme');
+  if (a === 'dark' || a === 'light') return a === 'dark';
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+}
+function paintThemeBtn(){
+  const b = document.getElementById('theme-toggle');
+  if (!b) return;
+  const dark = isDarkTheme();
+  b.textContent = dark ? '🌙' : '☀️';
+  const act = 'cambiar a ' + (dark ? 'tema claro' : 'tema oscuro');
+  b.title = act;
+  b.setAttribute('aria-label', act);
+}
+function toggleTheme(){
+  const next = isDarkTheme() ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  try{ localStorage.setItem('panel-theme', next); }catch(e){ /* storage no disponible: el tema no se persiste */ }
+  paintThemeBtn();
 }
 
 function el(tag, attrs){
@@ -640,7 +928,8 @@ async function loadReconcile(){
 
  const TASK_BADGE = {pending:'warn', waiting:'warn', running:'ok', done:'ok', failed:'err', dead:'err'};
 let ALL_TASKS = [];
-let LIVE_TASK = null, liveTimer = null, taskTimer = null, loadingTasks = false;
+let LIVE_TASK = null, liveTimer = null, taskTimer = null, loadingTasks = false, selectedTrace = null;
+let metricsLoadedAt = 0;
 
 function scheduleTaskPoll(){
   if (taskTimer) clearInterval(taskTimer);
@@ -651,45 +940,72 @@ function scheduleTaskPoll(){
 document.addEventListener('visibilitychange', scheduleTaskPoll);
 
 function renderLive(){
-  const body = document.getElementById('live-body');
-  const t = ALL_TASKS.find(x=>x.status==='running') || ALL_TASKS.find(x=>x.status==='waiting');
-  clearInterval(liveTimer); liveTimer=null; LIVE_TASK=t||null;
-  if (!t){ body.className='muted'; body.textContent='sin ejecución activa — la cola está en reposo'; return; }
-  const running = t.status==='running';
-  const badge = running
-    ? '<span class="pill ok"><span class="dot"></span>ejecutando</span>'
-    : '<span class="pill warn"><span class="dot"></span>esperando decisión</span>';
-  body.className='';
-  body.innerHTML =
-    `<div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
-      ${badge} <b class="mono">#${t.id}</b> <span class="mono">${esc(t.agent)}</span>
-      ${t.model?`<span class="tag">${esc(t.model)}</span>`:''}
-      · <span id="live-elapsed" class="mono">…</span>
-      · <span id="live-limit" class="muted"></span>
-      <button class="btn" style="padding:.15rem .5rem" onclick="showTrace(${t.id})">ver traza →</button>
-    </div>
-    ${t.error_kind?`<div class="tag" style="margin-top:.35rem">${esc(t.error_kind)}</div>`:''}`;
+  const running = ALL_TASKS.find(x=>x.status==='running');
+  const waiting = ALL_TASKS.filter(x=>x.status==='waiting');
+  clearInterval(liveTimer); liveTimer=null;
+  // Solo una tarea running es proceso vivo; waiting es una decision humana pendiente.
+  LIVE_TASK = running || null;
+  const bodies = ['live-body','live-body-detail'].map(id=>document.getElementById(id));
+  if (!running && !waiting.length){
+    bodies.forEach(body=>{body.className='muted';body.textContent='sin proceso en ejecución — la cola está en reposo';});
+    return;
+  }
+  // Resumen: solo proceso vivo. Las pendientes de decisión se pintan aparte
+  // en #execution-pending para no mezclarlas con una ejecucion real.
+  const html = running
+    ? `<div class="live-block" data-id="${running.id}" data-running="true">
+        <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+          <span class="pill ok"><span class="dot"></span>ejecutando</span>
+          <b class="mono">#${running.id}</b> <span class="mono">${esc(running.agent)}</span>
+          ${running.model?`<span class="tag">${esc(running.model)}</span>`:''}
+          · <span class="live-elapsed mono">…</span>
+          · <span class="live-limit muted"></span>
+          <button class="btn" style="padding:.15rem .5rem" onclick="showTrace(${running.id})">ver traza →</button>
+        </div>
+        ${running.error_kind?`<div class="tag" style="margin-top:.35rem">${esc(running.error_kind)}</div>`:''}
+      </div>`
+    : `sin proceso en ejecución · ${waiting.length} tarea(s) pendiente(s) de decisión humana (abajo)`;
+  bodies.forEach(body=>{body.className = running ? '' : 'muted'; body.innerHTML=html;});
   const tick = ()=>{
-    const el=document.getElementById('live-elapsed'), lm=document.getElementById('live-limit');
-    if(!el) return;
-    const since = running ? t.started_at : (t.finished_at||t.started_at);
-    if (since){
-      const s=(Date.now()-new Date(since))/1000;
-      el.textContent=(running?'ejecutando hace ':'esperando desde hace ')+fmtAge(s);
-    }
-    if (lm && running && t.lease_until){
+    running && tickElapsed(running, true, ['live-body','live-body-detail']);
+    waiting.forEach(t=>tickElapsed(t, false, ['execution-pending']));
+    liveTimer=setInterval(tick,1000);
+  };
+  tick();
+}
+
+// Contador local: en running es tiempo de trabajo; en waiting es tiempo de espera.
+function tickElapsed(t, isRunning, containerIds){
+  const since = isRunning ? t.started_at : (t.finished_at||t.started_at);
+  if (!since) return;
+  const s=(Date.now()-new Date(since))/1000;
+  containerIds.forEach(id=>{
+    const body=document.getElementById(id);
+    const node=body && body.querySelector(`.live-block[data-id="${t.id}"]`);
+    if (!node) return;
+    const el=node.querySelector('.live-elapsed'), lm=node.querySelector('.live-limit');
+    if (el) el.textContent=(isRunning?'ejecutando hace ':'esperando decisión desde hace ')+fmtAge(s);
+    if (isRunning && lm && t.lease_until){
       const r=(new Date(t.lease_until)-Date.now())/1000;
       lm.textContent = r>0 ? 'lease vence en '+fmtAge(r) : '⚠ lease vencido (el reconciliador la marcará dead)';
     }
-  };
-  tick(); liveTimer=setInterval(tick,1000);
+  });
 }
 
 async function showTrace(id){
-  const panel=document.getElementById('trace-panel'), body=document.getElementById('trace-body');
-  panel.hidden=false; body.className='muted'; body.textContent='cargando…';
+  selectedTrace=id;
+  showView('en-vivo');
+  await refreshTrace(id);
+}
+async function refreshTrace(id){
+  const panel=document.getElementById('trace-panel'), body=document.getElementById('trace-body'), why=document.getElementById('trace-why');
+  panel.hidden=false;
+  body.className='muted';
+  body.textContent='cargando…';
+  if (why){ why.hidden=true; why.innerHTML=''; }
   try{
     const tr=await fetchJSON('/api/tasks/'+id+'/trace');
+    if (selectedTrace !== id) return;
     const stop=(tr.stop_reason&&tr.status!=='done')
       ?`<div style="margin:.4rem 0"><span class="badge warn" style="font-size:.72rem;padding:.15rem .45rem;border-radius:.35rem;background:#e5a80722;color:var(--warn)">${esc(tr.stop_reason)}</span></div>`:'';
     const chain=tr.verifier
@@ -702,11 +1018,76 @@ async function showTrace(id){
       `<div>fase: <b>${esc(tr.phase)}</b> · estado: <span class="pill ${TASK_BADGE[tr.status]||'warn'}">${esc(tr.status)}</span> · duración: <span class="mono">${tr.elapsed_s!=null?fmtAge(tr.elapsed_s):'—'}</span> · intentos: ${tr.attempts}</div>`
       + stop + chain
       + `<div style="margin-top:.5rem;border-top:1px solid var(--border);padding-top:.4rem">${lines||'<span class="muted">sin eventos registrados</span>'}</div>`;
+    if (why){ why.hidden=false; why.innerHTML=explainTrace(tr); }
   }catch(e){
+    if (selectedTrace !== id) return;
     body.className='muted'; body.textContent='no se pudo cargar la traza: '+e.message;
+    if (why){ why.hidden=true; why.innerHTML=''; }
   }
 }
-function hideTrace(){ document.getElementById('trace-panel').hidden=true; }
+function explainTrace(tr){
+  const ek = tr.error_kind || '';
+  let txt = '';
+  const nota = tr.note ? esc(tr.note) : '';
+  const errBlock = `<div style="margin-bottom:.5rem;padding:.5rem;border:1px solid var(--border);border-radius:.4rem;background:var(--bg)"><div style="font-weight:600;font-size:.85rem;margin-bottom:.25rem">Error registrado</div>${nota ? `<div class="mono" style="font-size:.78rem">${nota}</div>` : '<div class="muted" style="font-size:.78rem">sin mensaje de error registrado</div>'}${ek ? ` <span class="tag">${esc(ek)}</span>` : ''}${tr.result_code != null ? ` <span class="tag">rc=${esc(tr.result_code)}</span>` : ''}</div>`;
+  const REVISAR = {contract:'el agente no emitió RESULT/SUMMARY/QUESTION válido; revisa la salida del agente en la sesión',timeout:'el agente tardó más de 15 min; revisa si el prompt era demasiado amplio o el modelo lento',provider_balance:'saldo insuficiente del proveedor; recarga o cambia de modelo',provider_rate:'rate limit; espera o cambia de proveedor',infra:'opencode no disponible; comprueba opencode service status',verification:'el check determinista falló; revisa el comando de verificación',review:'la verificación pidió decisión humana; revisa el verificador',agent:'fallo del agente; revisa la nota y reintenta'};
+  const revTxt = REVISAR[ek] || 'no hay información suficiente para orientar la revisión';
+  const revBlock = `<div style="margin-bottom:.5rem;padding:.5rem;border:1px solid var(--border);border-radius:.4rem;background:var(--bg)"><div style="font-weight:600;font-size:.85rem;margin-bottom:.25rem">Qué revisar</div><div class="muted" style="font-size:.78rem">${revTxt}</div></div>`;
+  if (tr.status === 'dead'){
+    if (ek === 'contract'){
+      txt = 'El agente terminó sin cumplir el contrato de salida (RESULT/SUMMARY/QUESTION). El runner la rechazó como error de contrato y, al agotar los 2 intentos, quedó en dead.';
+      if ((tr.attempts||0) < 2) txt += ' Un reintento la dejará en pending.';
+    } else if (ek === 'timeout'){
+      txt = 'El agente superó el timeout de 15 min y, al agotar los intentos, quedó en dead.';
+    } else if ((tr.stop_reason||'').toLowerCase().includes('reconciliador')){
+      txt = esc(tr.stop_reason) + ' El reconciliador la marcó dead: no había ejecución viva (lease vencido).';
+    } else {
+      txt = tr.stop_reason ? esc(tr.stop_reason) : 'no hay información suficiente en el registro para explicar este resultado.';
+    }
+  } else if (tr.status === 'waiting'){
+    if (ek === 'review'){
+      txt = 'La verificación (odd-verifier) encontró problemas y pide una decisión humana: no se reintenta automáticamente. Revisa y reencola con ↻ si procede.';
+      if (tr.verifier) txt += ` Estado del verificador #${tr.verifier.id}: ${esc(tr.verifier.status)}.`;
+    } else {
+      txt = 'El agente pidió una decisión (RESULT: blocked) o una operación del control-plane (transición no registrada): no continúa sola.';
+      if (tr.note) txt += ' Nota registrada: ' + esc(tr.note);
+    }
+  } else if (tr.status === 'done'){
+    txt = 'Terminó con rc=0 y contrato válido'
+      + ((tr.attempts||0) > 1 ? `, tras ${tr.attempts} intentos` : '')
+      + (tr.verifier ? `. Encadenó un verificador (#${tr.verifier.id}, estado ${esc(tr.verifier.status)})` : '. Sin verificador encadenado (solo odd-worker lo encadena)')
+      + (ek ? ` Último intento dejó error_kind=${esc(ek)}` : '');
+  } else if (tr.status === 'pending'){
+    txt = 'En cola: aún no se ha ejecutado. Se ejecuta con ▶ ejecutar siguiente o python3 -m control.cli task run.';
+    if (ek.indexOf('provider') === 0) txt += ' Un intento anterior falló por el proveedor sin consumir intento.';
+  } else if (tr.status === 'running'){
+    txt = 'En ejecución: fase «' + esc(tr.phase || '—') + '».';
+    if (tr.lease_until){
+      const r = (new Date(tr.lease_until) - Date.now()) / 1000;
+      txt += r > 0 ? ' Lease vence en ' + fmtAge(r) + '.' : ' Lease vencido (el reconciliador la marcará dead).';
+    }
+  } else {
+    txt = 'no hay información suficiente en el registro para explicar este resultado.';
+  }
+  return errBlock + revBlock + `<h3>¿Por qué tiene este resultado?</h3><div class="muted" style="margin-top:.3rem">${txt}</div>`;
+}
+function hideTrace(){ selectedTrace=null; document.getElementById('trace-panel').hidden=true; }
+
+async function loadExecutionMetrics(){
+  if (Date.now() - metricsLoadedAt < 30000) return;
+  metricsLoadedAt=Date.now();
+  const box=document.getElementById('execution-metrics');
+  try{
+    const data=await fetchJSON('/api/execution-metrics');
+    if (!data.agents.length && !data.phases.length){box.textContent='sin ejecuciones registradas en los últimos 30 días';return;}
+    const rows=data.agents.map(r=>`<tr><td class="mono">${esc(r.agent)}</td><td>${esc(r.status)}</td><td>${r.count}</td><td>${r.avg_seconds==null?'—':r.avg_seconds+' s'}</td></tr>`).join('');
+    const stages=data.phases.map(r=>`<tr><td class="mono">${esc(r.agent)}</td><td>${esc(r.phase)} (${esc(r.status)})</td><td>${r.count}</td><td>${r.avg_seconds==null?'—':r.avg_seconds+' s'}</td></tr>`).join('');
+    const errors=data.dead_errors.map(r=>`${esc(r.error_kind||'sin clasificar')}: ${r.count}`).join(' · ');
+    box.innerHTML=`<h3>Resultados por agente</h3><div class="table-wrap"><table><thead><tr><th>Agente</th><th>Estado</th><th>Tareas</th><th>Media total</th></tr></thead><tbody>${rows||'<tr><td colspan="4">sin tareas terminales</td></tr>'}</tbody></table></div>`+
+      `<h3>Fases instrumentadas</h3><div class="table-wrap"><table><thead><tr><th>Agente</th><th>Fase (resultado)</th><th>Intentos</th><th>Media</th></tr></thead><tbody>${stages||'<tr><td colspan="4">sin fases medidas todavía</td></tr>'}</tbody></table></div>`+
+      `<div class="muted">Tareas dead por causa: ${errors||'sin datos'}</div>`;
+  }catch(e){metricsLoadedAt=0;box.textContent='no se pudieron cargar métricas: '+e.message;}
+}
 
 function taskDuration(t){
   if (!t.started_at || !t.finished_at) return '—';
@@ -762,10 +1143,35 @@ function renderTasks(){
       ['pending','waiting','running','done','failed','dead'].map(k=>
         `<span class="tag" style="margin-right:.3rem">${k}: <b>${s[k]||0}</b></span>`).join('');
     document.getElementById('tasks-empty').style.display = d.tasks.length ? 'none' : 'block';
-    ALL_TASKS = d.tasks;
+    ALL_TASKS = d.active_task && !d.tasks.some(t=>t.id===d.active_task.id)
+      ? [d.active_task,...d.tasks] : d.tasks;
+    const pending = ALL_TASKS.filter(t=>t.status==='waiting');
+    const pendBox = document.getElementById('execution-pending');
+    pendBox.innerHTML = pending.length
+      ? '<div class="muted" style="font-size:.8rem;margin-bottom:.2rem">pendientes de decisión humana (no se están ejecutando):</div>' +
+        pending.map(t=>`<div class="live-block" data-id="${t.id}" data-running="false" style="margin-bottom:.35rem">
+          <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+            <span class="pill warn"><span class="dot"></span>requiere decisión</span>
+            <b class="mono">#${t.id}</b> <span class="mono">${esc(t.agent)}</span>
+            · <span class="live-elapsed mono">…</span>
+            <button class="btn" style="padding:.15rem .5rem" onclick="showTrace(${t.id})">ver traza →</button>
+            <button class="btn" style="padding:.15rem .5rem" title="reencola esta tarea; no consume intentos por sí sola"
+              onclick="event.stopPropagation();doAction('/api/actions/retry',{task_id:${t.id}})">↻ revisar y reencolar</button>
+          </div>
+          <div class="muted" style="margin-top:.2rem;font-size:.78rem">${esc((t.note||'').slice(0,160))}</div>
+        </div>`).join('')
+      : '';
+    document.getElementById('execution-recent').innerHTML =
+      '<div class="muted" style="font-size:.8rem">tareas recientes:</div>' +
+      (ALL_TASKS.slice(0,5).map(t=>
+        `<button type="button" class="btn" style="margin:.15rem" onclick="showTrace(${t.id})">#${t.id} ${esc(t.agent)} · ${esc(t.status)}</button>`
+      ).join('') || 'sin tareas recientes');
     fillTaskFilters();
     renderTasks();
     renderLive();
+    if (selectedTrace !== null && document.getElementById('tab-en-vivo').getAttribute('aria-selected') === 'true') refreshTrace(selectedTrace);
+    else if (selectedTrace === null && LIVE_TASK && document.getElementById('tab-en-vivo').getAttribute('aria-selected') === 'true') refreshTrace(LIVE_TASK.id);
+    loadExecutionMetrics();
     // select de agentes permitidos
     if (!document.getElementById('new-agent').options.length){
       ['qa-gate','sdd-implement','sdd-verify','risk-lens','reliability-lens','context-compressor','build','general','explore']
@@ -870,14 +1276,17 @@ document.addEventListener('keydown', e=>{
     return;
   }
   const tp = document.getElementById('trace-panel');
-  if (tp && !tp.hidden){ tp.hidden = true; return; }
+  if (tp && !tp.hidden){ hideTrace(); return; }
   if (SEL_NODE){
     SEL_NODE = null;
     renderGraph();
   }
+  if (SEL_COMP){
+    clearCompSelection();
+  }
 });
 
-document.addEventListener('DOMContentLoaded',()=>{showView(viewFromLocation());loadData();setInterval(loadData,30000);});
+document.addEventListener('DOMContentLoaded',()=>{paintThemeBtn();showView(viewFromLocation());loadData();setInterval(loadData,30000);});
 </script>
 </body>
 </html>

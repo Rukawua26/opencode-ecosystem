@@ -13,7 +13,7 @@ Reglas especificas de este repositorio. Complementan (no sustituyen) `~/AGENTS.m
 - Tests: `python3 -m unittest discover -s control/tests`.
 - Skills: `python3 validate-skills.py skills`.
 - Runtime: `./opencode-ecosystem status` debe terminar en `[ok] sin drift`.
-- Cierre: `./verify.sh` verde y `qa-gate.sh --strict` exit 0.
+- Cierre: `./verify.sh` verde y `scripts/qa-gate.sh --strict` exit 0.
 
 ## Limites duros
 

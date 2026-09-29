@@ -104,7 +104,7 @@ class ControlHandler(BaseHTTPRequestHandler):
             self._json([f.to_dict() for f in snap.flows])
             return
         if path == "/api/tasks":
-            from .db import list_tasks
+            from .db import list_tasks, running_task
             from .runner import queue_summary
             limit = 50
             for part in query.split("&"):
@@ -113,7 +113,12 @@ class ControlHandler(BaseHTTPRequestHandler):
                         limit = min(200, max(1, int(part[6:])))
                     except ValueError:
                         pass
-            self._json({"summary": queue_summary(), "tasks": list_tasks(limit)})
+            self._json({"summary": queue_summary(), "tasks": list_tasks(limit),
+                        "active_task": running_task()})
+            return
+        if path == "/api/execution-metrics":
+            from .db import execution_metrics
+            self._json(execution_metrics())
             return
         if path.startswith("/api/tasks/") and path.endswith("/trace"):
             from .trace import build_trace
