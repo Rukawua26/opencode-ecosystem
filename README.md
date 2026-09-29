@@ -183,6 +183,7 @@ en contexto al invocar la skill.
 | `resilience-lens` | 4R: red, timeouts, fallbacks y degradación elegible |
 | `reliability-lens` | 4R: flakiness, mocks frágiles, aserciones no deterministas |
 | `readability-lens` | 4R: sugiere revisión humana de legibilidad, nunca bloquea |
+| `supabase-apply-lite` | Migración, despliegue de Edge Function y verificación en el remoto |
 
 Las cuatro lentes informan; ninguna bloquea. Edita siempre la fuente en
 `skills/<name>/SKILL.md` y después:
