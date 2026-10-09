@@ -25,7 +25,7 @@ filosofía de **ahorro de tokens, YAGNI y stdlib solamente**.
 |---|---|
 | Lenguaje | Python 3, **solo stdlib**: 0 dependencias de runtime |
 | Tests | 159 con `unittest` (1 skip opt-in; Playwright solo si existe) |
-| Skills | 10 (6 núcleo + 4 lentes 4R) |
+| Skills | 13 bajo demanda (incluidas 4 lentes 4R) |
 | Panel | `http://127.0.0.1:8765` (local, sin red) |
 | Persistencia | SQLite local, retención 30 días / 20 000 filas |
 
@@ -34,7 +34,7 @@ filosofía de **ahorro de tokens, YAGNI y stdlib solamente**.
 ```mermaid
 flowchart TB
     subgraph ECO["Fuente de verdad: ~/opencode-ecosystem (Git)"]
-        A1["skills/<br/>10 skills bajo demanda"]
+        A1["skills/<br/>13 skills bajo demanda"]
         A2["scripts/<br/>qa-gate, higiene, ram-guard"]
         A3["configs/<br/>opencode, dcp, cron-jobs"]
         A4["control/<br/>plano de control Python stdlib"]
@@ -184,6 +184,7 @@ en contexto al invocar la skill.
 | `reliability-lens` | 4R: flakiness, mocks frágiles, aserciones no deterministas |
 | `readability-lens` | 4R: sugiere revisión humana de legibilidad, nunca bloquea |
 | `supabase-apply-lite` | Migración, despliegue de Edge Function y verificación en el remoto |
+| `web-quality-lite` | Estandar web de 20 puntos (legal, SEO, accesibilidad, rendimiento) |
 
 Las cuatro lentes informan; ninguna bloquea. Edita siempre la fuente en
 `skills/<name>/SKILL.md` y después:
