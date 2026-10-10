@@ -1,7 +1,7 @@
 ---
 nombre: 2026-09-29-memoria-senial-instruccion
 fecha: 2026-09-29
-estado: aplicado
+estado: verificado
 afecta: [scripts, memoria, docs]
 fuente: propio
 ---
@@ -77,3 +77,14 @@ Paridad conceptual lite con `~/docs/sources/gentle-ai-analysis.md`
 (trigger-rules, ODD-only, riesgo en lineas anadidas). Dejado fuera a
 proposito: Engram/vector, TUI, multi-runtime, telemetria, registry
 persistente, RDD con autoridad.
+
+## Cierre de observacion (2026-10-10)
+
+Observacion de 11 dias con evidencia en el runtime real (`~/.config/opencode/memory/`):
+- `observations.log`: cero lineas `ram-guard` desde el fix (ultima 2026-09-29T09:48,
+  antes del sync) y cero cabeceras `### kairos` vacias desde 2026-09-29T14:14.
+- `topics/`: sin `inbox-*`; 0 ficheros.
+- `MEMORY.md` con decision nueva (2026-09-29) presente.
+- `status` verde en cada cierre durante el periodo; `sync --apply` sin
+  sobrescribir memoria viva (tests `control/tests/test_ecosystem_sync.py` 7/7).
+Conclusion: estable; estado -> verificado.

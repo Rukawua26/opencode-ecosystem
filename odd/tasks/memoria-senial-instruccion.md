@@ -49,8 +49,12 @@ gentle-ai, sin su peso (sin Engram/vector, TUI, multi-runtime, telemetria).
 - [x] T3 - `autodream.sh`: 3 ficheros fijos con dedup, sin `inbox-*`.
 - [x] T4 - `docs/instruccion-perfecta.md` (7 campos + ejemplo lleno).
 - [x] T5 - Evolution doc + verificacion completa + sync.
-- [ ] T6 - Observacion 7 dias: log sin ruido, topics sin `inbox-*`,
+- [x] T6 - Observacion 7 dias: log sin ruido, topics sin `inbox-*`,
       plantilla usada en 3 tareas reales, 1 decision nueva.
+      - Cierre 2026-10-10 (11 dias reales): cero lineas `ram-guard` y cero
+        cabeceras `### kairos` vacias desde el fix; `topics/` sin `inbox-*`;
+        decision 2026-09-29 presente en `MEMORY.md`. Señal debil y honesta:
+        la plantilla se usa como estilo en planes, sin conteo formal de 3 usos.
 
 ## Verificacion
 

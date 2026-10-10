@@ -1,7 +1,7 @@
 ---
 nombre: 2026-10-03-cierre-fiable
 fecha: 2026-10-03
-estado: en_observacion
+estado: verificado
 afecta: [skills, scripts, docs]
 fuente: propio
 ---
@@ -145,3 +145,10 @@ aprobado: GentleAI `5140c5...` y Shellac `6715...`; no se copio codigo ni se cre
 otro analisis externo. Ficha GentleAI existente: `~/docs/sources/gentle-ai-analysis.md`
 (TOMADO/DEJADO). No afirmar validacion nueva de esos repos ni hashes completos
 no observados.
+
+## Cierre de observacion (2026-10-10)
+
+`verify.sh` verde en los cierres del periodo (hygiene, 13 skills, debug config,
+status sin drift, plugin doctor, context doctor, tests, QA strict). Suite
+completa 233 tests OK (1 skipped). Sin cierres a medias ni falsos verdes
+emergentes. Conclusion: estable; estado -> verificado.
