@@ -35,6 +35,8 @@ cmd_status() {
   if [ -d "$ECO/commands" ]; then
     diff -rq -x '*.bak-*' "$ECO/commands" "$CFG/commands" >/dev/null 2>&1 || { echo "[drift] commands/"; drift=1; }
   fi
+  diff -q "$ECO/memory/kairos.sh" "$CFG/memory/kairos.sh" >/dev/null 2>&1 || { echo "[drift] memory/kairos.sh"; drift=1; }
+  diff -q "$ECO/memory/autodream.sh" "$CFG/memory/autodream.sh" >/dev/null 2>&1 || { echo "[drift] memory/autodream.sh"; drift=1; }
   [ "$drift" = "0" ] && echo "[ok] sin drift"
   return "$drift"
 }
@@ -63,10 +65,16 @@ cmd_sync() { # sync --apply : ECO -> CFG con backup; jsonc solo con config-apply
       cp "$f" "$CFG/commands/"
     done
   fi
-  for s in kairos.sh autodream.sh MEMORY.md; do
-    [ -e "$CFG/memory/$s" ] || cp "$ECO/memory/$s" "$CFG/memory/$s"
+  # Scripts de memoria gestionados: copia siempre desde la fuente (con backup),
+  # para que el runtime no pueda divergir en silencio del repo.
+  for s in kairos.sh autodream.sh; do
+    backup_dest "$CFG/memory/$s"
+    cp "$ECO/memory/$s" "$CFG/memory/$s"
   done
-  chmod +x "$CFG/memory/"*.sh 2>/dev/null || true
+  # Memoria viva (MEMORY.md) y logs/topics: se sembran solo si faltan; nunca se
+  # sobrescribe un archivo existente, porque son estado del usuario.
+  [ -e "$CFG/memory/MEMORY.md" ] || cp "$ECO/memory/MEMORY.md" "$CFG/memory/MEMORY.md"
+  chmod +x "$CFG/memory/kairos.sh" "$CFG/memory/autodream.sh" 2>/dev/null || true
   managed_list > "$MANAGED"
   echo "[ok] sync aplicado"
 }
