@@ -24,7 +24,7 @@ filosofía de **ahorro de tokens, YAGNI y stdlib solamente**.
 | | |
 |---|---|
 | Lenguaje | Python 3, **solo stdlib**: 0 dependencias de runtime |
-| Tests | 159 con `unittest` (1 skip opt-in; Playwright solo si existe) |
+| Tests | Suite con `unittest` (skip opt-in; Playwright solo si existe) |
 | Skills | 13 bajo demanda (incluidas 4 lentes 4R) |
 | Panel | `http://127.0.0.1:8765` (local, sin red) |
 | Persistencia | SQLite local, retención 30 días / 20 000 filas |
@@ -78,7 +78,7 @@ cd ~/opencode-ecosystem
 
 ./opencode-ecosystem status          # diff ECO vs ~/.config/opencode
 ./opencode-ecosystem sync --apply    # instalar la fuente de verdad en el runtime
-./verify.sh                          # triggers + config + status + doctores
+./verify.sh                          # cierre único: tests + validadores + QA strict
 
 python3 -m control --serve           # panel local -> http://127.0.0.1:8765
 ```
@@ -203,10 +203,19 @@ Reinicia OpenCode para cargar la skill actualizada y documenta el cambio en
 
 | Script | Uso |
 |---|---|
-| `scripts/qa-gate.sh` | Staged diff: `catch` vacío, secretos, logs, TODO/FIXME y riesgos en líneas añadidas. `--strict` bloquea lo crítico |
+| `scripts/qa-gate.sh` | Índice canónico + rutas rastreadas raíz; warn=0 por hallazgos, strict=1 por bloqueantes, error/incompleto=2 |
 | `scripts/hygiene.sh` | `triggers`, `prune`, `reset` — manual y **preview por defecto** |
 | `scripts/ram-guard-lite.sh` | Presión de RAM: avisa y recorta contexto si toca el techo |
 | `scripts/co-change-analyzer.sh` | Sugiere qué revisar junto tras un cambio |
+
+QA analiza texto añadido: secretos y `catch` vacío bloquean en strict; logs,
+TODO/FIXME y riesgos avisan. Solo los riesgos excluyen tests/comentarios, no los
+secretos. Ignora `GIT_*` heredado; sin staged declara **no aplicable**, pero aún
+comprueba rutas sensibles rastreadas. No certifica unstaged ni es SAST/SCA.
+No imprime fragmentos fuente: solo ubicación saneada y etiquetas fijas. Git tiene
+15 s por consulta y 16 MiB de **lectura** por salida (no hard cap de disco/RAM);
+presenta hasta 50 hallazgos, evaluando todos. Binarios, formatos no soportados o
+diffs incompletos devuelven 2 incluso en warn; acepta vacíos válidos SHA-1/SHA-256.
 
 ### Higiene
 
@@ -226,7 +235,7 @@ líneas. Pin de backups: renombra a `.bak-pinned` y `prune` lo ignorará.
 | Ruta | Qué hay |
 |---|---|
 | `AGENTS.md` | Reglas del agente: autorización, ODD, routing, autopistas de contexto |
-| `skills/` | 10 skills (6 núcleo + 4 lentes 4R) |
+| `skills/` | 13 skills bajo demanda (incluidas 4 lentes 4R) |
 | `scripts/` | `qa-gate.sh`, `hygiene.sh`, `ram-guard-lite.sh`, `co-change-analyzer.sh` |
 | `configs/` | `opencode.jsonc`, `dcp.jsonc`, `cron-jobs.json` |
 | `control/` | Plano de control: panel, lanzador, SQLite, CLI y tests |
@@ -255,12 +264,26 @@ Si editas el JSON, replica el cambio en `~/.config/systemd/user/` y haz
 ## Verificación
 
 ```bash
-python3 -m unittest discover -s control/tests   # 159 tests
-./verify.sh                                     # vista única de cierre
-./scripts/qa-gate.sh --strict                   # staged diff
-python3 validate-skills.py skills               # 10 skills válidas
-./opencode-ecosystem status                     # [ok] sin drift
+./verify.sh                                     # cierre local único, sin argumentos
 ```
+
+Ejecuta secuencialmente hygiene triggers, validadores de skills fuente/runtime,
+config resuelta, drift, doctores de plugins/contexto, discovery no vacío,
+`python3 -m unittest discover -s control/tests`, consulta staged y QA strict.
+QA siempre se ejecuta, incluso sin staged. Cada control muestra etiqueta,
+estado y alcance (`ok`, `warn`, `fail`, `unavailable`, `incomplete`); descarta
+stdout/stderr de los hijos, sin persistir sus detalles. Hygiene rc=1 es aviso.
+Exit 0 exige todos los obligatorios completos; 1 significa cierre rojo;
+2, argumentos inválidos o entorno inicial no disponible.
+
+Tests leen el **working tree**; QA usa el **índice canónico y rutas rastreadas raíz**
+de `~/opencode-ecosystem`, ignorando `GIT_*` heredado. No congela un candidato ni
+certifica código unstaged. Los comandos individuales siguen disponibles para
+diagnóstico (`validate-skills.py`, `status`, unittest y `qa-gate.sh --strict`).
+Timeout GNU aplica KILL al grupo normal al deadline (15/30/60/180 s según control),
+no a procesos deliberadamente detached fuera de él. Desactiva trace/verbose/errexit
+heredados; `BASH_ENV` previo al arranque queda fuera de esa garantía: no es sandbox.
+Límites, rollback y evidencia pendiente: [cierre fiable](docs/evolution/2026-10-03-cierre-fiable.md).
 
 ## Ámbito: global vs proyecto
 
