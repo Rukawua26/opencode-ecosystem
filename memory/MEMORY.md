@@ -4,9 +4,10 @@
 > Sin Docker, sin vector DB, sin CodeMEM pesado. Solo Markdown + Bash. Máquina: i5-1235U, 8GB RAM.
 
 ## Topics
-- (vacío — `autodream.sh` creará `topics/*.md` al consolidar)
+- `decisiones.md`, `lecciones.md`, `preferencias.md` (destila `autodream.sh` con dedup; si no hay señal, no escribe)
 
 ## Decisiones
+- 2026-09-29: memoria-señal (ram-guard a log propio, kairos solo con señal, autodream a 3 fijos sin `inbox-*`) + plantilla `docs/instruccion-perfecta.md`. Base `67dbb55`.
 - 2026-09-11: base `noffolo/opencode-ecosystem`, adaptación lite. Ver `~/docs/sources/noffolo-ecosystem-analysis.md`.
 - 2026-09-11: DCP 32-40k (no 80k), modelos locales solo 1-3B, qa-gate en warn.
 
