@@ -144,6 +144,22 @@ class TestRunnerPolicy(LeaseFixture):
         self.assertEqual(verifier["parent_id"], tid)
         self.assertEqual(verifier["model"], "openai/gpt-5.6-luna")
         self.assertEqual(verifier["workspace"], str(Path.home()))
+        # Con documento ODD el verifier localiza la tarea ahi; no se duplica
+        # el prompt del worker (medido: ~600 chars por cadena).
+        self.assertIn("Documento ODD: odd/tasks/001-x.md", verifier["prompt"])
+        self.assertNotIn("Tarea original: crea x", verifier["prompt"])
+
+    def test_verifier_keeps_original_task_without_doc(self) -> None:
+        tid = db.add_task("odd-worker", "crea x", path=self.path)
+        with mock.patch.object(runner, "_run_agent", return_value={
+            "code": 0, "duration": 0.1, "note": "", "error_kind": "",
+            "result": "success", "summary": "x creado", "question": "",
+            "next_transition": "",
+        }):
+            runner.run_next(self.path)
+        verifier = db.next_pending(self.path)
+        self.assertEqual(verifier["agent"], "odd-verifier")
+        # Sin documento ODD, el texto original es la unica referencia.
         self.assertIn("Tarea original: crea x", verifier["prompt"])
 
     def test_sensitive_terminal_task_is_scrubbed(self) -> None:

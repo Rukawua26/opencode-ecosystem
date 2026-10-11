@@ -225,13 +225,23 @@ def run_next(path: Path | None = None, owner: str = "") -> dict | None:
                        path=path)
         if agent == _WORKER_AGENT:
             feature = task.get("feature") or ""
+            if feature:
+                # La tarea ya esta en el doc ODD: no duplicar el prompt del worker
+                # en el del verificador (medido: ~600 chars por cadena, 2026-10).
+                tarea_ref = (
+                    "Localiza en el documento ODD la tarea implementada "
+                    f"por el worker #{tid} y contrasta solo esa. "
+                )
+            else:
+                # Sin documento ODD, el texto original es la unica referencia.
+                tarea_ref = f"Tarea original: {task['prompt']}. "
             verifier_prompt = (
                 f"Verifica en modo read-only la tarea #{tid}. "
                 f"Workspace: {task.get('workspace') or '(actual)'}. "
                 f"Feature: {feature or '(no declarada)'}. "
                 f"Documento ODD: odd/tasks/{feature}.md. "
-                f"Tarea original: {task['prompt']}. "
-                f"Salidas esperadas: {task.get('expected_outputs') or '(no declaradas)'}. "
+                + tarea_ref
+                + f"Salidas esperadas: {task.get('expected_outputs') or '(no declaradas)'}. "
                 f"Verificacion esperada: {task.get('verification_command') or '(no declarada)'}. "
                 "Inspecciona el diff y los checks existentes; no modifiques archivos."
             )
