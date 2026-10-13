@@ -42,7 +42,7 @@ salida/entrada sin valor de seguridad.
 - [x] T2 - Cambio condicional en `_run_verification` (runner.py) + typo `terea`->`tarea`.
 - [x] T3 - Tests de contrato (con/sin documento ODD) verdes.
 - [x] T4 - Suite completa 234 OK, status sin drift, qa-gate exit 0, verify.sh verde.
-- [ ] T5 - Observacion 7 dias (primeras delegaciones reales tras el cambio).
+- [x] T5 - Observacion (cerrada 2026-10-12 con delegacion real post-cambio).
 
 ## Decisiones aceptadas
 - 2026-10: solo se elimina la duplicacion; se conserva ruta ODD + ID de worker.
@@ -57,8 +57,14 @@ salida/entrada sin valor de seguridad.
   `./verify.sh` -> `[ok] verify verde`.
 
 ## Progreso
-- Estado: T4/S implementada; observacion en curso (T5).
-- Ultima tarea: T4. Siguiente paso: observar 1-2 delegaciones reales y confirmar
-  que el verifier localiza la tarea sin el texto duplicado; si hay imprecision,
-  revertir solo ese bloque.
+- Estado: cerrada (2026-10-12).
+- Ultima tarea: T5 observado. Delegaccion real post-cambio: verificador #17
+  (parent #14, feature gentle-ai-parity-lite) ejecutada 2026-10-11T19:02,
+  despues del commit 8469039, con `RESULT: success`, rc=0 y nota
+  "Sin hallazgos.". El verificador localizo la tarea desde el documento ODD;
+  sin el bloque duplicado del prompt el ciclo completo funciono. Los prompts se
+  purgan al terminar, asi que no hay texto para medir de nuevo; el cierre es
+  por comportamiento observado, no por re-medicion.
+- Se vigilara si aparece imprecision en futuras delegaciones; en ese caso se
+  revierte solo el bloque de `_run_verification`.
 - Bloqueos: ninguno.

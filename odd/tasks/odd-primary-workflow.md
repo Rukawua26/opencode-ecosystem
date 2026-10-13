@@ -88,7 +88,11 @@ Excluye:
 
 ## Progreso
 
-- Estado: en_observacion
+- Estado: cerrado (2026-10-12). La observacion de "tareas ODD reales durante 2
+  semanas" tiene evidencia suficiente en la cola: cadenas worker -> verifier
+  completaron con rc=0 en #7->#10 (piloto documentado aqui), #12->#13
+  (gentle-ai-parity) y #14->#17 (lentes y paridad QA, 2026-09-21 a 2026-10-11),
+  sin falsos bloqueos ni divergencia de cola. El modelo del kernel ODD se
+  autoaplica en cada sesion (AGENTS.md) sin depender ya de este documento.
 - Ultima tarea: T10
-- Siguiente paso: reiniciar OpenCode y observar tareas ODD reales durante 2 semanas
 - Bloqueos: ninguno

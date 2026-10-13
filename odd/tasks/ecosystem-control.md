@@ -202,7 +202,7 @@ sino que hace visible lo que ya existe y cierra deuda operativa.
 
 ## Progreso
 - Última tarea terminada: T83 (Etapa 12A: monitor vivo + traza de detención)
-- Estado: en observacion (T47 reiniciado)
+- Estado: cerrado (T47 resultado de revision operativa 2026-10-12)
 - Bloqueos: ninguno
 - Commits: 89de1ba (Etapa 9A). Etapa 10A+11A en b967809. Etapa 12A sin confirmar.
 
@@ -243,11 +243,13 @@ verification_command NO se expone al navegador (ejecuta comandos locales arbitra
 diagnostico por CLI en vez de endpoint HTTP. Formulario avanzado generico descartado;
 si se demuestra necesidad, Etapa 8B con perfiles predefinidos.
 
-- [ ] T47 — Cerrar periodo de observacion REINICIADO tras cambios Etapa 11A
-  (inspector + README + pin plugin_doctor). Servicios activos (4/4 timers,
-  panel HTTP 200). Abierto hasta ~2026-09-25 o hasta detectar anomalias;
-  cierre con revision operativa semanal: servicio+reconciliador+3 timers,
-  tests, verify.sh, drift, actividad de la semana.
+- [x] T47 — Periodo de observacion cerrado (2026-10-12, 7 dias despues de lo
+  previsto inicial, sin anomalias). Revision operativa del dia: servicio
+  activo, reconciliador ok, 3/3 timers activos (ram-guard, kairos, reconcile),
+  todos los servicios de usuario activos; `control.cli doctor` -> ok=True;
+  suite 294 tests OK (1 skip); `./verify.sh` verde; `status` sin drift; cola
+  16 done/1 dead (#11: task historica con workspace ya inexistente; dead es
+  terminal y no bloquea). No hace falta reabrir.
 - [x] T48 — Documentacion coherente: README sin claims obsoletos (titulo Fase 1, "sin botones", "no lanza tareas" eliminados), doctor documentado, reconciliador con su propio encabezado, registro Etapa 8A aqui.
 - [x] T49 — Errores visibles y CSRF recuperable: fetchJSON con HTTP status; pushError con banner (max 3, dedup) para snapshot/tareas/eventos; 403 -> "La sesion del panel expiro... Recarga la pagina" sin tocar el formulario; clearErrors al recuperar.
 - [x] T50 — Cola sin backend nuevo: filtros f-status/f-agent/f-model/f-sens (locales, poblando opciones de la propia cola), columna Duracion (started_at/finished_at), duracion_s en actividad, badge parent_id "↳ de #N". Micro-fix: `--help` global y `task --help` verificados (exit 0).
