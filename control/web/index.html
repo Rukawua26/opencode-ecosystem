@@ -210,6 +210,12 @@ try{
     <div id="execution-metrics" class="muted">cargando métricas…</div>
   </section>
 
+  <section class="panel" data-view="resumen" id="verify-section">
+    <h2>🧾 Último cierre (<span class="mono">./verify.sh</span>)</h2>
+    <div class="hint">resultado del último cierre ejecutado en la terminal · el panel NO ejecuta la suite, solo lee un informe privado · verde = checks obligatorios OK; no cubre sesiones interactivas ni código sin stage</div>
+    <div id="verify-body" class="muted">cargando informe del cierre…</div>
+  </section>
+
   <section class="panel" data-view="resumen">
     <h2>⏱️ Timers systemd</h2>
     <div class="hint">tareas programadas del usuario (whitelist opencode-*)</div>
@@ -357,6 +363,7 @@ try{
       <tbody>
         <tr><td>Resumen · contadores</td><td>skills, comandos, agentes, timers, flujos y si el servicio está arriba</td><td><span class="mono">snapshot.json</span> (recolectado de disco + systemd + <span class="mono">opencode service status</span>)</td></tr>
         <tr><td>Resumen · ⚡ Ejecución en vivo</td><td>solo la tarea <span class="mono">running</span>: fase, tiempo en curso y cuenta atrás del <i>lease</i>. Si no hay ninguna, dice que no hay proceso en ejecución. Nunca el prompt ni la salida del agente</td><td>SQLite, tabla de tareas</td></tr>
+        <tr><td>Resumen · 🧾 Último cierre</td><td>resultado del último <span class="mono">./verify.sh</span> ejecutado en la terminal: cada check con su <b>alcance</b>, su resultado y el motivo cuando el informe lo trae. <b>El panel no ejecuta el cierre</b>: solo lee un informe privado. Sin informe, en curso o antiguo se dice explícitamente; nunca se pinta verde por defecto. Motivos: solo se traducen literales conocidos; si el detalle no está en el informe, dice que no hay causa disponible en lugar de inventarla</td><td><span class="mono">verify-last.json</span> escrito por <span class="mono">verify.sh</span> (0600, atómico). No guarda stdout de los comandos</td></tr>
         <tr><td>En vivo · Pendientes de decisión</td><td>tareas <span class="mono">waiting</span>: terminó y espera una decisión humana, con su tiempo de espera y nota. No se presentan como ejecución activa</td><td>SQLite, tabla de tareas</td></tr>
         <tr><td>Resumen · ⏱️ Timers systemd</td><td>tareas programadas del usuario (whitelist <span class="mono">opencode-*</span>): estado, última y próxima ejecución</td><td><span class="mono">systemctl --user list-timers</span></td></tr>
         <tr><td>Resumen · 🩺 Reconciliador</td><td>inconsistencias detectadas: tareas atascadas y timers declarados ausentes</td><td><span class="mono">control/reconcile.py</span> (timer cada 5&nbsp;min, con <i>cooldown</i> de 120&nbsp;s)</td></tr>
@@ -551,6 +558,66 @@ async function loadData(force){
     return;
   }
   clearErrors();
+  loadVerify();
+}
+
+// ---- Último cierre (./verify.sh): lectura de informe, nunca ejecución ----
+
+const VERIFY_BADGE = {
+  ok: ['ok', 'cierre verde'], red: ['err', 'cierre rojo'],
+  warn: ['warn', 'con avisos'], unknown: ['', 'desconocido'],
+};
+
+function verifyBadge(result) {
+  const map = {ok: 'ok', warn: 'warn', fail: 'err', unavailable: 'err', incomplete: 'warn'};
+  return map[result] || '';
+}
+
+async function loadVerify(){
+  const box = document.getElementById('verify-body');
+  try{
+    const r = await fetchJSON('/api/verify');
+    if (!r.available){
+      box.innerHTML =
+        `<div class="banner warn">⚠️ ${esc(r.why || 'sin informe')}</div>` +
+        `<div class="muted" style="margin-top:.4rem">Ejecuta <span class="mono">./verify.sh</span> en <span class="mono">~/opencode-ecosystem</span> para generar evidencia.</div>`;
+      return;
+    }
+    const meta = VERIFY_BADGE[r.overall] || VERIFY_BADGE.unknown;
+    const stateTxt = {
+      completed: 'completado', running: 'en curso', interrupted: 'interrumpido',
+    }[r.state] || r.state;
+    const staleTag = r.stale ? ' <span class="tag warn">antiguo</span>' : '';
+    const head =
+      `<div style="display:flex;flex-wrap:wrap;gap:.5rem;align-items:center">` +
+      `<span class="pill ${meta[0]}"><span class="dot"></span>${esc(meta[1])}</span>` +
+      `<span class="tag">${esc(stateTxt)}</span>${staleTag}` +
+      (r.age_s != null ? `<span class="muted">hace ${esc(fmtAge(r.age_s))}</span>` : '') +
+      (r.elapsed_s != null ? `<span class="muted">duró ${esc(r.elapsed_s)} s</span>` : '') +
+      (r.exit_code != null ? `<span class="tag">rc=${esc(String(r.exit_code))}</span>` : '') +
+      `</div>`;
+    const why = r.why ? `<div class="muted" style="margin-top:.4rem">${esc(r.why)}</div>` : '';
+    const rows = (r.checks || []).map(c =>
+      `<tr><td class="mono">${esc(c.name)}` +
+      (c.scope ? `<div class="muted" style="font-size:.72rem">${esc(c.scope)}</div>` : '') +
+      `</td>` +
+      `<td><span class="pill ${verifyBadge(c.result)}">${esc(c.result)}</span></td>` +
+      `<td class="muted">${esc(c.detail || '—')}` +
+      (c.elapsed_s ? ` · ${esc(c.elapsed_s)} s` : '') + `</td>` +
+      `<td class="muted">${esc(c.why || 'sin causa disponible en el informe')}</td></tr>`).join('');
+    const table = rows
+      ? `<div class="table-wrap" style="margin-top:.5rem"><table><thead><tr>` +
+        `<th>Check</th><th>Resultado</th><th>Detalle</th><th>Por qué / alcance</th>` +
+        `</tr></thead><tbody>${rows}</tbody></table></div>`
+      : '<div class="muted" style="margin-top:.4rem">el informe no llegó a registrar checks</div>';
+    const failed = (r.failing || []).length
+      ? `<div class="banner err" style="margin-top:.4rem">⛔ checks con resultado bloqueante: ${esc((r.failing || []).join(', '))}</div>`
+      : '';
+    box.innerHTML = head + why + failed + table +
+      `<div class="hint" style="margin-top:.5rem">${esc(r.note || '')}</div>`;
+  }catch(e){
+    box.innerHTML = `<div class="banner warn">⚠️ no se pudo leer el informe del cierre: ${esc(e.message)}</div>`;
+  }
 }
 
 function fmtAge(s){

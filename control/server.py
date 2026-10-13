@@ -116,6 +116,12 @@ class ControlHandler(BaseHTTPRequestHandler):
             self._json({"summary": queue_summary(), "tasks": list_tasks(limit),
                         "active_task": running_task()})
             return
+        if path == "/api/verify":
+            # Lectura del informe privado del cierre. NO ejecuta verify.sh:
+            # el panel nunca lanza la suite.
+            from .verify_report import read_report
+            self._json(read_report())
+            return
         if path == "/api/execution-metrics":
             from .db import execution_metrics
             self._json(execution_metrics())

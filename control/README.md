@@ -109,6 +109,28 @@ Sin SSE/WebSockets, sin migración SQLite, sin stdout persistido.
 Verificacion: 154/154 tests OK (1 skip opt-in ajeno a esta etapa),
 Playwright real, `verify.sh` verde, `status` sin drift, qa-gate strict OK.
 
+## Ultimo cierre (`./verify.sh`) — que se comprobo y por que
+
+- `verify.sh` deja un informe privado en
+  `~/.local/share/opencode-control/verify-last.json` (0600, escritura atomica).
+  Solo se escribe al ejecutar `./verify.sh` desde la terminal.
+- Contiene por check: nombre, alcance, resultado, detalle fijo y codigo de
+  salida. **No** contiene stdout/stderr de los hijos, prompts ni secretos.
+  Marcador `state=running` al empezar: si verify muere, no se presenta un
+  informe viejo como si fuera el estado actual.
+- `GET /api/verify` — lectura saneada por allowlist. Nunca lanza: ausente,
+  corrupto o de otro esquema se devuelve como estado desconocido.
+- Tarjeta "Ultimo cierre" en Resumen: resultado, antiguedad, checks con su
+  alcance y el motivo traducido. `warn` no es fallo. Un informe antiguo se
+  marca; uno en curso se marca; **sin informe no se pinta verde**.
+- Motivo: solo se traduce el literal que `verify.sh` ya produce. Para un
+  detalle desconocido dice que no hay causa disponible en lugar de inventar.
+- El panel **no ejecuta** el cierre ni la suite. No hay endpoint de ejecucion,
+  ni SSE, ni polling nuevo: se reutiliza el refresco de 30 s.
+
+Limite honesto: un cierre verde acredita los checks de `verify.sh` en ese
+momento. No cubre sesiones interactivas, uso de skills ni codigo sin stage.
+
 ## Vista En vivo — seguimiento de tareas del runner (2026-09-28)
 
 - Pestaña `En vivo`: tarea activa/esperando decisión, traza detallada y acceso

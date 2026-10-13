@@ -122,11 +122,24 @@ class VerifyTests(unittest.TestCase):
         self.assertNotIn("[ok] verify verde", output)
         self.assertIn("[fail] verify rojo", output)
 
+    def checks_of(self, events):
+        """Solo los checks del cierre, sin las llamadas al escritor de informe."""
+        return [e for e in events if e[0] in CHECKS]
+
+    def helpers_of(self, events):
+        """Llamadas auxiliares (marcador 'en curso' + informe final)."""
+        return [e for e in events if e[0] not in CHECKS]
+
     def test_full_success_runs_exact_tests_strict_and_all_existing_checks(self):
         code, output, events = self.run_verify()
         self.assertEqual(code, 0)
         self.assertIn("[ok] verify verde", output)
-        self.assertEqual([event[0] for event in events], list(CHECKS))
+        self.assertEqual([event[0] for event in self.checks_of(events)], list(CHECKS))
+        # verify.sh solo puede usar python3 para el informe privado: dos veces,
+        # una al empezar (marcador "en curso") y otra al terminar. Fijar el
+        # numero impide que aparezcan procesos auxiliares ocultos.
+        self.assertEqual(len(self.helpers_of(events)), 2,
+                         "solo se permiten 2 llamadas auxiliares al informe")
         self.assertEqual(next(e[1] for e in events if e[0] == "tests"),
                          ["-m", "unittest", "discover", "-s", "control/tests"])
         self.assertEqual(next(e[1] for e in events if e[0] == "gate"), ["--strict"])
@@ -142,7 +155,7 @@ class VerifyTests(unittest.TestCase):
             with self.subTest(label=label):
                 code, output, events = self.run_verify(faults={label: 2})
                 self.assert_red(code, output)
-                self.assertEqual([e[0] for e in events], list(CHECKS))
+                self.assertEqual([e[0] for e in self.checks_of(events)], list(CHECKS))
                 if label == "gate":
                     self.assertIn("[incomplete] QA strict", output)
 
@@ -167,7 +180,7 @@ class VerifyTests(unittest.TestCase):
         self.assert_red(code, output)
         self.assertIn("staged desconocido (consulta incompleta)", output)
         self.assertNotIn("sin cambios staged", output)
-        self.assertEqual(events[-1][0], "gate")
+        self.assertEqual(self.checks_of(events)[-1][0], "gate")
 
     def test_hygiene_trigger_warns_but_operational_error_does_not(self):
         code, output, _ = self.run_verify(faults={"hygiene": 1})
@@ -219,7 +232,7 @@ class VerifyTests(unittest.TestCase):
                 self.assert_red(code, output)
                 self.assertIn("[incomplete]", output)
                 if command != "qa-gate.sh":
-                    self.assertEqual(events[-1][0], "gate")
+                    self.assertEqual(self.checks_of(events)[-1][0], "gate")
 
     def test_invalid_arguments_fail_closed_without_execution_or_raw_output(self):
         code, output, events = self.run_verify(args=[MARKER])
@@ -251,7 +264,7 @@ class VerifyTests(unittest.TestCase):
                 self.env["HOME"] = str(self.home)
                 code, output, events = self.run_verify(faults={"source": 2})
                 self.assert_red(code, output)
-                self.assertEqual([e[0] for e in events], list(CHECKS))
+                self.assertEqual([e[0] for e in self.checks_of(events)], list(CHECKS))
 
     def test_git_environment_cannot_redirect_canonical_staged_query(self):
         git = shutil.which("git")
