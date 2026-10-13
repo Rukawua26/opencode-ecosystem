@@ -163,7 +163,7 @@ try{
     </div>
   </div>
   <div class="top-right">
-    <span id="health-pill"></span>
+    <span id="health-pill" title="mide servicio OpenCode + timers activos + errores; no incluye ./verify.sh ni los tests" aria-label="salud del runtime: servicio OpenCode y timers, no incluye verify.sh ni tests"></span>
     <button type="button" class="btn" id="theme-toggle" onclick="toggleTheme()" title="cambiar de tema" aria-label="cambiar de tema">🌓</button>
     <button class="btn" onclick="loadData(true)" title="fuerza recolección en el servidor">↻ actualizar</button>
   </div>
@@ -572,8 +572,8 @@ function render(){
   document.getElementById('meta').innerHTML =
     'generado <span class="mono">'+ esc(SNAP.generated_at||'—') +'</span> · hace '+fmtAge(age) + freshBadge +' · v'+esc(SNAP.version);
   document.getElementById('health-pill').innerHTML = h.ok
-    ? '<span class="pill ok"><span class="dot"></span>sano</span>'
-    : '<span class="pill err"><span class="dot"></span>revisar</span>';
+    ? '<span class="pill ok"><span class="dot"></span>runtime sano</span>'
+    : '<span class="pill err"><span class="dot"></span>runtime: revisar</span>';
 
   document.getElementById('stats').innerHTML = [
     ['🎯', c.skills||0, 'skills'],

@@ -113,6 +113,23 @@ def _collect_scripts(root: Path) -> list[Component]:
     ]
 
 
+def _collect_root_entrypoints(root: Path) -> list[Component]:
+    """Scripts de cierre en la raiz del repo (fuera de scripts/), si existen."""
+    p = root / "verify.sh"
+    if not p.is_file():
+        return []
+    return [
+        Component(
+            kind=ComponentKind.SCRIPT.value,
+            name=p.stem,
+            title=p.name,
+            description="",
+            path=str(p),
+            source=Source.OBSERVADO.value,
+        )
+    ]
+
+
 def _collect_memory_sh(root: Path) -> list[Component]:
     mem_dir = root / "memory"
     if not mem_dir.is_dir():
@@ -329,8 +346,29 @@ def _build_flows() -> list[Flow]:
         Flow(
             name="qa-gate",
             title="Control de calidad local",
-            description="restore -> qa-gate -> pre-commit; hooks ram-guard y kairos activos",
-            steps=["qa-gate", "ram-guard (5m)", "kairos (30m)"],
+            description=(
+                "qa-gate --strict sobre staged + rutas rastreadas, ejecutado siempre "
+                "por el cierre ./verify.sh; ram-guard y kairos son timers, no hooks"
+            ),
+            steps=["qa-gate --strict (staged + rastreadas)", "ram-guard timer (5m)", "kairos timer (30m)"],
+            source=Source.DECLARADO.value,
+        ),
+        Flow(
+            name="cierre",
+            title="Cierre local ./verify.sh",
+            description=(
+                "./verify.sh secuencial: hygiene, validate-skills (fuente y runtime), "
+                "opencode debug config, status sin drift, doctores, unittest de "
+                "control/tests, consulta staged y qa-gate --strict"
+            ),
+            steps=[
+                "validate-skills (fuente + runtime)",
+                "debug config",
+                "status sin drift",
+                "plugin doctor + context doctor",
+                "unittest control/tests",
+                "qa-gate --strict",
+            ],
             source=Source.DECLARADO.value,
         ),
     ]
@@ -344,6 +382,7 @@ def collect_snapshot(eco_root: Path | None = None) -> Snapshot:
     components += _collect_skills(root)
     components += _collect_commands(root)
     components += _collect_scripts(root)
+    components += _collect_root_entrypoints(root)
     components += _collect_memory_sh(root)
     components += _collect_configs(root)
     components += _parse_opencode_subagents(root)
@@ -395,6 +434,7 @@ def collect_snapshot(eco_root: Path | None = None) -> Snapshot:
             "configs/dcp.jsonc",
             "configs/cron-jobs.json",
             "scripts/",
+            "verify.sh",
             "memory/",
             "systemd --user (timers activos)",
             "opencode service status",

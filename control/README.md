@@ -6,9 +6,11 @@ Panel local (127.0.0.1:8765) que observa tu `opencode-ecosystem` y muestra:
 - skills, comandos, agentes, scripts, configs
 - timers systemd (activos, última ejecución, próxima)
 - salud del servicio OpenCode
-- flujos declarados (ODD, ODD delegado, QA-gate)
+- flujos declarados (ODD, ODD delegado, QA-gate, cierre)
 - cola de tareas del lanzador y actividad auditable
 - acciones cerradas desde el panel (Etapa 4, ver abajo)
+
+El alcance de "salud" es servicio OpenCode + timers activos + errores del snapshot: no incluye `./verify.sh` ni la suite de tests.
 
 ## Uso
 
