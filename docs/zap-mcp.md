@@ -1,10 +1,24 @@
 # ZAP via MCP en proyectos (opcional, bajo demanda)
 
-Estado: documentado. El endpoint real (HTTP vs HTTPS) queda **pendiente de
-verificar** hasta instalar ZAP y hacer un smoke-test; hasta entonces la plantilla
-lleva `disabled: true`.
+Estado: verificado en este proyecto (2026-10-12). ZAP 2.17 daemon con MCP
+0.4.0 responde en `http://127.0.0.1:8282`; handshake MCP correcto y rechazo
+sin clave. La plantilla del proyecto queda habilitada (`disabled` ausente) y
+solo se activa cuando el daemon está arrancado.
 
 ## Que es
+
+> Aclaración aditiva (2026-10-14): la verificación anterior es histórica y de
+> un proyecto concreto, no una comprobación actual ni una activación global.
+> La plantilla genérica de abajo conserva `disabled: true`; no representa la
+> configuración local habilitada descrita arriba. El fallo de sustitución de
+> entorno registrado más abajo corresponde al entorno del servicio observado,
+> no demuestra que la sintaxis sea inválida en todos los entornos. El header
+> directo es un antecedente, no una recomendación de guardar claves en Git;
+> no copiar claves a terminales compartidos, historial, informes o ejemplos.
+> La clave MCP y la API key de ZAP son distintas: `api.key` del ejemplo de
+> arranque no acredita configurar la security key MCP. Antes de usar, verificar
+> por separado autenticación MCP y alcance local autorizado. Esta revisión no
+> ha arrancado ZAP ni repetido su handshake ni modificado configuración.
 
 El complemento oficial **MCP Integration** de ZAP expone un servidor MCP en
 `http://localhost:8282` con herramientas (spider, ajax spider, active scan,
@@ -85,9 +99,40 @@ Notas:
 - Esta integracion complementa a `web-quality-lite`: aquella lista criterios,
   ZAP aporta evidencia de seguridad para el punto "seguridad basica".
 
-## Pendiente (cuando haya ZAP instalado)
+## Verificación (2026-10-12)
 
-- [ ] Smoke-test del endpoint y del handshake MCP.
-- [ ] Confirmar formato del header Authorization frente a la doc.
-- [ ] Verificar aislamiento: un proyecto sin la config no lista `zap`.
-- [ ] Documentar el resultado en `docs/evolution/`.
+- [x] Smoke-test del endpoint y del handshake MCP: `initialize` devuelve
+  `serverInfo: ZAP MCP Server 0.4.0`.
+- [x] Header `Authorization` con la clave exacta, sin prefijo `Bearer`; sin clave
+  responde `Invalid or missing security key`.
+- [x] Arranque daemon verificado en los puertos 8080 y 8282, MCP listener en
+  `127.0.0.1:8282`; `opencode mcp list` muestra `zap connected` y
+  `zap_version` responde `2.17.0`.
+- [x] Aislamiento: `opencode mcp list` solo muestra `zap` en este proyecto.
+- [x] El reemplazo `{env:ZAP_MCP_KEY}` en `opencode.json` **no funciona** para
+  este servidor remoto: OpenCode no tenía la variable en el entorno del
+  servicio y la conexión fallaba con 401. Solución aplicada: registrar el header
+  directo con `opencode mcp add zap --url http://127.0.0.1:8282 --header
+  "Authorization=<clave>"`. La clave viaja solo en la configuración local del
+  proyecto, nunca en Git ni en informes.
+- [ ] Documentar el resultado en `docs/evolution/` del ecosistema (sigue pendiente
+  de versionar el ecosistema, fuera del repo de la app).
+
+## Arranque y parada del daemon
+
+```bash
+# arrancar (mismo directorio home ~/.ZAP, puertos 8080/8282)
+/home/miguel/tools/zap/zap.sh -daemon -port 8080 \
+  -config mcp.securityKeyEnabled=true -config mcp.enabled=true \
+  -config mcp.port=8282 -config mcp.secureOnly=false \
+  -config api.key=<api-key>
+
+# verificar
+opencode mcp list
+
+# parar
+pkill -f 'zap-2.17.0.jar'
+```
+
+Si el daemon ya está en otro puerto o con otra clave, `opencode mcp add` vuelve a
+registrar el server del proyecto con la URL y el header correctos.
