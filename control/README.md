@@ -70,7 +70,7 @@ control/
   model.py      — dataclasses Component, TimerInfo, Flow, Snapshot
   collect.py    — scan fs + systemd + opencode service status
   state.py      — cache TTL + escritura atómica del snapshot
-  server.py     — http.server, solo 127.0.0.1, read-only
+  server.py     — http.server en 127.0.0.1, GET y acciones POST cerradas con CSRF/Origin
   cli.py        — status/snapshot rápido
   main.py       — entrada --once / --serve
   web/index.html — interfaz sin dependencias
@@ -185,7 +185,7 @@ Reglas:
 - Desde Etapa 7 corre solo via `opencode-control-reconcile.timer` (cada 5 min).
 
 ## Acciones desde el panel (Etapa 4)
-Tras la lista de "solo lectura", el panel admite acciones cerradas:
+El servidor no es solo lectura: el panel admite estas acciones cerradas:
 
 - **↻ actualizar** (arriba): fuerza recoleccion real.
 - **▶ ejecutar siguiente**: lanza la primera tarea `pending` (1 a la vez; si hay otra corriendo, avisa).
@@ -270,6 +270,13 @@ python3 -m control.cli task add odd-worker "implementa X" --workspace <ruta>
 
 ## Limitaciones conocidas
 - Los timers se leen del systemd del usuario actual.
+- El contraste con cron comprueba nombres/presencia/actividad, no horarios,
+  comandos efectivos ni resultados del servicio. Intervalos monotónicos systemd
+  y calendarios cron no son equivalentes por compartir frecuencia nominal.
+- Un detalle systemd fallido/incompleto queda `unknown`, inactivo y con error de
+  salud. Una lista fallida o inválida devuelve `[]`: no distingue ausencia de
+  indisponibilidad, y sin timers la salud no es verde. Las advertencias de
+  divergencia por sí solas no cambian `health.ok`.
 - Los "agentes" se extraen del `configs/opencode.jsonc` con regex — suficiente para esta etapa.
 - Los flujos no se infieren automaticamente: solo los declarados.
 - Sin WebSockets; refresco cada 30s.

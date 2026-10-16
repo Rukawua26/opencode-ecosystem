@@ -11,9 +11,10 @@ managed_list() {
   echo "opencode/dcp.jsonc"
   echo "opencode/cron-jobs.json"
   for f in "$ECO"/skills/*/SKILL.md; do
+    [ -e "$f" ] || continue
     rel="opencode/skills/$(basename "$(dirname "$f")")/SKILL.md"; echo "$rel"
   done
-  for f in "$ECO"/scripts/*.sh "$ECO"/memory/*.sh "$ECO"/memory/MEMORY.md; do
+  for f in "$ECO"/scripts/*.sh "$ECO"/memory/kairos.sh "$ECO"/memory/autodream.sh; do
     [ -e "$f" ] || continue
     case "$f" in
       */scripts/*) echo "opencode/scripts/$(basename "$f")" ;;
@@ -30,6 +31,7 @@ cmd_status() {
   local drift=0
   diff -q "$ECO/configs/opencode.jsonc" "$CFG/opencode.jsonc" >/dev/null 2>&1 || { echo "[drift] opencode.jsonc"; drift=1; }
   diff -q "$ECO/configs/dcp.jsonc" "$CFG/dcp.jsonc" >/dev/null 2>&1 || { echo "[drift] dcp.jsonc"; drift=1; }
+  diff -q "$ECO/configs/cron-jobs.json" "$CFG/cron-jobs.json" >/dev/null 2>&1 || { echo "[drift] cron-jobs.json"; drift=1; }
   diff -rq "$ECO/skills" "$CFG/skills" >/dev/null 2>&1 || { echo "[drift] skills/"; drift=1; }
   diff -rq "$ECO/scripts" "$CFG/scripts" >/dev/null 2>&1 || { echo "[drift] scripts/"; drift=1; }
   if [ -d "$ECO/commands" ]; then
@@ -43,55 +45,135 @@ cmd_status() {
 
 backup_dest() { # $1 = destino en CFG
   local d="$1"
+  [ ! -L "$d" ] || return 1
+  [ ! -e "$d" ] || [ -f "$d" ] || return 1
   if [ -e "$d" ] && [ ! -L "$d" ]; then
-    cp -a "$d" "$d.bak-$(date +%F)" && echo "[backup] $d"
+    local bk
+    bk=$(mktemp -d "$d.bak-XXXXXXXX") || return 1
+    cp -a "$d" "$bk/" || return 1
+    echo "[backup] $d"
   fi
+  return 0
+}
+
+# No seguir enlaces en arboles gestionados ni en sus antecesores.
+safe_tree() {
+  local p="$1"
+  while [ "$p" != / ]; do
+    [ ! -L "$p" ] || { echo "[error] enlace no permitido: $p" >&2; return 1; }
+    p=$(dirname "$p")
+  done
+  if [ -d "$1" ]; then
+    local links
+    links=$(find "$1" -type l -print -quit) || return 1
+    [ -z "$links" ] || return 1
+  fi
+}
+
+managed_path() {
+  case "$1" in
+    *..*|*//*|/*) return 1 ;;
+    opencode/opencode.jsonc|opencode/dcp.jsonc|opencode/cron-jobs.json|opencode/memory/kairos.sh|opencode/memory/autodream.sh) ;;
+    opencode/scripts/*.sh|opencode/commands/*.md|opencode/skills/*/SKILL.md)
+      # Los patrones shell admiten '/': limitar ademas la profundidad.
+      local tail="${1#opencode/}" rest
+      rest="${tail#*/}"
+      case "$tail" in
+        skills/*) rest="${rest%/SKILL.md}" ;;
+      esac
+      case "$rest" in */*|'') return 1 ;; esac ;;
+    *) return 1 ;;
+  esac
+  safe_tree "$CFG/${1#opencode/}"
 }
 
 cmd_sync() { # sync --apply : ECO -> CFG con backup; jsonc solo con config-apply --apply
   local apply="${1:-}"
   if [ "$apply" != "--apply" ]; then echo "uso: $0 sync --apply"; return 2; fi
   python3 "$ECO/validate-skills.py" "$ECO/skills" || return 1
-  mkdir -p "$CFG/scripts" "$CFG/skills" "$CFG/memory/topics" "$CFG/commands"
-  backup_dest "$CFG/opencode.jsonc"; cp "$ECO/configs/opencode.jsonc" "$CFG/opencode.jsonc"
-  backup_dest "$CFG/dcp.jsonc"; cp "$ECO/configs/dcp.jsonc" "$CFG/dcp.jsonc"
-  backup_dest "$CFG/cron-jobs.json"; cp "$ECO/configs/cron-jobs.json" "$CFG/cron-jobs.json"
-  cp -r "$ECO/skills/." "$CFG/skills/"
-  cp "$ECO"/scripts/*.sh "$CFG/scripts/"; chmod +x "$CFG/scripts/"*.sh
+  local tree
+  # Comprobar solo lo que se copia o escribe; no recorrer personalizaciones.
+  for tree in "$ECO/skills" "$CFG/skills" "$MANAGED" "$CFG/memory/MEMORY.md"; do
+    safe_tree "$tree" || return 1
+  done
+  for tree in opencode.jsonc dcp.jsonc cron-jobs.json; do
+    safe_tree "$ECO/configs/$tree" && safe_tree "$CFG/$tree" || return 1
+  done
+  for tree in "$ECO"/scripts/*.sh "$ECO"/commands/*.md "$ECO/memory/kairos.sh" "$ECO/memory/autodream.sh"; do
+    [ -e "$tree" ] || [ -L "$tree" ] || continue
+    safe_tree "$tree" && safe_tree "$CFG/${tree#"$ECO/"}" || return 1
+  done
+  safe_tree "$ECO/memory/MEMORY.md" || return 1
+  # Los directorios tambien se validan cuando la fuente no tiene entradas.
+  for tree in scripts commands memory; do
+    [ ! -L "$CFG/$tree" ] || return 1
+  done
+  mkdir -p "$CFG/scripts" "$CFG/skills" "$CFG/memory" "$CFG/commands" || return 1
+  for tree in opencode.jsonc dcp.jsonc cron-jobs.json; do
+    cmp -s "$ECO/configs/$tree" "$CFG/$tree" && continue
+    backup_dest "$CFG/$tree" || return 1
+    cp "$ECO/configs/$tree" "$CFG/$tree" || return 1
+  done
+  cp -r "$ECO/skills/." "$CFG/skills/" || return 1
+  for tree in "$ECO"/scripts/*.sh; do
+    [ -e "$tree" ] || continue
+    cmp -s "$tree" "$CFG/scripts/$(basename "$tree")" || cp "$tree" "$CFG/scripts/" || return 1
+    chmod +x "$CFG/scripts/$(basename "$tree")" || return 1
+  done
   if [ -d "$ECO/commands" ]; then
     for f in "$ECO"/commands/*.md; do
       [ -e "$f" ] || continue
-      backup_dest "$CFG/commands/$(basename "$f")"
-      cp "$f" "$CFG/commands/"
+      cmp -s "$f" "$CFG/commands/$(basename "$f")" && continue
+      backup_dest "$CFG/commands/$(basename "$f")" || return 1
+      cp "$f" "$CFG/commands/" || return 1
     done
   fi
-  # Scripts de memoria gestionados: copia siempre desde la fuente (con backup),
-  # para que el runtime no pueda divergir en silencio del repo.
+  # Scripts de memoria gestionados: copia con backup solo si difieren.
   for s in kairos.sh autodream.sh; do
-    backup_dest "$CFG/memory/$s"
-    cp "$ECO/memory/$s" "$CFG/memory/$s"
+    cmp -s "$ECO/memory/$s" "$CFG/memory/$s" && continue
+    backup_dest "$CFG/memory/$s" || return 1
+    cp "$ECO/memory/$s" "$CFG/memory/$s" || return 1
   done
-  # Memoria viva (MEMORY.md) y logs/topics: se sembran solo si faltan; nunca se
-  # sobrescribe un archivo existente, porque son estado del usuario.
-  [ -e "$CFG/memory/MEMORY.md" ] || cp "$ECO/memory/MEMORY.md" "$CFG/memory/MEMORY.md"
-  chmod +x "$CFG/memory/kairos.sh" "$CFG/memory/autodream.sh" 2>/dev/null || true
-  managed_list > "$MANAGED"
+  # MEMORY.md se siembra solo si falta; logs/topics personales no se tocan.
+  if [ ! -e "$CFG/memory/MEMORY.md" ]; then
+    cp "$ECO/memory/MEMORY.md" "$CFG/memory/MEMORY.md" || return 1
+  fi
+  chmod +x "$CFG/memory/kairos.sh" "$CFG/memory/autodream.sh" || return 1
+  managed_list > "$MANAGED" || return 1
   echo "[ok] sync aplicado"
 }
 
 cmd_publish() { # publish --yes : CFG -> ECO (solo gestionados)
   local yes="${1:-}"
   if [ "$yes" != "--yes" ]; then echo "uso: $0 publish --yes"; return 2; fi
-  python3 "$ECO/validate-skills.py" "$CFG/skills" || return 1
-  cp "$CFG/opencode.jsonc" "$ECO/configs/opencode.jsonc"
-  cp "$CFG/dcp.jsonc" "$ECO/configs/dcp.jsonc" 2>/dev/null || true
-  cp "$CFG/cron-jobs.json" "$ECO/configs/cron-jobs.json" 2>/dev/null || true
-  rm -rf "$ECO/skills" && cp -r "$CFG/skills" "$ECO/skills"
-  cp "$CFG"/scripts/*.sh "$ECO/scripts/" 2>/dev/null || true
-  if [ -d "$CFG/commands" ]; then
-    mkdir -p "$ECO/commands"
-    cp "$CFG"/commands/*.md "$ECO/commands/" 2>/dev/null || true
+  local tree stage
+  for tree in "$CFG" "$ECO/configs" "$ECO/skills" "$ECO/scripts" "$ECO/commands"; do
+    safe_tree "$tree" || return 1
+  done
+  stage=$(mktemp -d "$ECO/.publish-XXXXXXXX") || return 1
+  if ! cp -r "$CFG/skills" "$stage/skills" || ! python3 "$ECO/validate-skills.py" "$stage/skills"; then
+    rm -rf -- "$stage"
+    return 1
   fi
+  for tree in opencode.jsonc dcp.jsonc cron-jobs.json; do
+    [ ! -e "$ECO/configs/$tree" ] || [ -f "$ECO/configs/$tree" ] || { rm -rf -- "$stage"; return 1; }
+    cp "$CFG/$tree" "$ECO/configs/$tree" || { rm -rf -- "$stage"; return 1; }
+  done
+  cp "$CFG"/scripts/*.sh "$ECO/scripts/" || { rm -rf -- "$stage"; return 1; }
+  if [ -d "$CFG/commands" ]; then
+    mkdir -p "$ECO/commands" || { rm -rf -- "$stage"; return 1; }
+    for tree in "$CFG"/commands/*.md; do
+      [ -e "$tree" ] || continue
+      cp "$tree" "$ECO/commands/" || { rm -rf -- "$stage"; return 1; }
+    done
+  fi
+  mv "$ECO/skills" "$stage/original" || { rm -rf -- "$stage"; return 1; }
+  if ! mv "$stage/skills" "$ECO/skills"; then
+    mv "$stage/original" "$ECO/skills" || { echo "[error] restaurar skills desde $stage/original" >&2; return 1; }
+    rm -rf -- "$stage"
+    return 1
+  fi
+  rm -rf -- "$stage" || return 1
   echo "[ok] publish aplicado (sin .env/memoria/logs)"
 }
 
@@ -104,19 +186,27 @@ cmd_capture() { # capture --apply : recuperación manual controlada CFG->ECO inc
 cmd_uninstall() { # uninstall [--apply] : inverso selectivo por manifiesto, con backup previo
   local apply="${1:-preview}"
   local list src f n=0
-  if [ -f "$MANAGED" ]; then list=$(cat "$MANAGED"); else list=$(managed_list); fi
+  safe_tree "$MANAGED" || return 1
+  if [ -f "$MANAGED" ]; then list=$(cat "$MANAGED") || return 1; else list=$(managed_list) || return 1; fi
+  # Validar todo antes de borrar; manifiestos antiguos no autorizan memoria viva.
+  while IFS= read -r f; do
+    case "$f" in ''|opencode/memory/MEMORY.md) continue ;; esac
+    managed_path "$f" || { echo "[error] ruta no gestionada: $f" >&2; return 1; }
+  done <<< "$list"
   if [ "$apply" = "--apply" ]; then
-    local bk="$CFG/.pre-uninstall-$(date +%F-%H%M)"
-    mkdir -p "$bk"
+    local bk
+    bk=$(mktemp -d "$CFG/.pre-uninstall-XXXXXXXX") || return 1
   fi
   while IFS= read -r f; do
-    [ -z "$f" ] && continue
+    case "$f" in ''|opencode/memory/MEMORY.md) continue ;; esac
     src="$CFG/${f#opencode/}"
     [ -e "$src" ] || continue
     if [ "$apply" = "--apply" ]; then
-      mkdir -p "$bk/$(dirname "$f")"
-      cp -a "$src" "$bk/$f" 2>/dev/null || true
-      rm -f "$src"; echo "[rm] $src (backup en $bk)"
+      [ -f "$src" ] || return 1
+      mkdir -p "$bk/$(dirname "$f")" || return 1
+      cp -a "$src" "$bk/$f" || return 1
+      rm -f "$src" || return 1
+      echo "[rm] $src (backup en $bk)"
     else
       echo "[pdte] $src"
     fi

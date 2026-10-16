@@ -205,9 +205,17 @@ def _systemd_timers() -> list[TimerInfo]:
             text=True,
             timeout=5,
         )
+        if res.returncode != 0:
+            return []
         data = json.loads(res.stdout or "[]")
+        if not isinstance(data, list):
+            return []
         for item in data:
+            if not isinstance(item, dict):
+                return []
             unit = item.get("unit", "")
+            if not isinstance(unit, str):
+                return []
             if not unit.endswith(".timer"):
                 continue
             if not unit.startswith(_TIMER_WHITELIST_PREFIXES):
@@ -217,29 +225,36 @@ def _systemd_timers() -> list[TimerInfo]:
             units.append(
                 TimerInfo(
                     name=unit,
-                    active=True,
+                    active=False,
                     next_run=_fmt_usec(nxt) if nxt else "",
                     last_run=_fmt_usec(last) if last else "",
                 )
             )
-    except (FileNotFoundError, json.JSONDecodeError, subprocess.TimeoutExpired):
+    except (OSError, json.JSONDecodeError, subprocess.TimeoutExpired):
         return []
 
     # detallar con systemctl show
     detail: list[TimerInfo] = []
     for u in units:
+        u.result = "unknown"
         try:
             res = subprocess.run(
                 ["systemctl", "--user", "show", u.name, "--no-page",
                  "--property=ActiveState,SubState,Result,NextElapseUSecRealtime,LastTriggerUSec"],
                 capture_output=True, text=True, timeout=5,
             )
+            if res.returncode != 0:
+                detail.append(u)
+                continue
             kv = {}
             for line in res.stdout.splitlines():
                 if "=" in line:
                     k, v = line.split("=", 1)
                     kv[k.strip()] = v.strip()
-            u.active = kv.get("ActiveState") == "active"
+            if not kv.get("ActiveState"):
+                detail.append(u)
+                continue
+            u.active = kv["ActiveState"] == "active"
             nr = kv.get("NextElapseUSecRealtime", "")
             lr = kv.get("LastTriggerUSec", "")
             if nr:
@@ -247,7 +262,7 @@ def _systemd_timers() -> list[TimerInfo]:
             if lr:
                 u.last_run = lr
             u.result = kv.get("Result", "")
-        except Exception:
+        except (OSError, subprocess.TimeoutExpired):
             pass
         detail.append(u)
     return detail
@@ -271,7 +286,7 @@ def _declared_timer_units(root: Path) -> dict[str, str]:
 def crosscheck_timers(
     declared: dict[str, str], observed: list[TimerInfo]
 ) -> list[str]:
-    """Devuelve advertencias por divergencias config <-> systemd."""
+    """Contrasta nombres y actividad; no horarios ni comandos efectivos."""
     warnings: list[str] = []
     observed_names = {t.name for t in observed}
     for unit in declared:
@@ -409,6 +424,9 @@ def collect_snapshot(eco_root: Path | None = None) -> Snapshot:
         "componentes": len(components),
     }
     errors = []
+    for timer in timers:
+        if timer.result == "unknown":
+            errors.append(f"timer '{timer.name}': consulta systemd no disponible")
     warnings = crosscheck_timers(_declared_timer_units(root), timers)
     active_timers = sum(1 for t in timers if t.active)
     if not svc.active:

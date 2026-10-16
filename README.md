@@ -45,7 +45,7 @@ filosofía de **ahorro de tokens, YAGNI y stdlib solamente**.
 | Lenguaje | Python 3, **solo stdlib**: 0 dependencias de runtime |
 | Tests | Suite con `unittest` (skip opt-in; Playwright solo si existe) |
 | Skills | 13 bajo demanda (incluidas 4 lentes 4R) |
-| Panel | `http://127.0.0.1:8765` (local, sin red) |
+| Panel | `http://127.0.0.1:8765` (HTTP en loopback, no expuesto a la LAN) |
 | Persistencia | SQLite local, retención 30 días / 20 000 filas |
 
 ## Arquitectura
@@ -78,7 +78,7 @@ flowchart TB
     A2 --> CLI
     A3 --> CLI
     A5 --> CLI
-    CLI -->|"sync --apply con backup .bak-FECHA"| B1
+    CLI -->|"sync --apply con backup .bak-XXXXXXXX/"| B1
     CLI -->|"publish --yes"| A1
     B1 --> OC
     B2 --> OC
@@ -117,6 +117,12 @@ python3 -m control --serve           # panel local -> http://127.0.0.1:8765
 Nunca se sincronizan `.env`, `observations.log`, `topics/`, logs, backups ni plugins
 personales. `uninstall` los **retiene** por diseño. Reinicia OpenCode si cambian
 plugins, config de arranque o skills.
+
+`MEMORY.md` solo se siembra si falta y nunca se elimina por uninstall, incluso
+con manifiestos antiguos. Copias/backup fallidos devuelven error; sync/publish
+no son transacciones globales y pueden haber aplicado copias anteriores al fallo.
+Publish prepara y valida skills antes de sustituirlas; su rollback es acotado a
+esa sustitución. El ejecutable raíz y `control/` no se instalan mediante sync.
 
 ## Flujo de trabajo ODD
 
@@ -181,6 +187,8 @@ python3 -m control.cli task assess <worker_id> # revisión sin ejecutarla
 python3 -m control.cli task run                # 1 tarea a la vez
 ```
 
+El servidor permite acciones POST cerradas (encolar, ejecutar, reintentar/cancelar
+tareas y reiniciar timers), con controles CSRF/Origin; no es solo lectura.
 Qué **no** hace: no acepta comandos arbitrarios desde el navegador, no abre la API
 interna de OpenCode, no muestra prompts ni secretos, no relanza trabajo solo y no
 guarda la salida completa de los modelos. Detalle en [`control/README.md`](control/README.md).
@@ -203,6 +211,7 @@ en contexto al invocar la skill.
 | `reliability-lens` | 4R: flakiness, mocks frágiles, aserciones no deterministas |
 | `readability-lens` | 4R: sugiere revisión humana de legibilidad, nunca bloquea |
 | `supabase-apply-lite` | Migración, despliegue de Edge Function y verificación en el remoto |
+| `ui-ux-master` | Diseño y revisión visual de interfaces web, tokens y accesibilidad |
 | `web-quality-lite` | Estandar web de 20 puntos (legal, SEO, accesibilidad, rendimiento) |
 
 Las cuatro lentes informan; ninguna bloquea. Edita siempre la fuente en
@@ -224,7 +233,7 @@ Reinicia OpenCode para cargar la skill actualizada y documenta el cambio en
 |---|---|
 | `scripts/qa-gate.sh` | Índice canónico + rutas rastreadas raíz; warn=0 por hallazgos, strict=1 por bloqueantes, error/incompleto=2 |
 | `scripts/hygiene.sh` | `triggers`, `prune`, `reset` — manual y **preview por defecto** |
-| `scripts/ram-guard-lite.sh` | Presión de RAM: avisa y recorta contexto si toca el techo |
+| `scripts/ram-guard-lite.sh` | Si RAM disponible <15%, intenta terminar procesos que coincidan con `ollama run` y escribe su log |
 | `scripts/co-change-analyzer.sh` | Sugiere qué revisar junto tras un cambio |
 
 QA analiza texto añadido: secretos y `catch` vacío bloquean en strict; logs,
@@ -235,6 +244,22 @@ No imprime fragmentos fuente: solo ubicación saneada y etiquetas fijas. Git tie
 15 s por consulta y 16 MiB de **lectura** por salida (no hard cap de disco/RAM);
 presenta hasta 50 hallazgos, evaluando todos. Binarios, formatos no soportados o
 diffs incompletos devuelven 2 incluso en warn; acepta vacíos válidos SHA-1/SHA-256.
+
+RAM guard no compacta contexto ni comprueba que los procesos sean huérfanos:
+usa `pkill -f "ollama run"`, por lo que puede alcanzar sesiones activas. El log
+no demuestra que haya terminado un proceso (el fallo de pkill se ignora).
+Se documenta la política existente; no se cambia el umbral ni el script.
+
+### DCP: configuración conservada, consumidor no acreditado
+
+`configs/dcp.jsonc` se copia y compara, pero eso no prueba que se ejecute DCP.
+En esta fuente solo se encontraron consumidores de gestión/inventario (CLI y
+`control/collect.py`), no un motor de poda. La consulta efectiva `/api/config`
+del 2026-10-14 no mostró referencia a un plugin DCP ni clave DCP efectiva.
+Estado operativo: **inactivo/no acreditado**, aunque el archivo diga
+`enabled: true`; no se activa ni se atribuyen ahorros o umbrales efectivos
+32–40k. La compactación nativa observada es `auto=true, buffer=8000`, distinta
+de ese archivo. No se descarta un consumidor externo no observado.
 
 ### Higiene
 
@@ -273,12 +298,26 @@ líneas. Pin de backups: renombra a `.bak-pinned` y `prune` lo ignorará.
 
 | Timer | Cada | Qué hace |
 |---|---|---|
-| `opencode-ram-guard.timer` | 5 min | Vigila RAM y recorta contexto |
+| `opencode-ram-guard.timer` | 5 min | RAM disponible <15%: intenta terminar `ollama run` |
 | `opencode-control-reconcile.timer` | 5 min | Marca `dead` lo atascado, nunca relanza |
 | `opencode-kairos.timer` | 30 min | Consolida memoria |
 
-Si editas el JSON, replica el cambio en `~/.config/systemd/user/` y haz
-`daemon-reload`. Alternativa sin systemd: cron clásico con las mismas líneas.
+Son frecuencias nominales: las unidades observadas usan intervalos monotónicos
+desde activación/arranque; `*/5` o `*/30` del JSON son calendarios cron y no
+prueban horarios equivalentes. Editar el JSON no modifica unidades ni instala
+un ejecutor. Cualquier cambio de timers requiere autorización aparte.
+
+`./opencode-ecosystem status` compara bytes de `opencode.jsonc`, `dcp.jsonc` y
+`cron-jobs.json`, árboles `skills/` y `scripts/`, `commands/` si existe en fuente
+(excluye `*.bak-*`), y solo `memory/kairos.sh` y `memory/autodream.sh`.
+No valida semántica JSON, permisos, consumidores DCP, memoria viva, instalación
+de timers ni sus horarios/comandos/resultados. Un error de comparación también
+es drift (exit 1), nunca `[ok]`.
+
+El panel contrasta nombres/presencia/actividad de timers, no equivalencia de
+schedule/command. Fallos de detalle systemd quedan `unknown` y degradan salud;
+lista ausente/fallida se representa vacía, sin distinguir indisponibilidad de
+ausencia. Las advertencias de divergencia no hacen por sí solas `health.ok=false`.
 
 ## Verificación
 

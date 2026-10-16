@@ -110,6 +110,8 @@ class EcosystemSyncContract(unittest.TestCase):
     def test_topics_y_logs_no_se_tocan(self) -> None:
         self._sync()
         topics = self.cfg / "memory" / "topics"
+        self.assertFalse(topics.exists(), "sync no debe sembrar memoria personal")
+        topics.mkdir()
         (topics / "decisiones.md").write_text("# decisiones\n", encoding="utf-8")
         r = self._sync()
         self.assertEqual(r.returncode, 0, r.stderr)

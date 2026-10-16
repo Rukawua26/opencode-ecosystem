@@ -1,4 +1,4 @@
-"""Servidor web local read-only: solo 127.0.0.1, sin mutaciones."""
+"""Servidor HTTP en 127.0.0.1: lecturas y acciones POST cerradas con CSRF/Origin."""
 
 from __future__ import annotations
 
