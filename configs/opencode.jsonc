@@ -60,7 +60,13 @@
       "ssh *": "ask",
       "scp *": "ask",
       "sftp *": "ask",
-      "rsync *": "ask"
+      "rsync *": "ask",
+      // Lectura de ficheros de secretos por bash: best-effort. No cubre
+      // todas las variantes (python/node -e, redirecciones, alias...).
+      "* .env*": "ask",
+      "*/.env*": "ask",
+      "*/secrets/*": "ask",
+      "*/secrets/**": "ask"
     }
   },
   // 004-D: Context7 opt-in (docs vivas de libs). enabled:false = 0 tokens hasta activarlo.

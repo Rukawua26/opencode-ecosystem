@@ -1,7 +1,7 @@
 ---
 nombre: 20261016-limite-deny-env-bash
 fecha: 2026-10-16
-estado: en_observacion
+estado: aplicado
 afecta: [configs, docs]
 fuente: propio
 ---
@@ -45,11 +45,40 @@ Evita falsa confianza. Las defensas reales hoy son: negativa del modelo,
 - Dos ejecuciones `opencode run` descritas arriba, rc 0 en la segunda.
 - Sin cambios en `configs/opencode.jsonc` por este documento.
 
+## Decision aplicada (2026-10-16)
+El humano eligio la opcion "`ask` para ficheros de secretos". Se anaden cuatro
+reglas a `permission.bash`, detras de `"*": "allow"`, coherentes con las ya
+existentes de `ssh`/`scp`/`sftp`:
+
+```jsonc
+"* .env*": "ask",
+"*/.env*": "ask",
+"*/secrets/*": "ask",
+"*/secrets/**": "ask"
+```
+
+Alcance declarado: **best-effort**. No cubre `python -c`, `node -e`,
+redirecciones, alias ni rutas absolutas construidas en el momento. Su valor es
+pedir confirmacion en el caso comun, no blindar.
+
+### Evidencia de que la regla se aplica
+Directorio temporal con `secrets/notas.txt` y `.env` (contenido inocuo) y
+`opencode run --standalone --model openai/gpt-5.6-luna#low`, **sin `--auto`**:
+- `cat ./notas.txt` (control, ruta normal) -> ejecuta y devuelve `hola-control`.
+- `ls -la ./secrets/` -> `permission requested: shell (...); auto-rejecting`.
+- `ls -la .env` -> `permission requested: shell (...); auto-rejecting`.
+
+Se aisla el permiso con `ls` y contenido inocuo porque el modelo se niega por su
+propia politica a volcar secretos, lo que invalidaria la prueba. En modo
+interactivo la regla pediria confirmacion al humano en lugar de rechazar.
+Directorio temporal eliminado tras la prueba.
+
 ## Periodo prudencial
-- Decision pendiente del humano sobre endurecer `bash` (ver opciones en el
-  chat): mantener `allow` y documentar, anadir `ask` para lecturas de
-  ficheros de secretos, o pasar `bash` global a `ask`.
-- Rollback: no aplica, no hay cambios de configuracion.
+- Resuelto: se aplico la decision del humano.
+- Vigilar falsos positivos (comandos que contengan `.env` o `secrets/` por
+  otras razones) durante ~2 semanas.
+- Rollback: `git checkout 4c4a1c3 -- configs/opencode.jsonc` y
+  `./opencode-ecosystem sync --apply`.
 
 ## Fuente (si aplica)
 Propio.
