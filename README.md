@@ -44,7 +44,7 @@ filosofía de **ahorro de tokens, YAGNI y stdlib solamente**.
 |---|---|
 | Lenguaje | Python 3, **solo stdlib**: 0 dependencias de runtime |
 | Tests | Suite con `unittest` (skip opt-in; Playwright solo si existe) |
-| Skills | 13 bajo demanda (incluidas 4 lentes 4R) |
+| Skills | 14 bajo demanda (incluidas 5 lentes 4R) |
 | Panel | `http://127.0.0.1:8765` (HTTP en loopback, no expuesto a la LAN) |
 | Persistencia | SQLite local, retención 30 días / 20 000 filas |
 
@@ -53,7 +53,7 @@ filosofía de **ahorro de tokens, YAGNI y stdlib solamente**.
 ```mermaid
 flowchart TB
     subgraph ECO["Fuente de verdad: ~/opencode-ecosystem (Git)"]
-        A1["skills/<br/>13 skills bajo demanda"]
+        A1["skills/<br/>14 skills bajo demanda"]
         A2["scripts/<br/>qa-gate, higiene, ram-guard"]
         A3["configs/<br/>opencode, dcp, cron-jobs"]
         A4["control/<br/>plano de control Python stdlib"]
@@ -221,11 +221,12 @@ en contexto al invocar la skill.
 | `resilience-lens` | 4R: red, timeouts, fallbacks y degradación elegible |
 | `reliability-lens` | 4R: flakiness, mocks frágiles, aserciones no deterministas |
 | `readability-lens` | 4R: sugiere revisión humana de legibilidad, nunca bloquea |
+| `security-lens` | 4R: inyección, control de acceso y fuga de credenciales en el diff; complementa a `qa-gate`, nunca bloquea |
 | `supabase-apply-lite` | Migración, despliegue de Edge Function y verificación en el remoto |
 | `ui-ux-master` | Diseño y revisión visual de interfaces web, tokens y accesibilidad |
 | `web-quality-lite` | Estandar web de 20 puntos (legal, SEO, accesibilidad, rendimiento) |
 
-Las cuatro lentes informan; ninguna bloquea. Edita siempre la fuente en
+Las cinco lentes informan; ninguna bloquea. Edita siempre la fuente en
 `skills/<name>/SKILL.md` y después:
 
 ```bash
@@ -290,7 +291,7 @@ líneas. Pin de backups: renombra a `.bak-pinned` y `prune` lo ignorará.
 | Ruta | Qué hay |
 |---|---|
 | `AGENTS.md` | Reglas del agente: autorización, ODD, routing, autopistas de contexto |
-| `skills/` | 13 skills bajo demanda (incluidas 4 lentes 4R) |
+| `skills/` | 14 skills bajo demanda (incluidas 5 lentes 4R) |
 | `scripts/` | `qa-gate.sh`, `hygiene.sh`, `ram-guard-lite.sh`, `co-change-analyzer.sh` |
 | `configs/` | `opencode.jsonc`, `dcp.jsonc`, `cron-jobs.json` |
 | `control/` | Plano de control: panel, lanzador, SQLite, CLI y tests |

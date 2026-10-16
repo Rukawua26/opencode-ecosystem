@@ -37,6 +37,8 @@
       "~/.config/gh/hosts.yml": "deny",
       "~/.credentials/*": "deny",
       "**/secrets/*": "deny",
+      "**/secrets/**": "deny",
+      "**/.env*": "deny",
       "**/*.p12": "deny",
       "**/*.pfx": "deny"
     },
