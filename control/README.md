@@ -233,6 +233,17 @@ Reglas del lanzador:
 - Solo una operacion registrada del control-plane puede publicar una transicion ejecutable exacta. `task assess <worker-id>` es informativo: no ejecuta la transicion ni bloquea por tiempo.
 - `task assess` informa `pending|due|passed|failed`; `review_due` copia `finished_at` del worker como referencia, no es deadline ni SLA. Solo publica `python3 -m control.cli task run` cuando el verifier `pending` es el primero de la cola FIFO.
 - Un `odd-worker` ok encadena automaticamente un `odd-verifier` y registra recibo `receipt`.
+- La politica proporcional decide antes de entrar: documento ODD no obliga a
+  delegar; contexto limpio, paralelismo independiente o aislamiento justifican
+  worker. Riesgo en datos persistentes, seguridad, contratos, concurrencia,
+  entrega/entorno o falta de prueba eficaz exige revision independiente incluso
+  inline; incertidumbre peligrosa se aclara. Conteos no sustituyen esos motivos
+  ni eliminan guardas de seguridad/arquitectura o aprobacion humana.
+- Fuera de la cadena gestionada, verifier read-only puede revisar codigo inline
+  con documento, alcance, diff y checks, sin worker previo ni continuaciones o
+  autorizacion de mutaciones. Dentro del control-plane la cadena worker->verifier
+  sigue obligatoria: no se saltan gates ni se reclasifican tareas anteriores.
+  Checks funcionales y qa-gate se mantienen inline y delegado.
 - El verificador hereda workspace, feature, modelo y criterios; tras rc=0 ejecuta el `verification_command` determinista (timeout 120s).
 - El stdout del modelo NUNCA se guarda en el historial (solo rc + duracion + resumen).
 - Fallos del proveedor (saldo/rate limit) no consumen intentos funcionales.

@@ -135,9 +135,9 @@ flowchart LR
     A["1 Autorizar<br/>el humano aprueba alcance"]
     B["2 Explorar<br/>routing proporcional"]
     C["3 Resolver incertidumbre<br/>1 pregunta, 1 research"]
-    D["4 Clasificar<br/>inline vs odd-worker"]
-    E["5 Implementar<br/>odd-worker"]
-    F["6 Verificar<br/>odd-verifier + assess"]
+    D["4 Clasificar<br/>documento, delegacion, riesgo"]
+    E["5 Implementar<br/>inline o odd-worker"]
+    F["6 Verificar<br/>checks siempre; independiente por riesgo"]
     G["7 Cerrar<br/>verify, qa-gate, evolution"]
 
     A --> B --> C --> D --> E --> F --> G
@@ -146,8 +146,19 @@ flowchart LR
 ```
 
 - Trabajo pequeño entendido: **inline**, sin artefactos.
-- Trabajo sustancial (2+ pasos o progreso recuperable): **delegado** a
-  `odd-worker` y contrastado por `odd-verifier` en contexto fresco (profundidad 1).
+- Trabajo sustancial con decisiones, dependencias o progreso recuperable: documento
+  ODD y alcance aprobado; puede implementarse **inline** con checks funcionales.
+- Documento, delegacion y revision independiente son decisiones separadas. Delegar
+  requiere contexto limpio, paralelismo realmente independiente o aislamiento
+  justificado; contar archivos, writes, lecturas o capas no obliga (profundidad 1).
+- Riesgo en datos persistentes, seguridad, contratos, concurrencia, entrega/entorno
+  o falta de prueba eficaz exige verificador independiente, incluso inline.
+  La incertidumbre peligrosa se aclara; no se presume bajo riesgo. Se conservan
+  aprobaciones y guardas especializadas de seguridad/arquitectura de alto riesgo.
+- Al entrar al control-plane, `odd-worker` exitoso encadena siempre `odd-verifier`
+  y `assess`; no se saltan gates ni se reclasifican tareas previas automaticamente.
+  El verifier read-only tambien puede revisar inline fuera de esa cadena, sin
+  autorizar mutaciones ni emitir continuaciones. Checks y qa-gate siempre.
 - Un `RESULT: failed` del verificador deja la tarea en `waiting`: la decisión es
   humana, no un reintento ciego.
 
