@@ -85,6 +85,32 @@ class TestVerifyShObservado(unittest.TestCase):
             )
 
 
+class TestSubagentesDeclarados(unittest.TestCase):
+    """El parser no debe confundir el bloque 'agents' con su primer hijo."""
+
+    def test_nombra_los_subagentes_reales(self) -> None:
+        eco = Path(__file__).resolve().parent.parent.parent
+        subs = collect._parse_opencode_subagents(eco)  # noqa: SLF001
+        nombres = {c.name for c in subs}
+        self.assertNotIn("agents", nombres, "el contenedor no es un subagente")
+        self.assertEqual(nombres, {"odd-worker", "odd-verifier"})
+
+    def test_no_cruza_llaves_anidadas(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            cfg = root / "configs"
+            cfg.mkdir()
+            (cfg / "opencode.jsonc").write_text(
+                '{"agents": {'
+                '"a-uno": {"mode": "subagent", "description": "primero"},'
+                '"b-dos": {"mode": "subagent", "hidden": true, "description": "segundo"}'
+                "}}",
+                encoding="utf-8",
+            )
+            subs = collect._parse_opencode_subagents(root)  # noqa: SLF001
+            self.assertEqual([c.name for c in subs], ["a-uno", "b-dos"])
+
+
 class TestEtiquetaSaludAcotada(unittest.TestCase):
     def setUp(self) -> None:
         self.html = INDEX.read_text(encoding="utf-8")

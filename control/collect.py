@@ -174,8 +174,12 @@ def _parse_opencode_subagents(root: Path) -> list[Component]:
         return out
     try:
         text = cfg.read_text(encoding="utf-8", errors="replace")
-        # Campos sencillos: name/description dentro del bloque agent.*
-        for m in re.finditer(r'"([\w-]+)":\s*\{[^}]*?"description":\s*"([^"]*)"', text):
+        # Campos sencillos: name/description dentro del bloque agents.*
+        # Sin cruzar llaves: si no, "agents" se lleva la descripcion de su primer
+        # hijo y se pierde el nombre real del subagente.
+        for m in re.finditer(
+            r'"([\w-]+)":\s*\{(?:(?![{}])[\s\S])*?"description":\s*"([^"]*)"', text
+        ):
             name, desc = m.group(1), m.group(2)
             out.append(
                 Component(
