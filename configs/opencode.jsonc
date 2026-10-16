@@ -20,7 +20,6 @@
   },
   "compaction": {
     "auto": true,
-    "prune": true,
     "reserved": 8000
   },
   "watcher": {
