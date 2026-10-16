@@ -73,6 +73,18 @@ propia politica a volcar secretos, lo que invalidaria la prueba. En modo
 interactivo la regla pediria confirmacion al humano en lugar de rechazar.
 Directorio temporal eliminado tras la prueba.
 
+### Guardarraíl de regresion
+`control/tests/test_permission_rules.py` (6 tests) impide que las reglas
+desaparezcan en silencio al editar el JSONC: exige `read` deny de
+`**/.env*` y `**/secrets/**`, `edit` deny de `**/.env*`, `bash` ask de
+`* .env*`, `*/.env*`, `*/secrets/*` y `*/secrets/**`, y que se conserven
+`ssh`/`scp`/`sftp`/`rsync` en ask con `"*"` en allow.
+
+Verificado por mutacion (sobre copias temporales, sin tocar el fichero real):
+cambiar `ask` por `allow` y `deny` por `allow` hace fallar el test
+correspondiente. Alcance del test: solo configuracion; no prueba la
+ejecucion en caliente de la regla.
+
 ## Periodo prudencial
 - Resuelto: se aplico la decision del humano.
 - Vigilar falsos positivos (comandos que contengan `.env` o `secrets/` por
