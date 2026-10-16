@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""Lanzador explicito: avisa del cambio de version, nunca adapta el entorno."""
+
+import os
+from pathlib import Path
+import re
+import selectors
+import shutil
+import subprocess
+import sys
+import time
+
+
+def version(text):
+    match = re.fullmatch(r"(?:opencode\s+v?)?([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(?:[-+][A-Za-z0-9.-]{1,80})?)", text.strip())
+    return match.group(1) if match else None
+
+
+def probe_version(binary):
+    deadline = time.monotonic() + 3
+    with subprocess.Popen([binary, "--version"], stdout=subprocess.PIPE,
+                          stderr=subprocess.DEVNULL, bufsize=0) as process:
+        try:
+            output = bytearray()
+            with selectors.DefaultSelector() as selector:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                while True:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0 or not selector.select(remaining):
+                        raise subprocess.TimeoutExpired(binary, 3)
+                    chunk = os.read(process.stdout.fileno(), 257 - len(output))
+                    if not chunk:
+                        break
+                    output.extend(chunk)
+                    if len(output) > 256:
+                        raise ValueError("salida excesiva")
+            code = process.wait(timeout=max(0, deadline - time.monotonic()))
+            current = version(output.decode("utf-8"))
+            if code or not current:
+                raise ValueError("version no legible")
+            return current
+        finally:
+            if process.poll() is None:
+                process.kill()
+            process.wait()
+
+
+def check(binary, pin, interactive):
+    try:
+        with pin.open("rb") as stream:
+            pinned = version(stream.read(257).decode("utf-8"))
+        if not pinned:
+            raise ValueError("pin invalido")
+    except (OSError, UnicodeError, ValueError):
+        print("[aviso] Pin ausente o invalido; no hay autorizacion de revision.", file=sys.stderr)
+        return
+    try:
+        current = probe_version(binary)
+    except (OSError, UnicodeError, ValueError, subprocess.TimeoutExpired):
+        print("[aviso] No se pudo comprobar la version; sin autorizacion de revision.", file=sys.stderr)
+        return
+    if current == pinned:
+        return
+    print(f"[aviso] OpenCode instalado: {current}; pin aprobado: {pinned}.", file=sys.stderr)
+    if not interactive:
+        print("Sin consulta interactiva; no se ha autorizado ninguna revision.", file=sys.stderr)
+        return
+    print("¿Autorizar solo una revision, sin adaptar ni actualizar? [s/N] ", end="", file=sys.stderr, flush=True)
+    try:
+        answer = sys.stdin.readline(80).strip().lower()
+    except (OSError, UnicodeError):
+        print("[aviso] No se pudo leer la respuesta; se continua sin consentimiento.", file=sys.stderr)
+        answer = ""
+    if answer in ("s", "si"):
+        print("Revision aceptada solo en este lanzador. El agente NO recibe este consentimiento.\n"
+              "Solicitala en el chat: Revisa la compatibilidad de la version instalada; no hagas cambios.\n"
+              "No se inyecta ningun prompt ni se ejecuta ninguna revision automaticamente.", file=sys.stderr)
+    else:
+        print("Sin autorizacion de revision; se abre normalmente, sin adaptar.", file=sys.stderr)
+
+
+def main(args):
+    binary = shutil.which(os.environ.get("OPENCODE_BIN", "opencode"))
+    if not binary:
+        print("[error] Binario OpenCode no encontrado.", file=sys.stderr)
+        return 127
+    if Path(binary).resolve() == Path(__file__).resolve() or os.environ.get("OPENCODE_CHECKED_ACTIVE"):
+        print("[error] Recursion del lanzador rechazada.", file=sys.stderr)
+        return 126
+    # Cualquier argumento evita preguntas: incluye comandos no interactivos y rutas.
+    check(binary, Path.home() / ".config/opencode/.opencode-version.pin",
+          not args and sys.stdin.isatty() and sys.stderr.isatty())
+    env = os.environ.copy()
+    env["OPENCODE_CHECKED_ACTIVE"] = "1"
+    try:
+        os.execve(binary, [binary, *args], env)
+    except OSError:
+        print("[error] No se pudo abrir OpenCode.", file=sys.stderr)
+        return 126
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

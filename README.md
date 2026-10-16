@@ -13,6 +13,25 @@ y flujo de trabajo ODD, en Python stdlib, para una máquina de 8 GB.
 
 ## Qué es
 
+### Abrir con aviso de version (opcional)
+
+Ejecuta `~/opencode-ecosystem/opencode-checked` en lugar de `opencode`.
+Compara con `~/.config/opencode/.opencode-version.pin` mediante una consulta
+local `--version` (timeout de 3 segundos). Con el mismo pin no imprime nada.
+Si difiere, muestra ambas versiones y pregunta **solo sin argumentos y con
+stdin/stderr en TTY**. Con argumentos (incluidos rutas, `run`, `--help` y
+`--version`) o sin TTY, informa sin preguntar. Conserva argumentos y exit code.
+
+Aceptar autoriza solamente una revision: **no comunica consentimiento al agente**.
+Pide la revision en el chat; no se inyecta ningun prompt, no se cambia el pin,
+no se adapta ni actualiza nada. Rechazo/EOF abre normalmente sin adaptar.
+Pin ausente/invalido o probe fallido avisan y dejan abrir sin inferir permiso.
+`OPENCODE_BIN` permite seleccionar el binario; apuntar al lanzador se rechaza.
+
+No instala alias, perfiles ni plugins: el binario directo `opencode` sigue
+disponible sin este aviso. No cubre web/API ni sesiones nuevas dentro de una
+TUI ya abierta. No se requiere sync para este ejecutable del repositorio.
+
 Repo local (y privado) que contiene **todo** lo que OpenCode necesita para trabajar
 con disciplina: reglas del agente, skills curadas, plantillas de memoria, scripts de
 higiene y calidad, y un plano de control que observa el runtime real y lanza
